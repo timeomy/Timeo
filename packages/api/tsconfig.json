@@ -1,0 +1,9 @@
+{
+  "extends": "@timeo/config-ts/tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "./dist"
+  },
+  "include": ["convex/**/*.ts"],
+  "exclude": ["node_modules", "dist", "convex/_generated"]
+}

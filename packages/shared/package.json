@@ -1,0 +1,16 @@
+{
+  "name": "@timeo/shared",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/"
+  },
+  "devDependencies": {
+    "@timeo/config-ts": "workspace:*",
+    "@timeo/config-eslint": "workspace:*",
+    "typescript": "^5.3.3"
+  }
+}

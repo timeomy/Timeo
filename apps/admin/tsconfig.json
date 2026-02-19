@@ -1,0 +1,12 @@
+{
+  "extends": "@timeo/config-ts/tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@timeo/api": ["../../packages/api"],
+      "@timeo/ui": ["../../packages/ui/src"],
+      "@timeo/shared": ["../../packages/shared/src"],
+      "@timeo/auth": ["../../packages/auth/src"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
+}
