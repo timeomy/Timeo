@@ -5,6 +5,7 @@ const nextConfig = {
     "@timeo/shared",
     "@timeo/auth",
     "@timeo/api",
+    "@timeo/payments",
   ],
 };
 

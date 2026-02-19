@@ -296,6 +296,72 @@ export const getUserPushTokens = internalQuery({
   },
 });
 
+export const getBookingWithDetails = internalQuery({
+  args: { bookingId: v.id("bookings") },
+  handler: async (ctx, args) => {
+    const booking = await ctx.db.get(args.bookingId);
+    if (!booking) return null;
+
+    const customer = await ctx.db.get(booking.customerId);
+    const service = await ctx.db.get(booking.serviceId);
+    const staff = booking.staffId ? await ctx.db.get(booking.staffId) : null;
+    const tenant = await ctx.db.get(booking.tenantId);
+
+    return {
+      ...booking,
+      customerName: customer?.name ?? "Unknown",
+      customerEmail: customer?.email ?? "",
+      serviceName: service?.name ?? "Unknown",
+      staffName: staff?.name,
+      tenantName: tenant?.name ?? "Unknown",
+    };
+  },
+});
+
+export const getOrderWithDetails = internalQuery({
+  args: { orderId: v.id("orders") },
+  handler: async (ctx, args) => {
+    const order = await ctx.db.get(args.orderId);
+    if (!order) return null;
+
+    const customer = await ctx.db.get(order.customerId);
+    const items = await ctx.db
+      .query("orderItems")
+      .withIndex("by_order", (q) => q.eq("orderId", args.orderId))
+      .collect();
+    const tenant = await ctx.db.get(order.tenantId);
+
+    return {
+      ...order,
+      customerName: customer?.name ?? "Unknown",
+      customerEmail: customer?.email ?? "",
+      items,
+      tenantName: tenant?.name ?? "Unknown",
+    };
+  },
+});
+
+export const getUserInternal = internalQuery({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.userId);
+  },
+});
+
+export const getTenantInternal = internalQuery({
+  args: { tenantId: v.id("tenants") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.tenantId);
+  },
+});
+
+export const getPaymentInternal = internalQuery({
+  args: { paymentId: v.id("payments") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.paymentId);
+  },
+});
+
 export const getUpcomingBookingsForReminder = internalQuery({
   args: {},
   handler: async (ctx) => {

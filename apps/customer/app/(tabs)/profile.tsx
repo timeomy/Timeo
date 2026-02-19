@@ -9,6 +9,7 @@ import {
   ShoppingCart,
   CalendarDays,
   Shield,
+  Bell,
 } from "lucide-react-native";
 import {
   Screen,
@@ -221,6 +222,25 @@ export default function ProfileScreen() {
               </Text>
             </View>
           ) : null}
+          <ChevronRight size={18} color={theme.colors.textSecondary} />
+        </TouchableOpacity>
+        <Separator />
+        <TouchableOpacity
+          onPress={() => router.push("/notifications/")}
+          className="flex-row items-center py-3"
+        >
+          <View
+            className="mr-3 rounded-lg p-2"
+            style={{ backgroundColor: theme.colors.warning + "15" }}
+          >
+            <Bell size={18} color={theme.colors.warning} />
+          </View>
+          <Text
+            className="flex-1 text-base"
+            style={{ color: theme.colors.text }}
+          >
+            Notifications
+          </Text>
           <ChevronRight size={18} color={theme.colors.textSecondary} />
         </TouchableOpacity>
       </Card>

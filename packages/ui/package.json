@@ -24,6 +24,8 @@
   },
   "peerDependencies": {
     "expo": "*",
+    "expo-constants": "*",
+    "expo-notifications": "*",
     "nativewind": "*",
     "react": "*",
     "react-native": "*"

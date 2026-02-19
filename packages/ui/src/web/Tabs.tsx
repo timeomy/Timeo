@@ -14,20 +14,31 @@ const TabsContext = React.createContext<TabsContextValue>({
 });
 
 export interface TabsProps extends React.HTMLAttributes<HTMLDivElement> {
-  value: string;
-  onValueChange: (value: string) => void;
+  value?: string;
+  onValueChange?: (value: string) => void;
   defaultValue?: string;
 }
 
 function Tabs({
-  value,
+  value: controlledValue,
   onValueChange,
+  defaultValue = "",
   className,
   children,
   ...props
 }: TabsProps) {
+  const [uncontrolledValue, setUncontrolledValue] = React.useState(defaultValue);
+  const value = controlledValue ?? uncontrolledValue;
+  const handleChange = React.useCallback(
+    (v: string) => {
+      onValueChange?.(v);
+      if (controlledValue === undefined) setUncontrolledValue(v);
+    },
+    [controlledValue, onValueChange]
+  );
+
   return (
-    <TabsContext.Provider value={{ value, onValueChange }}>
+    <TabsContext.Provider value={{ value, onValueChange: handleChange }}>
       <div className={cn("w-full", className)} {...props}>
         {children}
       </div>

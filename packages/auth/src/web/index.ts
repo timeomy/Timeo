@@ -1,6 +1,5 @@
-// Web (Next.js) auth exports
+// Web (Next.js) client-safe auth exports
 export { TimeoWebAuthProvider, useTimeoWebAuthContext, useTimeoWebTenantContext } from "./provider";
-export { timeoMiddleware, middlewareMatcher } from "./middleware";
 
 // Re-export shared types and utils for convenience
 export type { TimeoAuthContext, TenantSwitcherContext, TimeoRole, TenantInfo, RoleContext } from "../types";

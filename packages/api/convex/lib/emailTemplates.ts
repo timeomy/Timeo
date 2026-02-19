@@ -42,13 +42,6 @@ const cardStyles = `
   margin: 24px 0;
 `;
 
-const detailRowStyles = `
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px solid #E2E8F0;
-`;
-
 const labelStyles = `
   color: #64748B;
   font-size: 14px;
@@ -58,17 +51,6 @@ const valueStyles = `
   color: #1E293B;
   font-size: 14px;
   font-weight: 600;
-`;
-
-const buttonStyles = `
-  display: inline-block;
-  background-color: #1A56DB;
-  color: #ffffff;
-  padding: 12px 32px;
-  border-radius: 8px;
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 14px;
 `;
 
 const footerStyles = `

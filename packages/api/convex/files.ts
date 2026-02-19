@@ -134,7 +134,7 @@ export const updateEntityImage = mutation({
 
     switch (args.entityType) {
       case "product": {
-        const product = await ctx.db.get(args.entityId as any);
+        const product = await ctx.db.get(args.entityId as any) as any;
         if (!product) throw new Error("Product not found");
         await requireRole(ctx, product.tenantId, ["admin", "staff"]);
         await ctx.db.patch(args.entityId as any, {
@@ -144,7 +144,7 @@ export const updateEntityImage = mutation({
         break;
       }
       case "service": {
-        const service = await ctx.db.get(args.entityId as any);
+        const service = await ctx.db.get(args.entityId as any) as any;
         if (!service) throw new Error("Service not found");
         await requireRole(ctx, service.tenantId, ["admin", "staff"]);
         await ctx.db.patch(args.entityId as any, {
@@ -161,7 +161,7 @@ export const updateEntityImage = mutation({
         break;
       }
       case "tenant": {
-        const tenant = await ctx.db.get(args.entityId as any);
+        const tenant = await ctx.db.get(args.entityId as any) as any;
         if (!tenant) throw new Error("Tenant not found");
         await requireRole(ctx, tenant._id, ["admin"]);
         await ctx.db.patch(tenant._id, {

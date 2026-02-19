@@ -1,6 +1,8 @@
-import { action, internalAction } from "../_generated/server";
+"use node";
+
+import { internalAction } from "../_generated/server";
 import { v } from "convex/values";
-import { api, internal } from "../_generated/api";
+import { internal } from "../_generated/api";
 import {
   bookingConfirmationTemplate,
   bookingReminderTemplate,
@@ -98,14 +100,11 @@ async function sendExpoPush(
 export const sendBookingConfirmation = internalAction({
   args: { bookingId: v.id("bookings") },
   handler: async (ctx, args) => {
-    const booking = await ctx.runQuery(api.bookings.getById, {
-      bookingId: args.bookingId,
-    });
+    const booking = await ctx.runQuery(
+      internal.notifications.getBookingWithDetails,
+      { bookingId: args.bookingId }
+    );
     if (!booking) return;
-
-    const tenant = await ctx.runQuery(api.tenants.getById, {
-      tenantId: booking.tenantId,
-    });
 
     const prefs = await ctx.runQuery(internal.notifications.getUserPreferences, {
       userId: booking.customerId,
@@ -130,7 +129,7 @@ export const sendBookingConfirmation = internalAction({
         staffName: booking.staffName ?? undefined,
         startTime: booking.startTime,
         endTime: booking.endTime,
-        tenantName: tenant?.name ?? "Your provider",
+        tenantName: booking.tenantName,
         notes: booking.notes ?? undefined,
       });
       await sendEmailViaResend(
@@ -148,7 +147,7 @@ export const sendBookingConfirmation = internalAction({
       );
       if (tokens.length > 0) {
         await sendExpoPush(
-          tokens.map((t) => t.token),
+          tokens.map((t: any) => t.token),
           "Booking Confirmed",
           `Your ${booking.serviceName} appointment is confirmed.`,
           { bookingId: args.bookingId, type: "booking_confirmed" }
@@ -165,14 +164,11 @@ export const sendBookingCancellation = internalAction({
     reason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const booking = await ctx.runQuery(api.bookings.getById, {
-      bookingId: args.bookingId,
-    });
+    const booking = await ctx.runQuery(
+      internal.notifications.getBookingWithDetails,
+      { bookingId: args.bookingId }
+    );
     if (!booking) return;
-
-    const tenant = await ctx.runQuery(api.tenants.getById, {
-      tenantId: booking.tenantId,
-    });
 
     // Notify the customer
     await ctx.runMutation(internal.notifications.createNotification, {
@@ -191,7 +187,7 @@ export const sendBookingCancellation = internalAction({
         staffName: booking.staffName ?? undefined,
         startTime: booking.startTime,
         endTime: booking.endTime,
-        tenantName: tenant?.name ?? "Your provider",
+        tenantName: booking.tenantName,
         reason: args.reason,
         cancelledBy:
           args.cancelledByUserId === booking.customerId ? "customer" : "staff",
@@ -210,7 +206,7 @@ export const sendBookingCancellation = internalAction({
     );
     if (tokens.length > 0) {
       await sendExpoPush(
-        tokens.map((t) => t.token),
+        tokens.map((t: any) => t.token),
         "Booking Cancelled",
         `Your ${booking.serviceName} appointment was cancelled.`,
         { bookingId: args.bookingId, type: "booking_cancelled" }
@@ -237,14 +233,11 @@ export const sendBookingCancellation = internalAction({
 export const sendBookingReminder = internalAction({
   args: { bookingId: v.id("bookings") },
   handler: async (ctx, args) => {
-    const booking = await ctx.runQuery(api.bookings.getById, {
-      bookingId: args.bookingId,
-    });
+    const booking = await ctx.runQuery(
+      internal.notifications.getBookingWithDetails,
+      { bookingId: args.bookingId }
+    );
     if (!booking) return;
-
-    const tenant = await ctx.runQuery(api.tenants.getById, {
-      tenantId: booking.tenantId,
-    });
 
     const prefs = await ctx.runQuery(internal.notifications.getUserPreferences, {
       userId: booking.customerId,
@@ -269,7 +262,7 @@ export const sendBookingReminder = internalAction({
         staffName: booking.staffName ?? undefined,
         startTime: booking.startTime,
         endTime: booking.endTime,
-        tenantName: tenant?.name ?? "Your provider",
+        tenantName: booking.tenantName,
       });
       await sendEmailViaResend(
         booking.customerEmail,
@@ -286,7 +279,7 @@ export const sendBookingReminder = internalAction({
       );
       if (tokens.length > 0) {
         await sendExpoPush(
-          tokens.map((t) => t.token),
+          tokens.map((t: any) => t.token),
           "Upcoming Appointment",
           `Your ${booking.serviceName} appointment is starting soon!`,
           { bookingId: args.bookingId, type: "booking_reminder" }
@@ -302,14 +295,11 @@ export const sendOrderUpdate = internalAction({
     newStatus: v.string(),
   },
   handler: async (ctx, args) => {
-    const order = await ctx.runQuery(api.orders.getById, {
-      orderId: args.orderId,
-    });
+    const order = await ctx.runQuery(
+      internal.notifications.getOrderWithDetails,
+      { orderId: args.orderId }
+    );
     if (!order) return;
-
-    const tenant = await ctx.runQuery(api.tenants.getById, {
-      tenantId: order.tenantId,
-    });
 
     const statusLabels: Record<string, string> = {
       confirmed: "confirmed",
@@ -326,7 +316,7 @@ export const sendOrderUpdate = internalAction({
       tenantId: order.tenantId,
       type: "order_update",
       title: `Order ${statusText.charAt(0).toUpperCase() + statusText.slice(1)}`,
-      body: `Your order at ${tenant?.name ?? "the store"} is ${statusText}.`,
+      body: `Your order at ${order.tenantName} is ${statusText}.`,
       data: { orderId: args.orderId, status: args.newStatus },
     });
 
@@ -348,7 +338,7 @@ export const sendOrderUpdate = internalAction({
             quantity: item.quantity,
             price: item.snapshotPrice,
           })),
-          tenantName: tenant?.name ?? "Store",
+          tenantName: order.tenantName,
         },
         args.newStatus
       );
@@ -367,7 +357,7 @@ export const sendOrderUpdate = internalAction({
       );
       if (tokens.length > 0) {
         await sendExpoPush(
-          tokens.map((t) => t.token),
+          tokens.map((t: any) => t.token),
           `Order ${statusText.charAt(0).toUpperCase() + statusText.slice(1)}`,
           `Your order is ${statusText}.`,
           { orderId: args.orderId, type: "order_update" }
@@ -385,9 +375,11 @@ export const sendStaffInvitation = internalAction({
     role: v.string(),
   },
   handler: async (ctx, args) => {
-    const tenant = await ctx.runQuery(api.tenants.getById, {
-      tenantId: args.tenantId,
-    });
+    const tenant = await ctx.runQuery(
+      internal.notifications.getTenantInternal,
+      { tenantId: args.tenantId }
+    );
+    const tenantName = tenant?.name ?? "an organization";
 
     // In-app notification
     await ctx.runMutation(internal.notifications.createNotification, {
@@ -395,23 +387,24 @@ export const sendStaffInvitation = internalAction({
       tenantId: args.tenantId,
       type: "staff_invitation",
       title: "You're Invited!",
-      body: `${args.inviterName} invited you to join ${tenant?.name ?? "an organization"} as ${args.role}.`,
+      body: `${args.inviterName} invited you to join ${tenantName} as ${args.role}.`,
       data: { tenantId: args.tenantId, role: args.role },
     });
 
     // Get invited user's email
-    const invitedUser = await ctx.runQuery(api.users.getById, {
-      userId: args.invitedUserId,
-    });
+    const invitedUser = await ctx.runQuery(
+      internal.notifications.getUserInternal,
+      { userId: args.invitedUserId }
+    );
     if (invitedUser?.email) {
       const html = staffInvitationTemplate(
-        tenant?.name ?? "an organization",
+        tenantName,
         args.inviterName,
         args.role
       );
       await sendEmailViaResend(
         invitedUser.email,
-        `You're invited to join ${tenant?.name ?? "Timeo"}`,
+        `You're invited to join ${tenantName}`,
         html
       );
     }
@@ -423,9 +416,9 @@ export const sendStaffInvitation = internalAction({
     );
     if (tokens.length > 0) {
       await sendExpoPush(
-        tokens.map((t) => t.token),
+        tokens.map((t: any) => t.token),
         "You're Invited!",
-        `Join ${tenant?.name ?? "a team"} as ${args.role}`,
+        `Join ${tenantName} as ${args.role}`,
         { tenantId: args.tenantId, type: "staff_invitation" }
       );
     }
@@ -435,17 +428,20 @@ export const sendStaffInvitation = internalAction({
 export const sendPaymentReceipt = internalAction({
   args: { paymentId: v.id("payments") },
   handler: async (ctx, args) => {
-    const payment = await ctx.runQuery(api.payments.getById, {
-      paymentId: args.paymentId,
-    });
+    const payment = await ctx.runQuery(
+      internal.notifications.getPaymentInternal,
+      { paymentId: args.paymentId }
+    );
     if (!payment) return;
 
-    const tenant = await ctx.runQuery(api.tenants.getById, {
-      tenantId: payment.tenantId,
-    });
-    const customer = await ctx.runQuery(api.users.getById, {
-      userId: payment.customerId,
-    });
+    const tenant = await ctx.runQuery(
+      internal.notifications.getTenantInternal,
+      { tenantId: payment.tenantId }
+    );
+    const customer = await ctx.runQuery(
+      internal.notifications.getUserInternal,
+      { userId: payment.customerId }
+    );
     if (!customer) return;
 
     // In-app
@@ -481,7 +477,7 @@ export const sendPaymentReceipt = internalAction({
     );
     if (tokens.length > 0) {
       await sendExpoPush(
-        tokens.map((t) => t.token),
+        tokens.map((t: any) => t.token),
         "Payment Confirmed",
         `${payment.currency} ${payment.amount.toFixed(2)} received.`,
         { paymentId: args.paymentId, type: "payment_received" }
@@ -492,7 +488,7 @@ export const sendPaymentReceipt = internalAction({
 
 export const sendBookingReminders = internalAction({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<{ reminded: number }> => {
     const bookings = await ctx.runQuery(
       internal.notifications.getUpcomingBookingsForReminder,
       {}
@@ -524,7 +520,7 @@ export const sendPushNotification = internalAction({
     if (tokens.length === 0) return { sent: false };
 
     const sent = await sendExpoPush(
-      tokens.map((t) => t.token),
+      tokens.map((t: any) => t.token),
       args.title,
       args.body,
       args.data

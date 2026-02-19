@@ -498,7 +498,7 @@ export const getCustomerAnalytics = query({
         const user = await ctx.db.get(customerId as any);
         return {
           customerId,
-          name: user?.name ?? "Unknown",
+          name: (user as any)?.name ?? "Unknown",
           totalSpent: stats.totalSpent,
           bookingCount: stats.bookingCount,
         };

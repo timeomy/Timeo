@@ -82,10 +82,12 @@ export default function SettingsScreen() {
   const [secondaryColor, setSecondaryColor] = useState("");
   const [savingBranding, setSavingBranding] = useState(false);
 
-  // Notification toggle state (placeholder)
-  const [notifyBookings, setNotifyBookings] = useState(true);
-  const [notifyOrders, setNotifyOrders] = useState(true);
-  const [notifyStaff, setNotifyStaff] = useState(false);
+  // Notification preferences
+  const notifPrefs = useQuery(
+    api.notifications.getPreferences,
+    tenantId ? { tenantId: tenantId as any } : "skip"
+  );
+  const updateNotifPrefs = useMutation(api.notifications.updatePreferences);
 
   const [toast, setToast] = useState<{
     message: string;
@@ -701,23 +703,62 @@ export default function SettingsScreen() {
             <View className="mt-3">
               <Card>
                 <Switch
-                  label="New booking notifications"
-                  value={notifyBookings}
-                  onValueChange={setNotifyBookings}
+                  label="Booking confirmation emails"
+                  value={notifPrefs?.emailBookingConfirm ?? true}
+                  onValueChange={(val: boolean) =>
+                    updateNotifPrefs({
+                      tenantId: tenantId as any,
+                      emailBookingConfirm: val,
+                    })
+                  }
                   className="mb-4"
                 />
                 <Separator className="mb-4" />
                 <Switch
-                  label="New order notifications"
-                  value={notifyOrders}
-                  onValueChange={setNotifyOrders}
+                  label="Booking reminder emails"
+                  value={notifPrefs?.emailBookingReminder ?? true}
+                  onValueChange={(val: boolean) =>
+                    updateNotifPrefs({
+                      tenantId: tenantId as any,
+                      emailBookingReminder: val,
+                    })
+                  }
                   className="mb-4"
                 />
                 <Separator className="mb-4" />
                 <Switch
-                  label="Staff activity alerts"
-                  value={notifyStaff}
-                  onValueChange={setNotifyStaff}
+                  label="Order update emails"
+                  value={notifPrefs?.emailOrderUpdate ?? true}
+                  onValueChange={(val: boolean) =>
+                    updateNotifPrefs({
+                      tenantId: tenantId as any,
+                      emailOrderUpdate: val,
+                    })
+                  }
+                  className="mb-4"
+                />
+                <Separator className="mb-4" />
+                <Switch
+                  label="Push notifications"
+                  value={notifPrefs?.pushEnabled ?? true}
+                  onValueChange={(val: boolean) =>
+                    updateNotifPrefs({
+                      tenantId: tenantId as any,
+                      pushEnabled: val,
+                    })
+                  }
+                  className="mb-4"
+                />
+                <Separator className="mb-4" />
+                <Switch
+                  label="In-app notifications"
+                  value={notifPrefs?.inAppEnabled ?? true}
+                  onValueChange={(val: boolean) =>
+                    updateNotifPrefs({
+                      tenantId: tenantId as any,
+                      inAppEnabled: val,
+                    })
+                  }
                 />
               </Card>
               <Spacer size={8} />
@@ -725,8 +766,7 @@ export default function SettingsScreen() {
                 className="text-center text-xs"
                 style={{ color: theme.colors.textSecondary }}
               >
-                Notification settings are saved locally. Push notifications
-                coming soon.
+                Changes are saved automatically.
               </Text>
             </View>
           )}

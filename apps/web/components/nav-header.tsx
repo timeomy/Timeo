@@ -10,6 +10,7 @@ import {
   AvatarImage,
   AvatarFallback,
   Separator,
+  NotificationBell,
   cn,
 } from "@timeo/ui/web";
 import { getInitials } from "@timeo/shared";
@@ -24,7 +25,10 @@ import {
   LogOut,
   ChevronDown,
   Package,
+  Bell,
 } from "lucide-react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@timeo/api";
 
 const navLinks = [
   { href: "/services", label: "Services", icon: Calendar },
@@ -32,6 +36,64 @@ const navLinks = [
   { href: "/bookings", label: "Bookings", icon: ClipboardList },
   { href: "/orders", label: "Orders", icon: Package },
 ];
+
+function NotificationBellWidget() {
+  const unreadCount = useQuery(api.notifications.getUnreadCount) ?? 0;
+  const result = useQuery(api.notifications.listByUser, { limit: 5 });
+  const markAsRead = useMutation(api.notifications.markAsRead);
+
+  const notifications = result?.notifications ?? [];
+
+  return (
+    <NotificationBell unreadCount={unreadCount}>
+      <div className="max-h-96 overflow-y-auto">
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <span className="text-sm font-semibold">Notifications</span>
+          <Link
+            href="/notifications"
+            className="text-xs font-medium text-primary hover:underline"
+          >
+            View all
+          </Link>
+        </div>
+        {notifications.length === 0 ? (
+          <div className="flex flex-col items-center py-8 text-center">
+            <Bell className="mb-2 h-6 w-6 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">No notifications</p>
+          </div>
+        ) : (
+          <div className="divide-y">
+            {notifications.map((n: any) => (
+              <button
+                key={n._id}
+                onClick={() => {
+                  if (!n.read) markAsRead({ notificationId: n._id });
+                }}
+                className={`flex w-full items-start gap-2 px-4 py-3 text-left transition-colors hover:bg-accent/50 ${
+                  !n.read ? "bg-accent/30" : ""
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <p
+                    className={`text-sm ${n.read ? "font-normal" : "font-semibold"}`}
+                  >
+                    {n.title}
+                  </p>
+                  <p className="text-xs text-muted-foreground line-clamp-1">
+                    {n.body}
+                  </p>
+                </div>
+                {!n.read && (
+                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </NotificationBell>
+  );
+}
 
 export function NavHeader() {
   const pathname = usePathname();
@@ -84,11 +146,13 @@ export function NavHeader() {
           {!isLoaded ? (
             <div className="h-8 w-20 animate-pulse rounded-md bg-muted" />
           ) : isSignedIn ? (
-            <div className="relative">
-              <button
-                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent"
-              >
+            <>
+              <NotificationBellWidget />
+              <div className="relative">
+                <button
+                  onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent"
+                >
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user.imageUrl} alt={displayName} />
                   <AvatarFallback className="text-xs">
@@ -137,6 +201,7 @@ export function NavHeader() {
                 </>
               )}
             </div>
+            </>
           ) : (
             <>
               <Link href="/sign-in">

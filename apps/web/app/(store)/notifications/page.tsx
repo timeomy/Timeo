@@ -6,11 +6,7 @@ import { useCallback } from "react";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
   Button,
-  Separator,
-  Badge,
 } from "@timeo/ui/web";
 import {
   Bell,

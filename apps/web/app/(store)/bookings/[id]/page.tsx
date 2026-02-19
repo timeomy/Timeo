@@ -373,7 +373,7 @@ export default function BookingDetailPage() {
                 </p>
               ) : (
                 <div className="relative space-y-0">
-                  {events.map((event, index) => (
+                  {events.map((event: any, index: number) => (
                     <div key={event._id} className="relative flex gap-3 pb-6 last:pb-0">
                       {/* Connector line */}
                       {index < events.length - 1 && (

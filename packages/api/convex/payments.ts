@@ -1,4 +1,4 @@
-import { query, mutation, action, internalMutation } from "./_generated/server";
+import { query, mutation, action, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import {
@@ -9,6 +9,16 @@ import {
 import { paymentStatusValidator, subscriptionStatusValidator } from "./validators";
 
 // ─── QUERIES ───
+
+export const getById = query({
+  args: { paymentId: v.id("payments") },
+  handler: async (ctx, args) => {
+    const payment = await ctx.db.get(args.paymentId);
+    if (!payment) throw new Error("Payment not found");
+    await requireTenantAccess(ctx, payment.tenantId);
+    return payment;
+  },
+});
 
 export const getPaymentsByOrder = query({
   args: { orderId: v.id("orders") },
@@ -349,7 +359,7 @@ export const createPaymentIntent = action({
 
     const Stripe = (await import("stripe")).default;
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-      apiVersion: "2025-01-27.acacia",
+      apiVersion: "2025-02-24.acacia",
     });
 
     // Check if tenant has a connected account for destination charges
@@ -409,7 +419,7 @@ export const createCheckoutSession = action({
   handler: async (ctx, args) => {
     const Stripe = (await import("stripe")).default;
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-      apiVersion: "2025-01-27.acacia",
+      apiVersion: "2025-02-24.acacia",
     });
 
     const membership = await ctx.runQuery(
@@ -465,7 +475,7 @@ export const refundPayment = action({
   handler: async (ctx, args) => {
     const Stripe = (await import("stripe")).default;
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-      apiVersion: "2025-01-27.acacia",
+      apiVersion: "2025-02-24.acacia",
     });
 
     const payment = await ctx.runQuery(
@@ -496,7 +506,7 @@ export const createConnectAccount = action({
   handler: async (ctx, args) => {
     const Stripe = (await import("stripe")).default;
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-      apiVersion: "2025-01-27.acacia",
+      apiVersion: "2025-02-24.acacia",
     });
 
     const tenant = await ctx.runQuery(
@@ -532,7 +542,7 @@ export const getConnectOnboardingLink = action({
   handler: async (ctx, args) => {
     const Stripe = (await import("stripe")).default;
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-      apiVersion: "2025-01-27.acacia",
+      apiVersion: "2025-02-24.acacia",
     });
 
     const stripeAccount = await ctx.runQuery(
@@ -557,7 +567,7 @@ export const getConnectOnboardingLink = action({
 
 // ─── INTERNAL QUERIES (used by actions) ───
 
-export const getStripeAccountInternal = query({
+export const getStripeAccountInternal = internalQuery({
   args: { tenantId: v.id("tenants") },
   handler: async (ctx, args) => {
     return await ctx.db
@@ -567,21 +577,21 @@ export const getStripeAccountInternal = query({
   },
 });
 
-export const getPaymentInternal = query({
+export const getPaymentInternal = internalQuery({
   args: { paymentId: v.id("payments") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.paymentId);
   },
 });
 
-export const getMembershipInternal = query({
+export const getMembershipInternal = internalQuery({
   args: { membershipId: v.id("memberships") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.membershipId);
   },
 });
 
-export const getTenantInternal = query({
+export const getTenantInternal = internalQuery({
   args: { tenantId: v.id("tenants") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.tenantId);
