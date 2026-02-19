@@ -13,6 +13,7 @@ import {
   Badge,
   Skeleton,
   Separator,
+  ConvexImage,
 } from "@timeo/ui/web";
 import {
   ArrowLeft,
@@ -86,17 +87,14 @@ export default function ProductDetailPage() {
 
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Product Image */}
-        <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border bg-muted/30">
-          {product.imageUrl ? (
-            <img
-              src={product.imageUrl}
-              alt={product.name}
-              className="h-full w-full object-cover"
-            />
-          ) : (
+        <ConvexImage
+          url={product.imageUrl}
+          alt={product.name}
+          className="aspect-square w-full"
+          fallback={
             <ShoppingBag className="h-24 w-24 text-muted-foreground/20" />
-          )}
-        </div>
+          }
+        />
 
         {/* Product Info */}
         <div className="flex flex-col">

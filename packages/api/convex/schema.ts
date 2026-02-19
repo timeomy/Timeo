@@ -77,6 +77,7 @@ export default defineSchema({
     durationMinutes: v.number(),
     price: v.number(),
     currency: v.string(),
+    imageUrl: v.optional(v.string()),
     isActive: v.boolean(),
     createdBy: v.id("users"),
     createdAt: v.number(),
@@ -146,6 +147,7 @@ export default defineSchema({
     customerId: v.id("users"),
     status: v.union(
       v.literal("pending"),
+      v.literal("awaiting_payment"),
       v.literal("confirmed"),
       v.literal("preparing"),
       v.literal("ready"),
@@ -208,4 +210,166 @@ export default defineSchema({
   })
     .index("by_tenant", ["tenantId"])
     .index("by_actor", ["actorId"]),
+
+  staffAvailability: defineTable({
+    staffId: v.id("users"),
+    tenantId: v.id("tenants"),
+    dayOfWeek: v.number(), // 0-6, 0=Sunday
+    startTime: v.string(), // "HH:mm"
+    endTime: v.string(), // "HH:mm"
+    isAvailable: v.boolean(),
+  })
+    .index("by_staff", ["staffId"])
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_day", ["tenantId", "dayOfWeek"]),
+
+  businessHours: defineTable({
+    tenantId: v.id("tenants"),
+    dayOfWeek: v.number(), // 0-6, 0=Sunday
+    openTime: v.string(), // "HH:mm"
+    closeTime: v.string(), // "HH:mm"
+    isOpen: v.boolean(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_day", ["tenantId", "dayOfWeek"]),
+
+  blockedSlots: defineTable({
+    tenantId: v.id("tenants"),
+    staffId: v.optional(v.id("users")),
+    startTime: v.number(), // unix ms
+    endTime: v.number(), // unix ms
+    reason: v.string(),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_staff", ["staffId"])
+    .index("by_tenant_daterange", ["tenantId", "startTime"]),
+
+  payments: defineTable({
+    tenantId: v.id("tenants"),
+    customerId: v.id("users"),
+    orderId: v.optional(v.id("orders")),
+    bookingId: v.optional(v.id("bookings")),
+    stripePaymentIntentId: v.string(),
+    amount: v.number(),
+    currency: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+      v.literal("refunded")
+    ),
+    metadata: v.optional(v.any()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_customer", ["customerId"])
+    .index("by_order", ["orderId"])
+    .index("by_booking", ["bookingId"])
+    .index("by_stripe_pi", ["stripePaymentIntentId"]),
+
+  subscriptions: defineTable({
+    tenantId: v.id("tenants"),
+    customerId: v.id("users"),
+    membershipId: v.id("memberships"),
+    stripeSubscriptionId: v.string(),
+    stripeCustomerId: v.string(),
+    status: v.union(
+      v.literal("active"),
+      v.literal("past_due"),
+      v.literal("canceled"),
+      v.literal("incomplete")
+    ),
+    currentPeriodStart: v.number(),
+    currentPeriodEnd: v.number(),
+    cancelAtPeriodEnd: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_customer", ["customerId"])
+    .index("by_membership", ["membershipId"])
+    .index("by_stripe_sub", ["stripeSubscriptionId"]),
+
+  stripeAccounts: defineTable({
+    tenantId: v.id("tenants"),
+    stripeAccountId: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("active"),
+      v.literal("restricted")
+    ),
+    chargesEnabled: v.boolean(),
+    payoutsEnabled: v.boolean(),
+    createdAt: v.number(),
+  }).index("by_tenant", ["tenantId"]),
+
+  notifications: defineTable({
+    userId: v.id("users"),
+    tenantId: v.id("tenants"),
+    type: v.union(
+      v.literal("booking_confirmed"),
+      v.literal("booking_cancelled"),
+      v.literal("booking_reminder"),
+      v.literal("order_update"),
+      v.literal("staff_invitation"),
+      v.literal("payment_received"),
+      v.literal("system")
+    ),
+    title: v.string(),
+    body: v.string(),
+    data: v.optional(v.any()),
+    read: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_unread", ["userId", "read"])
+    .index("by_tenant", ["tenantId"]),
+
+  notificationPreferences: defineTable({
+    userId: v.id("users"),
+    tenantId: v.id("tenants"),
+    emailBookingConfirm: v.boolean(),
+    emailBookingReminder: v.boolean(),
+    emailOrderUpdate: v.boolean(),
+    pushEnabled: v.boolean(),
+    inAppEnabled: v.boolean(),
+  }).index("by_user_tenant", ["userId", "tenantId"]),
+
+  pushTokens: defineTable({
+    userId: v.id("users"),
+    token: v.string(),
+    platform: v.union(
+      v.literal("ios"),
+      v.literal("android"),
+      v.literal("web")
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_token", ["token"]),
+
+  files: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    uploadedBy: v.id("users"),
+    storageId: v.string(),
+    filename: v.string(),
+    mimeType: v.string(),
+    size: v.number(), // bytes
+    type: v.union(
+      v.literal("product_image"),
+      v.literal("service_image"),
+      v.literal("avatar"),
+      v.literal("logo"),
+      v.literal("document")
+    ),
+    entityId: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_entity", ["type", "entityId"])
+    .index("by_uploader", ["uploadedBy"]),
 });

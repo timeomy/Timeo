@@ -45,5 +45,28 @@ export {
   type TabsContentProps,
 } from "./Tabs";
 
+// Media Components
+export {
+  ImageUploader,
+  type WebImageUploaderProps as ImageUploaderProps,
+} from "./ImageUploader";
+export {
+  ConvexImage,
+  type WebConvexImageProps as ConvexImageProps,
+} from "./ConvexImage";
+
+// Charts
+export {
+  BarChart,
+  type BarChartProps,
+  type BarChartData,
+} from "./BarChart";
+
+// Notification Components
+export {
+  NotificationBell,
+  type WebNotificationBellProps as NotificationBellProps,
+} from "./NotificationBell";
+
 // Re-export utility
 export { cn } from "../lib/cn";

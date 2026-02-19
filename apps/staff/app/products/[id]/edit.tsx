@@ -12,6 +12,7 @@ import {
   Switch,
   Spacer,
   LoadingScreen,
+  ImageUploader,
 } from "@timeo/ui";
 import type { Id } from "@timeo/api";
 
@@ -31,10 +32,14 @@ export default function ProductEditScreen() {
 
   const createProduct = useMutation(api.products.create);
   const updateProduct = useMutation(api.products.update);
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const updateEntityImage = useMutation(api.files.updateEntityImage);
+  const saveFile = useMutation(api.files.saveFile);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
   const [initialized, setInitialized] = useState(isNew);
@@ -46,9 +51,35 @@ export default function ProductEditScreen() {
       setDescription(existingProduct.description);
       setPrice((existingProduct.price / 100).toFixed(2));
       setIsActive(existingProduct.isActive);
+      setImageUrl(existingProduct.imageUrl ?? null);
       setInitialized(true);
     }
   }, [existingProduct, initialized]);
+
+  const handleImageUpload = useCallback(
+    async (storageId: string) => {
+      if (!productId || isNew) return;
+      try {
+        await saveFile({
+          tenantId: tenantId ?? undefined,
+          filename: "product-image",
+          mimeType: "image/jpeg",
+          size: 0,
+          type: "product_image",
+          entityId: productId,
+          storageId,
+        });
+        await updateEntityImage({
+          entityType: "product",
+          entityId: productId,
+          storageId,
+        });
+      } catch {
+        Alert.alert("Error", "Failed to save image.");
+      }
+    },
+    [productId, isNew, tenantId, saveFile, updateEntityImage]
+  );
 
   const validate = useCallback((): string | null => {
     if (!name.trim()) return "Product name is required.";
@@ -135,6 +166,19 @@ export default function ProductEditScreen() {
           contentContainerStyle={{ paddingBottom: 40 }}
         >
           <Spacer size={8} />
+
+          <ImageUploader
+            label="Product Image"
+            generateUploadUrl={generateUploadUrl}
+            currentImageUrl={imageUrl}
+            onUpload={(storageId, url) => {
+              setImageUrl(url);
+              handleImageUpload(storageId);
+            }}
+            onRemove={() => setImageUrl(null)}
+          />
+
+          <Spacer size={16} />
 
           <Input
             label="Product Name"

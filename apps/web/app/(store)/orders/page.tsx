@@ -28,6 +28,7 @@ function getOrderStatusVariant(
     case "preparing":
       return "default";
     case "pending":
+    case "awaiting_payment":
       return "secondary";
     case "ready":
     case "completed":
@@ -43,6 +44,8 @@ function getOrderStatusLabel(status: string): string {
   switch (status) {
     case "pending":
       return "Pending";
+    case "awaiting_payment":
+      return "Awaiting Payment";
     case "confirmed":
       return "Confirmed";
     case "preparing":

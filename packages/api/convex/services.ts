@@ -42,6 +42,7 @@ export const create = mutation({
     durationMinutes: v.number(),
     price: v.number(),
     currency: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { user } = await requireRole(ctx, args.tenantId, ["admin", "staff"]);
@@ -54,6 +55,7 @@ export const create = mutation({
       durationMinutes: args.durationMinutes,
       price: args.price,
       currency: args.currency ?? "MYR",
+      imageUrl: args.imageUrl,
       isActive: true,
       createdBy: user._id,
       createdAt: now,
@@ -80,6 +82,7 @@ export const update = mutation({
     durationMinutes: v.optional(v.number()),
     price: v.optional(v.number()),
     currency: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const service = await ctx.db.get(args.serviceId);
@@ -97,6 +100,7 @@ export const update = mutation({
       updates.durationMinutes = args.durationMinutes;
     if (args.price !== undefined) updates.price = args.price;
     if (args.currency !== undefined) updates.currency = args.currency;
+    if (args.imageUrl !== undefined) updates.imageUrl = args.imageUrl;
 
     await ctx.db.patch(args.serviceId, updates);
 

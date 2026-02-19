@@ -69,6 +69,7 @@ export interface Service extends ConvexDocument {
   durationMinutes: number;
   price: number;
   currency: string;
+  imageUrl?: string;
   isActive: boolean;
   createdBy: string;
   createdAt: number;
@@ -171,6 +172,60 @@ export interface AuditLog extends ConvexDocument {
   timestamp: number;
 }
 
+// Scheduling types
+export interface StaffAvailability extends ConvexDocument {
+  staffId: string;
+  tenantId: string;
+  dayOfWeek: number; // 0-6, 0=Sunday
+  startTime: string; // "HH:mm"
+  endTime: string; // "HH:mm"
+  isAvailable: boolean;
+}
+
+export interface BusinessHours extends ConvexDocument {
+  tenantId: string;
+  dayOfWeek: number; // 0-6, 0=Sunday
+  openTime: string; // "HH:mm"
+  closeTime: string; // "HH:mm"
+  isOpen: boolean;
+}
+
+export interface BlockedSlot extends ConvexDocument {
+  tenantId: string;
+  staffId?: string;
+  startTime: number; // unix ms
+  endTime: number; // unix ms
+  reason: string;
+  createdBy: string;
+  createdAt: number;
+}
+
+export type FileType =
+  | "product_image"
+  | "service_image"
+  | "avatar"
+  | "logo"
+  | "document";
+
+export interface FileRecord extends ConvexDocument {
+  tenantId?: string;
+  uploadedBy: string;
+  storageId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  type: FileType;
+  entityId?: string;
+  createdAt: number;
+}
+
+export interface TimeSlot {
+  startTime: number; // unix ms
+  endTime: number; // unix ms
+  staffId: string;
+  staffName: string;
+}
+
 // DTO types for customer-facing queries
 export interface TenantPublicDTO {
   _id: string;
@@ -220,4 +275,96 @@ export interface SystemHealth {
   pendingBookings: number;
   pendingOrders: number;
   timestamp: number;
+}
+
+// ─── Analytics Types ──────────────────────────────────────────────────────────
+
+export type AnalyticsPeriod = "day" | "week" | "month" | "year";
+
+export interface RevenueOverview {
+  totalRevenue: number;
+  bookingRevenue: number;
+  orderRevenue: number;
+  percentChange: number;
+  revenueByDay: Array<{ date: string; amount: number }>;
+}
+
+export interface BookingAnalytics {
+  totalBookings: number;
+  completedBookings: number;
+  cancelledBookings: number;
+  noShows: number;
+  completionRate: number;
+  averageBookingsPerDay: number;
+  bookingsByStatus: Record<string, number>;
+  bookingsByDay: Array<{ date: string; count: number }>;
+  peakHours: Array<{ hour: number; count: number }>;
+}
+
+export interface OrderAnalytics {
+  totalOrders: number;
+  completedOrders: number;
+  averageOrderValue: number;
+  ordersByStatus: Record<string, number>;
+  ordersByDay: Array<{ date: string; count: number; revenue: number }>;
+}
+
+export interface TopService {
+  serviceId: string;
+  serviceName: string;
+  bookingCount: number;
+  revenue: number;
+  percentOfTotal: number;
+}
+
+export interface TopProduct {
+  productId: string;
+  productName: string;
+  unitsSold: number;
+  revenue: number;
+  percentOfTotal: number;
+}
+
+export interface CustomerAnalytics {
+  totalCustomers: number;
+  newCustomers: number;
+  returningCustomers: number;
+  topCustomers: Array<{
+    customerId: string;
+    name: string;
+    totalSpent: number;
+    bookingCount: number;
+  }>;
+}
+
+export interface StaffPerformance {
+  staffId: string;
+  staffName: string;
+  bookingsHandled: number;
+  completionRate: number;
+  revenue: number;
+}
+
+export interface PlatformOverview {
+  totalTenants: number;
+  activeTenants: number;
+  totalUsers: number;
+  totalBookings: number;
+  totalOrders: number;
+  totalRevenue: number;
+  tenantsByPlan: Record<string, number>;
+  growthMetrics: {
+    newTenantsThisMonth: number;
+    newTenantsLastMonth: number;
+    tenantGrowthPercent: number;
+    newUsersThisMonth: number;
+    newUsersLastMonth: number;
+    userGrowthPercent: number;
+  };
+}
+
+export interface TenantRanking {
+  tenantId: string;
+  tenantName: string;
+  value: number;
 }

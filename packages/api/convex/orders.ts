@@ -7,6 +7,7 @@ import {
 } from "./lib/middleware";
 import { insertAuditLog } from "./lib/helpers";
 import { orderStatusValidator } from "./validators";
+import { internal } from "./_generated/api";
 
 export const listByTenant = query({
   args: { tenantId: v.id("tenants") },
@@ -140,7 +141,7 @@ export const create = mutation({
     const orderId = await ctx.db.insert("orders", {
       tenantId: args.tenantId,
       customerId: user._id,
-      status: "pending",
+      status: "awaiting_payment",
       totalAmount,
       currency,
       notes: args.notes,
@@ -177,6 +178,7 @@ export const updateStatus = mutation({
     ]);
 
     const validTransitions: Record<string, string[]> = {
+      awaiting_payment: ["pending", "confirmed", "cancelled"],
       pending: ["confirmed", "cancelled"],
       confirmed: ["preparing", "cancelled"],
       preparing: ["ready", "cancelled"],
@@ -205,5 +207,12 @@ export const updateStatus = mutation({
       resourceId: args.orderId,
       metadata: { previousStatus: order.status },
     });
+
+    // Send order update notification
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.notifications.sendOrderUpdate,
+      { orderId: args.orderId, newStatus: args.status }
+    );
   },
 });

@@ -2,8 +2,23 @@ import "../global.css";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { TimeoAuthProvider } from "@timeo/auth";
-import { ThemeProvider } from "@timeo/ui";
+import { ThemeProvider, usePushNotifications } from "@timeo/ui";
 import Constants from "expo-constants";
+import { useMutation } from "convex/react";
+import { api } from "@timeo/api";
+import { useCallback } from "react";
+
+function PushRegistration() {
+  const registerPushToken = useMutation(api.notifications.registerPushToken);
+  const handleRegister = useCallback(
+    async (token: string, platform: "ios" | "android") => {
+      await registerPushToken({ token, platform });
+    },
+    [registerPushToken]
+  );
+  usePushNotifications(handleRegister);
+  return null;
+}
 
 export default function RootLayout() {
   return (
@@ -12,6 +27,7 @@ export default function RootLayout() {
       convexUrl={Constants.expoConfig?.extra?.convexUrl ?? ""}
     >
       <ThemeProvider>
+        <PushRegistration />
         <StatusBar style="auto" />
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(auth)" />
@@ -30,6 +46,10 @@ export default function RootLayout() {
           />
           <Stack.Screen
             name="logs/index"
+            options={{ presentation: "card" }}
+          />
+          <Stack.Screen
+            name="notifications/index"
             options={{ presentation: "card" }}
           />
         </Stack>

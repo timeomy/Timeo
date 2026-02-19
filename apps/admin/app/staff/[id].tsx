@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { View, Text, Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTimeoAuth } from "@timeo/auth";
@@ -10,6 +10,8 @@ import {
   Card,
   Select,
   Button,
+  Input,
+  Switch,
   Row,
   Spacer,
   StatCard,
@@ -23,6 +25,15 @@ import {
 import { getInitials } from "@timeo/shared";
 import { api } from "@timeo/api";
 import { useQuery, useMutation } from "convex/react";
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+interface DayAvailability {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  isAvailable: boolean;
+}
 
 const ROLE_OPTIONS = [
   { label: "Admin", value: "admin" },
@@ -57,11 +68,14 @@ export default function StaffDetailScreen() {
 
   const updateRole = useMutation(api.tenantMemberships.updateRole);
   const suspendMember = useMutation(api.tenantMemberships.suspend);
+  const setStaffAvailabilityMutation = useMutation(api.scheduling.setStaffAvailability);
 
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [updatingRole, setUpdatingRole] = useState(false);
   const [suspending, setSuspending] = useState(false);
   const [showSuspendModal, setShowSuspendModal] = useState(false);
+  const [availability, setAvailability] = useState<DayAvailability[]>([]);
+  const [savingAvailability, setSavingAvailability] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
     type: "success" | "error";
@@ -72,6 +86,62 @@ export default function StaffDetailScreen() {
     if (!members) return null;
     return members.find((m) => m._id === id) ?? null;
   }, [members, id]);
+
+  const staffUserId = member?.userId;
+
+  const staffAvailabilityData = useQuery(
+    api.scheduling.getStaffAvailability,
+    tenantId && staffUserId
+      ? { tenantId: tenantId as any, staffId: staffUserId as any }
+      : "skip"
+  );
+
+  useEffect(() => {
+    if (staffAvailabilityData && availability.length === 0) {
+      setAvailability(
+        staffAvailabilityData.map((a: any) => ({
+          dayOfWeek: a.dayOfWeek,
+          startTime: a.startTime,
+          endTime: a.endTime,
+          isAvailable: a.isAvailable,
+        }))
+      );
+    }
+  }, [staffAvailabilityData, availability.length]);
+
+  const updateDayAvailability = useCallback(
+    (dayOfWeek: number, field: keyof DayAvailability, value: any) => {
+      setAvailability((prev) =>
+        prev.map((a) =>
+          a.dayOfWeek === dayOfWeek ? { ...a, [field]: value } : a
+        )
+      );
+    },
+    []
+  );
+
+  const handleSaveAvailability = useCallback(async () => {
+    if (!tenantId || !staffUserId) return;
+    setSavingAvailability(true);
+    try {
+      await setStaffAvailabilityMutation({
+        tenantId: tenantId as any,
+        staffId: staffUserId as any,
+        availability,
+      });
+      setToast({
+        message: "Availability saved",
+        type: "success",
+        visible: true,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to save availability";
+      setToast({ message, type: "error", visible: true });
+    } finally {
+      setSavingAvailability(false);
+    }
+  }, [tenantId, staffUserId, availability, setStaffAvailabilityMutation]);
 
   const staffBookings = useMemo(() => {
     if (!bookings || !member) return { total: 0, completed: 0 };
@@ -235,6 +305,85 @@ export default function StaffDetailScreen() {
         >
           Update Role
         </Button>
+      </Card>
+
+      {/* Availability Editor */}
+      <Card className="mb-4">
+        <Text
+          className="mb-3 text-base font-semibold"
+          style={{ color: theme.colors.text }}
+        >
+          Weekly Availability
+        </Text>
+        {availability.length === 0 ? (
+          <Text
+            className="py-4 text-center text-sm"
+            style={{ color: theme.colors.textSecondary }}
+          >
+            Loading availability...
+          </Text>
+        ) : (
+          <>
+            {availability.map((day) => (
+              <View
+                key={day.dayOfWeek}
+                className="mb-2 rounded-lg p-3"
+                style={{ backgroundColor: theme.colors.surface }}
+              >
+                <Row justify="between" align="center">
+                  <Text
+                    className="text-sm font-semibold"
+                    style={{
+                      color: day.isAvailable
+                        ? theme.colors.text
+                        : theme.colors.textSecondary,
+                      width: 90,
+                    }}
+                  >
+                    {DAY_NAMES[day.dayOfWeek]}
+                  </Text>
+                  <Switch
+                    value={day.isAvailable}
+                    onValueChange={(val: boolean) =>
+                      updateDayAvailability(day.dayOfWeek, "isAvailable", val)
+                    }
+                  />
+                </Row>
+                {day.isAvailable && (
+                  <Row gap={8} className="mt-2">
+                    <View className="flex-1">
+                      <Input
+                        label="Start"
+                        value={day.startTime}
+                        onChangeText={(val: string) =>
+                          updateDayAvailability(day.dayOfWeek, "startTime", val)
+                        }
+                        placeholder="09:00"
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <Input
+                        label="End"
+                        value={day.endTime}
+                        onChangeText={(val: string) =>
+                          updateDayAvailability(day.dayOfWeek, "endTime", val)
+                        }
+                        placeholder="17:00"
+                      />
+                    </View>
+                  </Row>
+                )}
+              </View>
+            ))}
+            <Spacer size={8} />
+            <Button
+              onPress={handleSaveAvailability}
+              loading={savingAvailability}
+            >
+              Save Availability
+            </Button>
+          </>
+        )}
       </Card>
 
       {/* Actions */}

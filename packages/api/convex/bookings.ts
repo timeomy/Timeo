@@ -6,6 +6,7 @@ import {
   requireTenantAccess,
 } from "./lib/middleware";
 import { insertAuditLog, insertBookingEvent } from "./lib/helpers";
+import { internal } from "./_generated/api";
 
 export const listByTenant = query({
   args: { tenantId: v.id("tenants") },
@@ -135,6 +136,157 @@ export const create = mutation({
     const now = Date.now();
 
     const tenant = await ctx.db.get(args.tenantId);
+    const timezone = tenant?.settings?.timezone ?? "Asia/Kuala_Lumpur";
+
+    // ── Availability validation ──────────────────────────────────────
+
+    // Check business hours
+    const requestDate = new Date(args.startTime);
+    const dayStr = requestDate.toLocaleDateString("en-US", {
+      timeZone: timezone,
+      weekday: "short",
+    });
+    const dayMap: Record<string, number> = {
+      Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+    };
+    const dayOfWeek = dayMap[dayStr] ?? 0;
+
+    const businessHours = await ctx.db
+      .query("businessHours")
+      .withIndex("by_tenant_day", (q) =>
+        q.eq("tenantId", args.tenantId).eq("dayOfWeek", dayOfWeek)
+      )
+      .unique();
+
+    if (businessHours) {
+      if (!businessHours.isOpen) {
+        throw new Error("Business is closed on this day");
+      }
+      // Validate time falls within business hours
+      const midnightLocal = new Date(
+        new Date(args.startTime).toLocaleString("en-US", { timeZone: timezone })
+      );
+      midnightLocal.setHours(0, 0, 0, 0);
+      const utcRef = new Date(
+        new Date(args.startTime).toLocaleString("en-US", { timeZone: "UTC" })
+      );
+      const localRef = new Date(
+        new Date(args.startTime).toLocaleString("en-US", { timeZone: timezone })
+      );
+      const offset = utcRef.getTime() - localRef.getTime();
+      const dayStart = midnightLocal.getTime() + offset;
+
+      const [openH, openM] = businessHours.openTime.split(":").map(Number);
+      const [closeH, closeM] = businessHours.closeTime.split(":").map(Number);
+      const openMs = dayStart + (openH * 60 + openM) * 60 * 1000;
+      const closeMs = dayStart + (closeH * 60 + closeM) * 60 * 1000;
+
+      if (args.startTime < openMs || endTime > closeMs) {
+        throw new Error("Requested time is outside business hours");
+      }
+    }
+
+    // Determine staff assignment
+    let assignedStaffId = args.staffId;
+
+    if (assignedStaffId) {
+      // Validate the specific staff member's availability
+      const staffAvail = await ctx.db
+        .query("staffAvailability")
+        .withIndex("by_staff", (q) => q.eq("staffId", assignedStaffId!))
+        .collect();
+      const dayAvail = staffAvail.find(
+        (a) => a.tenantId === args.tenantId && a.dayOfWeek === dayOfWeek
+      );
+      if (dayAvail && !dayAvail.isAvailable) {
+        throw new Error("Selected staff member is not available on this day");
+      }
+
+      // Check for conflicts with existing bookings
+      const staffBookings = await ctx.db
+        .query("bookings")
+        .withIndex("by_staff", (q) => q.eq("staffId", assignedStaffId!))
+        .collect();
+      const hasConflict = staffBookings.some(
+        (b) =>
+          b.tenantId === args.tenantId &&
+          b.status !== "cancelled" &&
+          args.startTime < b.endTime &&
+          endTime > b.startTime
+      );
+      if (hasConflict) {
+        throw new Error("Selected time slot is already booked");
+      }
+
+      // Check for blocked slots
+      const blockedSlots = await ctx.db
+        .query("blockedSlots")
+        .withIndex("by_staff", (q) => q.eq("staffId", assignedStaffId!))
+        .collect();
+      const isBlocked = blockedSlots.some(
+        (bs) =>
+          bs.tenantId === args.tenantId &&
+          args.startTime < bs.endTime &&
+          endTime > bs.startTime
+      );
+      if (isBlocked) {
+        throw new Error("Selected time slot is blocked");
+      }
+    } else {
+      // Auto-assign: find first available staff
+      const staffMemberships = await ctx.db
+        .query("tenantMemberships")
+        .withIndex("by_tenant_role", (q) =>
+          q.eq("tenantId", args.tenantId).eq("role", "staff")
+        )
+        .collect();
+      const activeStaff = staffMemberships.filter(
+        (m) => m.status === "active"
+      );
+
+      for (const staffMember of activeStaff) {
+        // Check day availability
+        const staffAvail = await ctx.db
+          .query("staffAvailability")
+          .withIndex("by_staff", (q) => q.eq("staffId", staffMember.userId))
+          .collect();
+        const dayAvail = staffAvail.find(
+          (a) => a.tenantId === args.tenantId && a.dayOfWeek === dayOfWeek
+        );
+        if (dayAvail && !dayAvail.isAvailable) continue;
+
+        // Check booking conflicts
+        const staffBookings = await ctx.db
+          .query("bookings")
+          .withIndex("by_staff", (q) => q.eq("staffId", staffMember.userId))
+          .collect();
+        const hasConflict = staffBookings.some(
+          (b) =>
+            b.tenantId === args.tenantId &&
+            b.status !== "cancelled" &&
+            args.startTime < b.endTime &&
+            endTime > b.startTime
+        );
+        if (hasConflict) continue;
+
+        // Check blocked slots
+        const blockedSlots = await ctx.db
+          .query("blockedSlots")
+          .withIndex("by_staff", (q) => q.eq("staffId", staffMember.userId))
+          .collect();
+        const isBlocked = blockedSlots.some(
+          (bs) =>
+            bs.tenantId === args.tenantId &&
+            args.startTime < bs.endTime &&
+            endTime > bs.startTime
+        );
+        if (isBlocked) continue;
+
+        assignedStaffId = staffMember.userId;
+        break;
+      }
+    }
+
     const initialStatus =
       tenant?.settings?.autoConfirmBookings === true
         ? ("confirmed" as const)
@@ -144,7 +296,7 @@ export const create = mutation({
       tenantId: args.tenantId,
       customerId: user._id,
       serviceId: args.serviceId,
-      staffId: args.staffId,
+      staffId: assignedStaffId,
       startTime: args.startTime,
       endTime,
       status: initialStatus,
@@ -168,6 +320,13 @@ export const create = mutation({
         actorId: user._id,
         metadata: { autoConfirmed: true },
       });
+
+      // Send booking confirmation notification
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.notifications.sendBookingConfirmation,
+        { bookingId }
+      );
     }
 
     return bookingId;
@@ -208,6 +367,13 @@ export const confirm = mutation({
       resource: "bookings",
       resourceId: args.bookingId,
     });
+
+    // Send booking confirmation notification
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.notifications.sendBookingConfirmation,
+      { bookingId: args.bookingId }
+    );
   },
 });
 
@@ -255,6 +421,17 @@ export const cancel = mutation({
       resourceId: args.bookingId,
       metadata: args.reason ? { reason: args.reason } : undefined,
     });
+
+    // Send cancellation notification
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.notifications.sendBookingCancellation,
+      {
+        bookingId: args.bookingId,
+        cancelledByUserId: user._id,
+        reason: args.reason,
+      }
+    );
   },
 });
 

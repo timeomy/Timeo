@@ -11,8 +11,10 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^6.9.0",
+    "@stripe/stripe-js": "^5.5.0",
     "@timeo/api": "workspace:*",
     "@timeo/auth": "workspace:*",
+    "@timeo/payments": "workspace:*",
     "@timeo/shared": "workspace:*",
     "@timeo/ui": "workspace:*",
     "class-variance-authority": "^0.7.0",

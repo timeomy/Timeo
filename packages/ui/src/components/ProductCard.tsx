@@ -10,6 +10,7 @@ export interface ProductCardProps {
   price: number; // cents
   currency?: string;
   image?: string | null;
+  storageUrl?: string | null;
   inStock?: boolean;
   onPress?: () => void;
   onAddToCart?: () => void;
@@ -22,12 +23,14 @@ export function ProductCard({
   price,
   currency,
   image,
+  storageUrl,
   inStock = true,
   onPress,
   onAddToCart,
   className,
 }: ProductCardProps) {
   const theme = useTheme();
+  const displayImage = storageUrl || image;
 
   return (
     <TouchableOpacity
@@ -36,8 +39,8 @@ export function ProductCard({
       className={`overflow-hidden rounded-2xl ${className ?? ""}`}
       style={{ backgroundColor: theme.colors.surface }}
     >
-      {image ? (
-        <Image source={{ uri: image }} className="h-40 w-full" resizeMode="cover" />
+      {displayImage ? (
+        <Image source={{ uri: displayImage }} className="h-40 w-full" resizeMode="cover" />
       ) : (
         <View
           className="h-40 w-full items-center justify-center"

@@ -7,6 +7,7 @@ import {
 } from "./lib/middleware";
 import { insertAuditLog } from "./lib/helpers";
 import { memberRoleValidator } from "./validators";
+import { internal } from "./_generated/api";
 
 export const listByTenant = query({
   args: { tenantId: v.id("tenants") },
@@ -80,6 +81,18 @@ export const invite = mutation({
       resourceId: membershipId,
       metadata: { invitedUserId: args.userId, role: args.role },
     });
+
+    // Send invitation notification
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.notifications.sendStaffInvitation,
+      {
+        invitedUserId: args.userId,
+        tenantId: args.tenantId,
+        inviterName: user.name,
+        role: args.role,
+      }
+    );
 
     return membershipId;
   },

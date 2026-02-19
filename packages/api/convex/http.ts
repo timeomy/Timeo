@@ -1,6 +1,7 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { handleStripeWebhook } from "./stripeWebhook";
 
 const http = httpRouter();
 
@@ -44,6 +45,13 @@ http.route({
       headers: { "Content-Type": "application/json" },
     });
   }),
+});
+
+// Stripe webhook route
+http.route({
+  path: "/stripe-webhook",
+  method: "POST",
+  handler: handleStripeWebhook,
 });
 
 export default http;

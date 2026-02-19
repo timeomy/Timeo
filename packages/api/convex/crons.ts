@@ -9,4 +9,10 @@ crons.interval(
   internal.bookings.autoCancelNoShows
 );
 
+crons.interval(
+  "send-booking-reminders",
+  { minutes: 15 },
+  internal.actions.notifications.sendBookingReminders
+);
+
 export default crons;

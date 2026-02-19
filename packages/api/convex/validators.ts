@@ -50,6 +50,7 @@ export const bookingEventTypeValidator = v.union(
 // Order enums
 export const orderStatusValidator = v.union(
   v.literal("pending"),
+  v.literal("awaiting_payment"),
   v.literal("confirmed"),
   v.literal("preparing"),
   v.literal("ready"),
@@ -57,10 +58,51 @@ export const orderStatusValidator = v.union(
   v.literal("cancelled")
 );
 
+// Payment enums
+export const paymentStatusValidator = v.union(
+  v.literal("pending"),
+  v.literal("processing"),
+  v.literal("succeeded"),
+  v.literal("failed"),
+  v.literal("refunded")
+);
+
+// Subscription enums
+export const subscriptionStatusValidator = v.union(
+  v.literal("active"),
+  v.literal("past_due"),
+  v.literal("canceled"),
+  v.literal("incomplete")
+);
+
+// Stripe Connect account enums
+export const stripeAccountStatusValidator = v.union(
+  v.literal("pending"),
+  v.literal("active"),
+  v.literal("restricted")
+);
+
 // Membership interval
 export const membershipIntervalValidator = v.union(
   v.literal("monthly"),
   v.literal("yearly")
+);
+
+// Notification enums
+export const notificationTypeValidator = v.union(
+  v.literal("booking_confirmed"),
+  v.literal("booking_cancelled"),
+  v.literal("booking_reminder"),
+  v.literal("order_update"),
+  v.literal("staff_invitation"),
+  v.literal("payment_received"),
+  v.literal("system")
+);
+
+export const pushPlatformValidator = v.union(
+  v.literal("ios"),
+  v.literal("android"),
+  v.literal("web")
 );
 
 // Common input shapes
@@ -81,6 +123,15 @@ export const tenantBrandingValidator = v.object({
   logoUrl: v.optional(v.string()),
   businessName: v.optional(v.string()),
 });
+
+// File type
+export const fileTypeValidator = v.union(
+  v.literal("product_image"),
+  v.literal("service_image"),
+  v.literal("avatar"),
+  v.literal("logo"),
+  v.literal("document")
+);
 
 export const paginationValidator = {
   cursor: v.optional(v.string()),

@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useMemo } from "react";
-import { View, Text, RefreshControl, ScrollView } from "react-native";
+import React, { useState, useCallback } from "react";
+import { View, Text, RefreshControl, ScrollView, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import {
   CalendarCheck,
@@ -7,7 +7,9 @@ import {
   Briefcase,
   Package,
   TrendingUp,
-  Clock,
+  TrendingDown,
+  BarChart3,
+  ChevronRight,
 } from "lucide-react-native";
 import { useTimeoAuth } from "@timeo/auth";
 import {
@@ -20,118 +22,52 @@ import {
   Spacer,
   Skeleton,
   Badge,
+  BarChart,
   useTheme,
 } from "@timeo/ui";
-import { formatPrice, formatRelativeTime } from "@timeo/shared";
+import { formatPrice } from "@timeo/shared";
+import type { AnalyticsPeriod } from "@timeo/shared";
 import { api } from "@timeo/api";
 import { useQuery } from "convex/react";
+
+const PERIOD_OPTIONS: { label: string; value: AnalyticsPeriod }[] = [
+  { label: "Today", value: "day" },
+  { label: "Week", value: "week" },
+  { label: "Month", value: "month" },
+  { label: "Year", value: "year" },
+];
 
 export default function AdminDashboard() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId, activeOrg } = useTimeoAuth();
   const [refreshing, setRefreshing] = useState(false);
+  const [period, setPeriod] = useState<AnalyticsPeriod>("month");
 
   const tenantId = activeTenantId as string;
 
-  const bookings = useQuery(
-    api.bookings.listByTenant,
-    tenantId ? { tenantId: tenantId as any } : "skip"
+  const revenue = useQuery(
+    api.analytics.getRevenueOverview,
+    tenantId ? { tenantId: tenantId as any, period } : "skip"
   );
-  const services = useQuery(
-    api.services.list,
-    tenantId ? { tenantId: tenantId as any } : "skip"
+  const bookingStats = useQuery(
+    api.analytics.getBookingAnalytics,
+    tenantId ? { tenantId: tenantId as any, period } : "skip"
   );
-  const products = useQuery(
-    api.products.list,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
-  const orders = useQuery(
-    api.orders.listByTenant,
-    tenantId ? { tenantId: tenantId as any } : "skip"
+  const topServices = useQuery(
+    api.analytics.getTopServices,
+    tenantId ? { tenantId: tenantId as any, period, limit: 5 } : "skip"
   );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    // Convex queries auto-refresh; simulate delay for UX
     setTimeout(() => setRefreshing(false), 1000);
   }, []);
 
   const isLoading =
-    bookings === undefined ||
-    services === undefined ||
-    products === undefined ||
-    orders === undefined;
-
-  const stats = useMemo(() => {
-    if (isLoading) return null;
-
-    const totalBookings = bookings?.length ?? 0;
-    const completedBookings =
-      bookings?.filter((b) => b.status === "completed") ?? [];
-    const totalRevenue = completedBookings.reduce((sum, b) => {
-      return sum + (b.servicePrice ?? 0);
-    }, 0);
-    const orderRevenue =
-      orders
-        ?.filter((o) => o.status === "completed")
-        .reduce((sum, o) => sum + o.totalAmount, 0) ?? 0;
-
-    const activeServices =
-      services?.filter((s) => s.isActive).length ?? 0;
-    const activeProducts =
-      products?.filter((p) => p.isActive).length ?? 0;
-
-    const now = Date.now();
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-    weekStart.setHours(0, 0, 0, 0);
-
-    const todayBookings =
-      bookings?.filter((b) => b.createdAt >= todayStart.getTime()).length ?? 0;
-    const weekBookings =
-      bookings?.filter((b) => b.createdAt >= weekStart.getTime()).length ?? 0;
-
-    return {
-      totalBookings,
-      totalRevenue: totalRevenue + orderRevenue,
-      activeServices,
-      activeProducts,
-      todayBookings,
-      weekBookings,
-    };
-  }, [isLoading, bookings, services, products, orders]);
-
-  const topServices = useMemo(() => {
-    if (!bookings || !services) return [];
-
-    const serviceCounts = new Map<string, number>();
-    for (const b of bookings) {
-      serviceCounts.set(
-        b.serviceId,
-        (serviceCounts.get(b.serviceId) ?? 0) + 1
-      );
-    }
-
-    return services
-      .filter((s) => s.isActive)
-      .map((s) => ({
-        ...s,
-        bookingCount: serviceCounts.get(s._id) ?? 0,
-      }))
-      .sort((a, b) => b.bookingCount - a.bookingCount)
-      .slice(0, 5);
-  }, [bookings, services]);
-
-  const recentActivity = useMemo(() => {
-    if (!bookings) return [];
-    return bookings
-      .slice()
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, 10);
-  }, [bookings]);
+    revenue === undefined ||
+    bookingStats === undefined ||
+    topServices === undefined;
 
   if (!tenantId) {
     return (
@@ -164,6 +100,33 @@ export default function AdminDashboard() {
           />
         }
       >
+        {/* Period Selector */}
+        <View className="mb-4 mt-2 flex-row gap-2">
+          {PERIOD_OPTIONS.map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              onPress={() => setPeriod(opt.value)}
+              className="flex-1 items-center rounded-full py-2"
+              style={{
+                backgroundColor:
+                  period === opt.value
+                    ? theme.colors.primary
+                    : theme.colors.surface,
+              }}
+            >
+              <Text
+                className="text-sm font-medium"
+                style={{
+                  color:
+                    period === opt.value ? "#FFFFFF" : theme.colors.textSecondary,
+                }}
+              >
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         {/* Stats Grid */}
         {isLoading ? (
           <View>
@@ -190,25 +153,28 @@ export default function AdminDashboard() {
             <Row gap={12} wrap>
               <View className="flex-1 min-w-[45%]">
                 <StatCard
-                  label="Total Bookings"
-                  value={stats?.totalBookings ?? 0}
+                  label="Total Revenue"
+                  value={formatPrice(revenue?.totalRevenue ?? 0)}
                   icon={
-                    <CalendarCheck
-                      size={20}
-                      color={theme.colors.primary}
-                    />
+                    <DollarSign size={20} color={theme.colors.success} />
+                  }
+                  trend={
+                    revenue?.percentChange !== undefined
+                      ? {
+                          value: Math.abs(revenue.percentChange),
+                          direction:
+                            revenue.percentChange >= 0 ? "up" : "down",
+                        }
+                      : undefined
                   }
                 />
               </View>
               <View className="flex-1 min-w-[45%]">
                 <StatCard
-                  label="Total Revenue"
-                  value={formatPrice(stats?.totalRevenue ?? 0)}
+                  label="Bookings"
+                  value={bookingStats?.totalBookings ?? 0}
                   icon={
-                    <DollarSign
-                      size={20}
-                      color={theme.colors.success}
-                    />
+                    <CalendarCheck size={20} color={theme.colors.primary} />
                   }
                 />
               </View>
@@ -217,25 +183,23 @@ export default function AdminDashboard() {
             <Row gap={12} wrap>
               <View className="flex-1 min-w-[45%]">
                 <StatCard
-                  label="Active Services"
-                  value={stats?.activeServices ?? 0}
+                  label="Completion Rate"
+                  value={`${bookingStats?.completionRate ?? 0}%`}
                   icon={
-                    <Briefcase
-                      size={20}
-                      color={theme.colors.warning}
-                    />
+                    (bookingStats?.completionRate ?? 0) >= 50 ? (
+                      <TrendingUp size={20} color={theme.colors.success} />
+                    ) : (
+                      <TrendingDown size={20} color={theme.colors.error} />
+                    )
                   }
                 />
               </View>
               <View className="flex-1 min-w-[45%]">
                 <StatCard
-                  label="Active Products"
-                  value={stats?.activeProducts ?? 0}
+                  label="Avg/Day"
+                  value={bookingStats?.averageBookingsPerDay ?? 0}
                   icon={
-                    <Package
-                      size={20}
-                      color={theme.colors.info}
-                    />
+                    <Briefcase size={20} color={theme.colors.warning} />
                   }
                 />
               </View>
@@ -243,60 +207,47 @@ export default function AdminDashboard() {
           </View>
         )}
 
-        {/* Booking Trends */}
-        <Section title="Booking Trends">
+        {/* Revenue Chart */}
+        <Section title="Revenue">
           {isLoading ? (
-            <View>
-              <Skeleton height={60} borderRadius={12} />
-              <Spacer size={8} />
-              <Skeleton height={60} borderRadius={12} />
-            </View>
+            <Skeleton height={140} borderRadius={12} />
           ) : (
-            <View>
-              <Card>
-                <Row justify="between" align="center">
-                  <View className="flex-row items-center">
-                    <Clock size={18} color={theme.colors.primary} />
-                    <Text
-                      className="ml-2 text-base font-medium"
-                      style={{ color: theme.colors.text }}
-                    >
-                      Today
-                    </Text>
-                  </View>
+            <Card>
+              <Row justify="between" align="center" className="mb-3">
+                <View>
                   <Text
-                    className="text-xl font-bold"
-                    style={{ color: theme.colors.text }}
+                    className="text-xs"
+                    style={{ color: theme.colors.textSecondary }}
                   >
-                    {stats?.todayBookings ?? 0}
+                    Bookings: {formatPrice(revenue?.bookingRevenue ?? 0)}
                   </Text>
-                </Row>
-              </Card>
-              <Spacer size={8} />
-              <Card>
-                <Row justify="between" align="center">
-                  <View className="flex-row items-center">
-                    <TrendingUp size={18} color={theme.colors.success} />
-                    <Text
-                      className="ml-2 text-base font-medium"
-                      style={{ color: theme.colors.text }}
-                    >
-                      This Week
-                    </Text>
-                  </View>
                   <Text
-                    className="text-xl font-bold"
-                    style={{ color: theme.colors.text }}
+                    className="text-xs"
+                    style={{ color: theme.colors.textSecondary }}
                   >
-                    {stats?.weekBookings ?? 0}
+                    Orders: {formatPrice(revenue?.orderRevenue ?? 0)}
                   </Text>
-                </Row>
-              </Card>
-            </View>
+                </View>
+                {revenue?.percentChange !== undefined ? (
+                  <Badge
+                    label={`${revenue.percentChange >= 0 ? "+" : ""}${revenue.percentChange}%`}
+                    variant={revenue.percentChange >= 0 ? "success" : "error"}
+                  />
+                ) : null}
+              </Row>
+              <BarChart
+                data={(revenue?.revenueByDay ?? []).slice(-14).map((d) => ({
+                  label: d.date.slice(5),
+                  value: d.amount,
+                }))}
+                height={100}
+                barColor={theme.colors.primary}
+              />
+            </Card>
           )}
         </Section>
 
-        {/* Top Performing Services */}
+        {/* Top Services */}
         <Section title="Top Services">
           {isLoading ? (
             <View>
@@ -306,19 +257,19 @@ export default function AdminDashboard() {
                 </View>
               ))}
             </View>
-          ) : topServices.length === 0 ? (
+          ) : (topServices ?? []).length === 0 ? (
             <Card>
               <Text
                 className="text-center text-sm"
                 style={{ color: theme.colors.textSecondary }}
               >
-                No services yet. Create your first service.
+                No service data for this period.
               </Text>
             </Card>
           ) : (
             <View>
-              {topServices.map((service, index) => (
-                <Card key={service._id} className="mb-2">
+              {(topServices ?? []).map((service, index) => (
+                <Card key={service.serviceId} className="mb-2">
                   <Row justify="between" align="center">
                     <View className="flex-1 flex-row items-center">
                       <View
@@ -340,14 +291,13 @@ export default function AdminDashboard() {
                           style={{ color: theme.colors.text }}
                           numberOfLines={1}
                         >
-                          {service.name}
+                          {service.serviceName}
                         </Text>
                         <Text
                           className="text-xs"
                           style={{ color: theme.colors.textSecondary }}
                         >
-                          {formatPrice(service.price, service.currency)} /{" "}
-                          {service.durationMinutes}min
+                          {formatPrice(service.revenue)} ({service.percentOfTotal}%)
                         </Text>
                       </View>
                     </View>
@@ -362,65 +312,40 @@ export default function AdminDashboard() {
           )}
         </Section>
 
-        {/* Recent Activity */}
-        <Section title="Recent Activity">
-          {isLoading ? (
-            <View>
-              {[1, 2, 3, 4, 5].map((i) => (
-                <View key={i} className="mb-2">
-                  <Skeleton height={48} borderRadius={12} />
-                </View>
-              ))}
-            </View>
-          ) : recentActivity.length === 0 ? (
+        {/* View Full Analytics */}
+        <Section title="">
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => router.push("/analytics" as any)}
+          >
             <Card>
-              <Text
-                className="text-center text-sm"
-                style={{ color: theme.colors.textSecondary }}
-              >
-                No recent activity.
-              </Text>
+              <Row justify="between" align="center">
+                <View className="flex-row items-center">
+                  <View
+                    className="mr-3 rounded-full p-2"
+                    style={{ backgroundColor: theme.colors.primary + "15" }}
+                  >
+                    <BarChart3 size={20} color={theme.colors.primary} />
+                  </View>
+                  <View>
+                    <Text
+                      className="text-base font-semibold"
+                      style={{ color: theme.colors.text }}
+                    >
+                      View Full Analytics
+                    </Text>
+                    <Text
+                      className="text-sm"
+                      style={{ color: theme.colors.textSecondary }}
+                    >
+                      Revenue, customers, staff performance
+                    </Text>
+                  </View>
+                </View>
+                <ChevronRight size={18} color={theme.colors.textSecondary} />
+              </Row>
             </Card>
-          ) : (
-            <View>
-              {recentActivity.map((booking) => {
-                const statusColors: Record<string, "default" | "success" | "warning" | "error" | "info"> = {
-                  pending: "warning",
-                  confirmed: "info",
-                  completed: "success",
-                  cancelled: "error",
-                  no_show: "error",
-                };
-
-                return (
-                  <Card key={booking._id} className="mb-2">
-                    <Row justify="between" align="center">
-                      <View className="flex-1">
-                        <Text
-                          className="text-sm font-semibold"
-                          style={{ color: theme.colors.text }}
-                          numberOfLines={1}
-                        >
-                          {booking.customerName}
-                        </Text>
-                        <Text
-                          className="text-xs"
-                          style={{ color: theme.colors.textSecondary }}
-                        >
-                          {booking.serviceName} -{" "}
-                          {formatRelativeTime(booking.createdAt)}
-                        </Text>
-                      </View>
-                      <Badge
-                        label={booking.status}
-                        variant={statusColors[booking.status] ?? "default"}
-                      />
-                    </Row>
-                  </Card>
-                );
-              })}
-            </View>
-          )}
+          </TouchableOpacity>
         </Section>
 
         <Spacer size={20} />

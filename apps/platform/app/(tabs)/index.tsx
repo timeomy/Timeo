@@ -10,6 +10,10 @@ import {
   Flag,
   ClipboardList,
   ChevronRight,
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  ShoppingCart,
 } from "lucide-react-native";
 import {
   Screen,
@@ -20,13 +24,14 @@ import {
   Button,
   Spacer,
   Skeleton,
-  ErrorScreen,
+  Row,
+  BarChart,
   useTheme,
 } from "@timeo/ui";
 import { useTimeoAuth } from "@timeo/auth";
 import { api } from "@timeo/api";
 import { useQuery } from "convex/react";
-import { formatRelativeTime } from "@timeo/shared";
+import { formatPrice, formatRelativeTime } from "@timeo/shared";
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -34,16 +39,23 @@ export default function DashboardScreen() {
   const { user } = useTimeoAuth();
   const [refreshing, setRefreshing] = useState(false);
 
-  const systemHealth = useQuery(api.platform.getSystemHealth);
+  const platformOverview = useQuery(api.analytics.getPlatformOverview);
   const tenants = useQuery(api.tenants.list);
+  const revenueRankings = useQuery(api.analytics.getTenantRankings, {
+    metric: "revenue",
+    limit: 5,
+  });
+  const bookingRankings = useQuery(api.analytics.getTenantRankings, {
+    metric: "bookings",
+    limit: 5,
+  });
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    // Convex queries are live, so a brief delay is sufficient for UX
     setTimeout(() => setRefreshing(false), 1000);
   }, []);
 
-  if (systemHealth === undefined || tenants === undefined) {
+  if (platformOverview === undefined || tenants === undefined) {
     return (
       <Screen scroll>
         <View className="mt-4">
@@ -69,7 +81,7 @@ export default function DashboardScreen() {
   }
 
   const displayName = user?.firstName ?? "Admin";
-  const healthStatus = systemHealth.totalTenants > 0 ? "Healthy" : "No Data";
+  const growth = platformOverview.growthMetrics;
 
   return (
     <Screen scroll={false}>
@@ -106,15 +118,33 @@ export default function DashboardScreen() {
           <View className="flex-1">
             <StatCard
               label="Total Tenants"
-              value={systemHealth.totalTenants}
+              value={platformOverview.totalTenants}
               icon={<Building2 size={18} color={theme.colors.primary} />}
+              trend={
+                growth.tenantGrowthPercent !== 0
+                  ? {
+                      value: Math.abs(growth.tenantGrowthPercent),
+                      direction:
+                        growth.tenantGrowthPercent >= 0 ? "up" : "down",
+                    }
+                  : undefined
+              }
             />
           </View>
           <View className="flex-1">
             <StatCard
               label="Total Users"
-              value={systemHealth.totalUsers}
+              value={platformOverview.totalUsers}
               icon={<Users size={18} color={theme.colors.secondary} />}
+              trend={
+                growth.userGrowthPercent !== 0
+                  ? {
+                      value: Math.abs(growth.userGrowthPercent),
+                      direction:
+                        growth.userGrowthPercent >= 0 ? "up" : "down",
+                    }
+                  : undefined
+              }
             />
           </View>
         </View>
@@ -122,19 +152,234 @@ export default function DashboardScreen() {
         <View className="mt-3 flex-row gap-3">
           <View className="flex-1">
             <StatCard
-              label="Pending Bookings"
-              value={systemHealth.pendingBookings}
+              label="Total Bookings"
+              value={platformOverview.totalBookings}
               icon={<CalendarCheck size={18} color={theme.colors.warning} />}
             />
           </View>
           <View className="flex-1">
             <StatCard
-              label="System Health"
-              value={healthStatus}
+              label="Total Revenue"
+              value={formatPrice(platformOverview.totalRevenue)}
+              icon={<DollarSign size={18} color={theme.colors.success} />}
+            />
+          </View>
+        </View>
+
+        <View className="mt-3 flex-row gap-3">
+          <View className="flex-1">
+            <StatCard
+              label="Total Orders"
+              value={platformOverview.totalOrders}
+              icon={<ShoppingCart size={18} color={theme.colors.info} />}
+            />
+          </View>
+          <View className="flex-1">
+            <StatCard
+              label="Active Tenants"
+              value={platformOverview.activeTenants}
               icon={<Activity size={18} color={theme.colors.success} />}
             />
           </View>
         </View>
+
+        {/* Plan Distribution */}
+        <Section title="Tenant Plans">
+          <Card>
+            {Object.entries(platformOverview.tenantsByPlan).map(
+              ([plan, count]) => (
+                <Row key={plan} justify="between" className="mb-1">
+                  <Text
+                    className="text-sm capitalize"
+                    style={{ color: theme.colors.text }}
+                  >
+                    {plan}
+                  </Text>
+                  <Badge label={`${count}`} variant="default" />
+                </Row>
+              )
+            )}
+          </Card>
+        </Section>
+
+        {/* Growth Metrics */}
+        <Section title="Monthly Growth">
+          <Card>
+            <Row justify="between" align="center" className="mb-2">
+              <Text
+                className="text-sm"
+                style={{ color: theme.colors.text }}
+              >
+                New Tenants
+              </Text>
+              <View className="flex-row items-center">
+                <Text
+                  className="mr-2 text-sm font-semibold"
+                  style={{ color: theme.colors.text }}
+                >
+                  {growth.newTenantsThisMonth}
+                </Text>
+                {growth.tenantGrowthPercent !== 0 ? (
+                  <View className="flex-row items-center">
+                    {growth.tenantGrowthPercent > 0 ? (
+                      <TrendingUp size={14} color={theme.colors.success} />
+                    ) : (
+                      <TrendingDown size={14} color={theme.colors.error} />
+                    )}
+                    <Text
+                      className="ml-1 text-xs font-medium"
+                      style={{
+                        color:
+                          growth.tenantGrowthPercent > 0
+                            ? theme.colors.success
+                            : theme.colors.error,
+                      }}
+                    >
+                      {Math.abs(growth.tenantGrowthPercent)}%
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            </Row>
+            <Row justify="between" align="center">
+              <Text
+                className="text-sm"
+                style={{ color: theme.colors.text }}
+              >
+                New Users
+              </Text>
+              <View className="flex-row items-center">
+                <Text
+                  className="mr-2 text-sm font-semibold"
+                  style={{ color: theme.colors.text }}
+                >
+                  {growth.newUsersThisMonth}
+                </Text>
+                {growth.userGrowthPercent !== 0 ? (
+                  <View className="flex-row items-center">
+                    {growth.userGrowthPercent > 0 ? (
+                      <TrendingUp size={14} color={theme.colors.success} />
+                    ) : (
+                      <TrendingDown size={14} color={theme.colors.error} />
+                    )}
+                    <Text
+                      className="ml-1 text-xs font-medium"
+                      style={{
+                        color:
+                          growth.userGrowthPercent > 0
+                            ? theme.colors.success
+                            : theme.colors.error,
+                      }}
+                    >
+                      {Math.abs(growth.userGrowthPercent)}%
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            </Row>
+          </Card>
+        </Section>
+
+        {/* Tenant Rankings by Revenue */}
+        <Section title="Top Tenants by Revenue">
+          {revenueRankings === undefined ? (
+            <Skeleton height={80} borderRadius={12} />
+          ) : (revenueRankings ?? []).length === 0 ? (
+            <Card>
+              <Text
+                className="text-center text-sm"
+                style={{ color: theme.colors.textSecondary }}
+              >
+                No revenue data yet.
+              </Text>
+            </Card>
+          ) : (
+            <View>
+              {(revenueRankings ?? []).map((t, i) => (
+                <Card key={t.tenantId} className="mb-2">
+                  <Row justify="between" align="center">
+                    <View className="flex-row items-center flex-1">
+                      <View
+                        className="mr-3 h-7 w-7 items-center justify-center rounded-full"
+                        style={{
+                          backgroundColor: theme.colors.success + "20",
+                        }}
+                      >
+                        <Text
+                          className="text-xs font-bold"
+                          style={{ color: theme.colors.success }}
+                        >
+                          {i + 1}
+                        </Text>
+                      </View>
+                      <Text
+                        className="flex-1 text-sm font-semibold"
+                        style={{ color: theme.colors.text }}
+                        numberOfLines={1}
+                      >
+                        {t.tenantName}
+                      </Text>
+                    </View>
+                    <Text
+                      className="text-sm font-semibold"
+                      style={{ color: theme.colors.success }}
+                    >
+                      {formatPrice(t.value)}
+                    </Text>
+                  </Row>
+                </Card>
+              ))}
+            </View>
+          )}
+        </Section>
+
+        {/* Tenant Rankings by Bookings */}
+        <Section title="Top Tenants by Bookings">
+          {bookingRankings === undefined ? (
+            <Skeleton height={80} borderRadius={12} />
+          ) : (bookingRankings ?? []).length === 0 ? (
+            <Card>
+              <Text
+                className="text-center text-sm"
+                style={{ color: theme.colors.textSecondary }}
+              >
+                No booking data yet.
+              </Text>
+            </Card>
+          ) : (
+            <View>
+              {(bookingRankings ?? []).map((t, i) => (
+                <Card key={t.tenantId} className="mb-2">
+                  <Row justify="between" align="center">
+                    <View className="flex-row items-center flex-1">
+                      <View
+                        className="mr-3 h-7 w-7 items-center justify-center rounded-full"
+                        style={{
+                          backgroundColor: theme.colors.primary + "20",
+                        }}
+                      >
+                        <Text
+                          className="text-xs font-bold"
+                          style={{ color: theme.colors.primary }}
+                        >
+                          {i + 1}
+                        </Text>
+                      </View>
+                      <Text
+                        className="flex-1 text-sm font-semibold"
+                        style={{ color: theme.colors.text }}
+                        numberOfLines={1}
+                      >
+                        {t.tenantName}
+                      </Text>
+                    </View>
+                    <Badge label={`${t.value}`} variant="info" />
+                  </Row>
+                </Card>
+              ))}
+            </View>
+          )}
+        </Section>
 
         {/* Quick Actions */}
         <Section title="Quick Actions">

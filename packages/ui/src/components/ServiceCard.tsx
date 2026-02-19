@@ -12,6 +12,7 @@ export interface ServiceCardProps {
   price: number; // cents
   currency?: string;
   image?: string | null;
+  storageUrl?: string | null;
   onPress?: () => void;
   onBook?: () => void;
   className?: string;
@@ -24,11 +25,13 @@ export function ServiceCard({
   price,
   currency,
   image,
+  storageUrl,
   onPress,
   onBook,
   className,
 }: ServiceCardProps) {
   const theme = useTheme();
+  const displayImage = storageUrl || image;
 
   return (
     <TouchableOpacity
@@ -37,9 +40,9 @@ export function ServiceCard({
       className={`flex-row rounded-2xl p-3 ${className ?? ""}`}
       style={{ backgroundColor: theme.colors.surface }}
     >
-      {image ? (
+      {displayImage ? (
         <Image
-          source={{ uri: image }}
+          source={{ uri: displayImage }}
           className="mr-3 h-20 w-20 rounded-xl"
         />
       ) : null}

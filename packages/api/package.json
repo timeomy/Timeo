@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "convex": "^1.17.0"
+    "convex": "^1.17.0",
+    "stripe": "^17.5.0"
   },
   "devDependencies": {
     "@timeo/config-ts": "workspace:*",

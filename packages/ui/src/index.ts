@@ -33,6 +33,15 @@ export { BookingCard, type BookingCardProps } from "./components/BookingCard";
 export { OrderCard, type OrderCardProps } from "./components/OrderCard";
 export { StatCard, type StatCardProps } from "./components/StatCard";
 export { EmptyState, type EmptyStateProps } from "./components/EmptyState";
+export {
+  BarChart,
+  type BarChartProps,
+  type BarChartData,
+} from "./components/BarChart";
+export {
+  ProgressRing,
+  type ProgressRingProps,
+} from "./components/ProgressRing";
 
 // Form Components
 export { Select, type SelectProps, type SelectOption } from "./components/Select";
@@ -60,6 +69,34 @@ export {
   type LoadingScreenProps,
 } from "./components/LoadingScreen";
 export { ErrorScreen, type ErrorScreenProps } from "./components/ErrorScreen";
+
+// Media Components
+export {
+  ImageUploader,
+  type ImageUploaderProps,
+} from "./components/ImageUploader";
+export {
+  ConvexImage,
+  type ConvexImageProps,
+} from "./components/ConvexImage";
+
+// Notification Components
+export {
+  NotificationBell,
+  type NotificationBellProps,
+} from "./components/NotificationBell";
+export {
+  NotificationItem,
+  type NotificationItemProps,
+} from "./components/NotificationItem";
+export {
+  NotificationsScreen,
+  type NotificationsScreenProps,
+  type Notification,
+} from "./screens/NotificationsScreen";
+
+// Hooks
+export { usePushNotifications } from "./hooks/usePushNotifications";
 
 // Utilities
 export { cn } from "./lib/cn";

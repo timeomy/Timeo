@@ -1,7 +1,12 @@
-import React, { useState, useCallback } from "react";
-import { View, Text, Image, Alert, ScrollView } from "react-native";
+import React, { useState, useCallback, useMemo } from "react";
+import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Clock, DollarSign, FileText, CheckCircle } from "lucide-react-native";
+import {
+  Clock,
+  DollarSign,
+  CheckCircle,
+  User,
+} from "lucide-react-native";
 import {
   Screen,
   Header,
@@ -19,12 +24,38 @@ import { api } from "@timeo/api";
 import { useQuery, useMutation } from "convex/react";
 import { formatDate, formatTime } from "@timeo/shared";
 
+function getNext7Days(): number[] {
+  const days: number[] = [];
+  const now = new Date();
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() + i);
+    d.setHours(12, 0, 0, 0); // noon to avoid DST issues
+    days.push(d.getTime());
+  }
+  return days;
+}
+
+function formatSlotTime(ms: number): string {
+  return new Date(ms).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function ServiceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const theme = useTheme();
   const { activeTenantId } = useTimeoAuth();
 
+  const [selectedDate, setSelectedDate] = useState<number>(getNext7Days()[0]);
+  const [selectedSlot, setSelectedSlot] = useState<{
+    startTime: number;
+    endTime: number;
+    staffId: string;
+    staffName: string;
+  } | null>(null);
   const [isBooking, setIsBooking] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
 
@@ -33,19 +64,47 @@ export default function ServiceDetailScreen() {
     id ? { serviceId: id as any } : "skip"
   );
 
+  const availableSlots = useQuery(
+    api.scheduling.getAvailableSlots,
+    service && activeTenantId
+      ? {
+          tenantId: activeTenantId as any,
+          serviceId: service._id as any,
+          date: selectedDate,
+        }
+      : "skip"
+  );
+
   const createBooking = useMutation(api.bookings.create);
 
-  const handleBook = useCallback(async () => {
-    if (!service || !activeTenantId) return;
+  const dates = useMemo(() => getNext7Days(), []);
 
-    // Default to booking 1 hour from now (rounded to next 30 min)
-    const now = Date.now();
-    const thirtyMin = 30 * 60 * 1000;
-    const startTime = Math.ceil((now + 60 * 60 * 1000) / thirtyMin) * thirtyMin;
+  // Group slots by time (merge staff options for same time)
+  const groupedSlots = useMemo(() => {
+    if (!availableSlots) return [];
+    const map = new Map<
+      number,
+      Array<{ startTime: number; endTime: number; staffId: string; staffName: string }>
+    >();
+    for (const slot of availableSlots) {
+      const existing = map.get(slot.startTime);
+      if (existing) {
+        existing.push(slot);
+      } else {
+        map.set(slot.startTime, [slot]);
+      }
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([time, slots]) => ({ time, slots }));
+  }, [availableSlots]);
+
+  const handleBook = useCallback(async () => {
+    if (!selectedSlot || !service || !activeTenantId) return;
 
     Alert.alert(
       "Confirm Booking",
-      `Book "${service.name}" for ${formatDate(startTime)} at ${formatTime(startTime)}?`,
+      `Book "${service.name}" on ${formatDate(selectedSlot.startTime)} at ${formatTime(selectedSlot.startTime)} with ${selectedSlot.staffName}?`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -56,7 +115,8 @@ export default function ServiceDetailScreen() {
               await createBooking({
                 tenantId: activeTenantId as any,
                 serviceId: service._id as any,
-                startTime,
+                startTime: selectedSlot.startTime,
+                staffId: selectedSlot.staffId as any,
               });
               setBookingSuccess(true);
               setTimeout(() => {
@@ -75,7 +135,13 @@ export default function ServiceDetailScreen() {
         },
       ]
     );
-  }, [service, activeTenantId, createBooking, router]);
+  }, [selectedSlot, service, activeTenantId, createBooking, router]);
+
+  // Reset selected slot when date changes
+  const handleDateSelect = useCallback((date: number) => {
+    setSelectedDate(date);
+    setSelectedSlot(null);
+  }, []);
 
   if (service === undefined) {
     return <LoadingScreen message="Loading service..." />;
@@ -99,31 +165,16 @@ export default function ServiceDetailScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
       >
-        {/* Hero Image Placeholder */}
-        <View
-          className="mx-4 h-48 items-center justify-center rounded-2xl"
-          style={{ backgroundColor: theme.colors.surface }}
-        >
-          <FileText size={48} color={theme.colors.textSecondary} />
-          <Text
-            className="mt-2 text-sm"
-            style={{ color: theme.colors.textSecondary }}
-          >
-            {service.name}
-          </Text>
-        </View>
-
+        {/* Service Info */}
         <View className="px-4">
-          {/* Service Details */}
-          <View className="mt-5">
+          <View className="mt-2">
             <Text
               className="text-2xl font-bold"
               style={{ color: theme.colors.text }}
             >
               {service.name}
             </Text>
-
-            <View className="mt-3 flex-row items-center gap-4">
+            <View className="mt-2 flex-row items-center gap-4">
               <View className="flex-row items-center">
                 <Clock size={16} color={theme.colors.primary} />
                 <Text
@@ -144,79 +195,248 @@ export default function ServiceDetailScreen() {
             </View>
           </View>
 
-          <Separator className="my-4" />
+          {service.description ? (
+            <>
+              <Spacer size={12} />
+              <Text
+                className="text-sm leading-5"
+                style={{ color: theme.colors.textSecondary }}
+              >
+                {service.description}
+              </Text>
+            </>
+          ) : null}
+        </View>
 
-          {/* Description */}
-          <Card>
-            <Text
-              className="mb-2 text-sm font-semibold uppercase tracking-wide"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              About this service
-            </Text>
-            <Text
-              className="text-base leading-6"
-              style={{ color: theme.colors.text }}
-            >
-              {service.description}
-            </Text>
-          </Card>
+        <Separator className="my-4" />
 
-          <Spacer size={16} />
+        {/* Date Picker */}
+        <View className="px-4">
+          <Text
+            className="mb-3 text-base font-semibold"
+            style={{ color: theme.colors.text }}
+          >
+            Select Date
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8 }}
+          >
+            {dates.map((date) => {
+              const isSelected =
+                new Date(date).toDateString() ===
+                new Date(selectedDate).toDateString();
+              const d = new Date(date);
+              return (
+                <TouchableOpacity
+                  key={date}
+                  onPress={() => handleDateSelect(date)}
+                  className="items-center rounded-2xl px-4 py-3"
+                  style={{
+                    backgroundColor: isSelected
+                      ? theme.colors.primary
+                      : theme.colors.surface,
+                    minWidth: 72,
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    className="text-xs font-medium"
+                    style={{
+                      color: isSelected ? "#FFFFFF" : theme.colors.textSecondary,
+                    }}
+                  >
+                    {d.toLocaleDateString("en-US", { weekday: "short" })}
+                  </Text>
+                  <Text
+                    className="mt-1 text-lg font-bold"
+                    style={{
+                      color: isSelected ? "#FFFFFF" : theme.colors.text,
+                    }}
+                  >
+                    {d.getDate()}
+                  </Text>
+                  <Text
+                    className="text-xs"
+                    style={{
+                      color: isSelected ? "#FFFFFF" : theme.colors.textSecondary,
+                    }}
+                  >
+                    {d.toLocaleDateString("en-US", { month: "short" })}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
 
-          {/* Additional Info */}
-          <Card>
-            <Text
-              className="mb-3 text-sm font-semibold uppercase tracking-wide"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              Details
-            </Text>
-            <View className="gap-3">
-              <View className="flex-row items-center justify-between">
+        <Spacer size={20} />
+
+        {/* Available Slots */}
+        <View className="px-4">
+          <Text
+            className="mb-3 text-base font-semibold"
+            style={{ color: theme.colors.text }}
+          >
+            Available Times
+          </Text>
+
+          {availableSlots === undefined ? (
+            <Card>
+              <View className="items-center py-6">
                 <Text
                   className="text-sm"
                   style={{ color: theme.colors.textSecondary }}
                 >
-                  Duration
+                  Loading available slots...
                 </Text>
+              </View>
+            </Card>
+          ) : groupedSlots.length === 0 ? (
+            <Card>
+              <View className="items-center py-6">
+                <Clock size={32} color={theme.colors.textSecondary} />
+                <Spacer size={8} />
                 <Text
-                  className="text-sm font-medium"
+                  className="text-base font-medium"
                   style={{ color: theme.colors.text }}
                 >
-                  {service.durationMinutes} minutes
+                  No slots available
                 </Text>
-              </View>
-              <View className="flex-row items-center justify-between">
                 <Text
-                  className="text-sm"
+                  className="mt-1 text-center text-sm"
                   style={{ color: theme.colors.textSecondary }}
                 >
-                  Price
-                </Text>
-                <PriceDisplay
-                  amount={service.price}
-                  currency={service.currency}
-                  size="sm"
-                />
-              </View>
-              <View className="flex-row items-center justify-between">
-                <Text
-                  className="text-sm"
-                  style={{ color: theme.colors.textSecondary }}
-                >
-                  Status
-                </Text>
-                <Text
-                  className="text-sm font-medium"
-                  style={{ color: theme.colors.success }}
-                >
-                  Available
+                  Try selecting a different date
                 </Text>
               </View>
+            </Card>
+          ) : (
+            <View className="flex-row flex-wrap gap-2">
+              {groupedSlots.map(({ time, slots }) => {
+                // Pick the first available staff for display; user picks time
+                const slot = slots[0];
+                const isSelected =
+                  selectedSlot?.startTime === slot.startTime &&
+                  selectedSlot?.staffId === slot.staffId;
+                return (
+                  <TouchableOpacity
+                    key={`${time}-${slot.staffId}`}
+                    onPress={() => setSelectedSlot(slot)}
+                    className="items-center rounded-xl px-4 py-3"
+                    style={{
+                      backgroundColor: isSelected
+                        ? theme.colors.primary
+                        : theme.colors.surface,
+                      borderWidth: 1,
+                      borderColor: isSelected
+                        ? theme.colors.primary
+                        : theme.colors.border,
+                      minWidth: 90,
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      className="text-sm font-semibold"
+                      style={{
+                        color: isSelected ? "#FFFFFF" : theme.colors.text,
+                      }}
+                    >
+                      {formatSlotTime(slot.startTime)}
+                    </Text>
+                    {slots.length > 1 ? (
+                      <Text
+                        className="mt-0.5 text-xs"
+                        style={{
+                          color: isSelected
+                            ? "#FFFFFF"
+                            : theme.colors.textSecondary,
+                        }}
+                      >
+                        {slots.length} staff
+                      </Text>
+                    ) : (
+                      <Text
+                        className="mt-0.5 text-xs"
+                        style={{
+                          color: isSelected
+                            ? "#FFFFFF"
+                            : theme.colors.textSecondary,
+                        }}
+                      >
+                        {slot.staffName}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-          </Card>
+          )}
         </View>
+
+        {/* Staff selection if multiple for same time */}
+        {selectedSlot && groupedSlots.length > 0 && (() => {
+          const group = groupedSlots.find(
+            (g) => g.time === selectedSlot.startTime
+          );
+          if (!group || group.slots.length <= 1) return null;
+          return (
+            <>
+              <Spacer size={16} />
+              <View className="px-4">
+                <Text
+                  className="mb-2 text-sm font-semibold"
+                  style={{ color: theme.colors.text }}
+                >
+                  Select Staff
+                </Text>
+                <View className="gap-2">
+                  {group.slots.map((slot) => {
+                    const isStaffSelected =
+                      selectedSlot.staffId === slot.staffId;
+                    return (
+                      <TouchableOpacity
+                        key={slot.staffId}
+                        onPress={() => setSelectedSlot(slot)}
+                        className="flex-row items-center rounded-xl px-4 py-3"
+                        style={{
+                          backgroundColor: isStaffSelected
+                            ? theme.colors.primary + "15"
+                            : theme.colors.surface,
+                          borderWidth: 1,
+                          borderColor: isStaffSelected
+                            ? theme.colors.primary
+                            : theme.colors.border,
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <User
+                          size={16}
+                          color={
+                            isStaffSelected
+                              ? theme.colors.primary
+                              : theme.colors.textSecondary
+                          }
+                        />
+                        <Text
+                          className="ml-2 text-sm font-medium"
+                          style={{
+                            color: isStaffSelected
+                              ? theme.colors.primary
+                              : theme.colors.text,
+                          }}
+                        >
+                          {slot.staffName}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </>
+          );
+        })()}
       </ScrollView>
 
       {/* Sticky Book Button */}
@@ -228,7 +448,8 @@ export default function ServiceDetailScreen() {
         }}
       >
         {bookingSuccess ? (
-          <View className="flex-row items-center justify-center rounded-xl py-3"
+          <View
+            className="flex-row items-center justify-center rounded-xl py-3"
             style={{ backgroundColor: theme.colors.success + "15" }}
           >
             <CheckCircle size={20} color={theme.colors.success} />
@@ -246,7 +467,9 @@ export default function ServiceDetailScreen() {
                 className="text-sm"
                 style={{ color: theme.colors.textSecondary }}
               >
-                Total
+                {selectedSlot
+                  ? `${formatSlotTime(selectedSlot.startTime)} · ${selectedSlot.staffName}`
+                  : "Select a time slot"}
               </Text>
               <PriceDisplay
                 amount={service.price}
@@ -258,6 +481,7 @@ export default function ServiceDetailScreen() {
               size="lg"
               loading={isBooking}
               onPress={handleBook}
+              disabled={!selectedSlot}
               className="min-w-[140px]"
             >
               Book Now

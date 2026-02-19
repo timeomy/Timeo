@@ -12,6 +12,7 @@ import {
   Switch,
   Spacer,
   LoadingScreen,
+  ImageUploader,
 } from "@timeo/ui";
 import type { Id } from "@timeo/api";
 
@@ -31,11 +32,15 @@ export default function ServiceEditScreen() {
 
   const createService = useMutation(api.services.create);
   const updateService = useMutation(api.services.update);
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const updateEntityImage = useMutation(api.files.updateEntityImage);
+  const saveFile = useMutation(api.files.saveFile);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [duration, setDuration] = useState("");
   const [price, setPrice] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
   const [initialized, setInitialized] = useState(isNew);
@@ -48,9 +53,35 @@ export default function ServiceEditScreen() {
       setDuration(String(existingService.durationMinutes));
       setPrice((existingService.price / 100).toFixed(2));
       setIsActive(existingService.isActive);
+      setImageUrl((existingService as any).imageUrl ?? null);
       setInitialized(true);
     }
   }, [existingService, initialized]);
+
+  const handleImageUpload = useCallback(
+    async (storageId: string) => {
+      if (!serviceId || isNew) return;
+      try {
+        await saveFile({
+          tenantId: tenantId ?? undefined,
+          filename: "service-image",
+          mimeType: "image/jpeg",
+          size: 0,
+          type: "service_image",
+          entityId: serviceId,
+          storageId,
+        });
+        await updateEntityImage({
+          entityType: "service",
+          entityId: serviceId,
+          storageId,
+        });
+      } catch {
+        Alert.alert("Error", "Failed to save image.");
+      }
+    },
+    [serviceId, isNew, tenantId, saveFile, updateEntityImage]
+  );
 
   const validate = useCallback((): string | null => {
     if (!name.trim()) return "Service name is required.";
@@ -145,6 +176,19 @@ export default function ServiceEditScreen() {
           contentContainerStyle={{ paddingBottom: 40 }}
         >
           <Spacer size={8} />
+
+          <ImageUploader
+            label="Service Image"
+            generateUploadUrl={generateUploadUrl}
+            currentImageUrl={imageUrl}
+            onUpload={(storageId, url) => {
+              setImageUrl(url);
+              handleImageUpload(storageId);
+            }}
+            onRemove={() => setImageUrl(null)}
+          />
+
+          <Spacer size={16} />
 
           <Input
             label="Service Name"
