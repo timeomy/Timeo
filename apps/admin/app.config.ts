@@ -32,6 +32,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   extra: {
     clerkPublishableKey: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY,
     convexUrl: process.env.EXPO_PUBLIC_CONVEX_URL,
+    posthogKey: process.env.EXPO_PUBLIC_POSTHOG_KEY,
+    posthogHost: process.env.EXPO_PUBLIC_POSTHOG_HOST,
     eas: {
       projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID,
     },

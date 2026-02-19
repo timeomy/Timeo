@@ -25,6 +25,7 @@
   "peerDependencies": {
     "expo": "*",
     "expo-constants": "*",
+    "expo-image-picker": "*",
     "expo-notifications": "*",
     "nativewind": "*",
     "react": "*",
