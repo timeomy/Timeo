@@ -13,10 +13,11 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@clerk/clerk-expo": "^2.4.0",
+    "@clerk/clerk-expo": "^2.19.25",
+    "@clerk/clerk-react": "^5.61.0",
     "@clerk/nextjs": "^6.9.0",
     "convex": "^1.17.0",
-    "expo-secure-store": "~14.0.0"
+    "expo-secure-store": "~15.0.8"
   },
   "peerDependencies": {
     "expo": "*",
@@ -25,7 +26,7 @@
   },
   "devDependencies": {
     "@timeo/config-ts": "workspace:*",
-    "@types/react": "^18.2.0",
+    "@types/react": "~19.1.0",
     "typescript": "^5.3.3"
   }
 }

@@ -16,8 +16,4 @@ config.resolver.nodeModulesPaths = [
   path.resolve(monorepoRoot, "node_modules"),
 ];
 
-// Follow symlinks (required for pnpm)
-config.resolver.unstable_enableSymlinks = true;
-config.resolver.unstable_enablePackageExports = true;
-
 module.exports = withNativeWind(config, { input: "./global.css" });
