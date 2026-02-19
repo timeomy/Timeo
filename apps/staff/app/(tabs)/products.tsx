@@ -23,13 +23,11 @@ import {
   LoadingScreen,
   useTheme,
 } from "@timeo/ui";
-import type { Id } from "@timeo/api";
-
 export default function ProductsScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as Id<"tenants"> | null;
+  const tenantId = activeTenantId as any | null;
 
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -59,7 +57,7 @@ export default function ProductsScreen() {
   }, [products, searchQuery]);
 
   const handleToggleActive = useCallback(
-    async (productId: Id<"products">) => {
+    async (productId: any) => {
       try {
         await toggleActive({ productId });
       } catch (err) {
@@ -172,7 +170,7 @@ export default function ProductsScreen() {
                 <Switch
                   value={item.isActive}
                   onValueChange={() =>
-                    handleToggleActive(item._id as Id<"products">)
+                    handleToggleActive(item._id as any)
                   }
                 />
               </View>

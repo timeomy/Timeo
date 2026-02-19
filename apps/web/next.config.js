@@ -6,6 +6,9 @@ const nextConfig = {
     "@timeo/auth",
     "@timeo/api",
     "@timeo/payments",
+    "@timeo/analytics",
+    "@timeo/cms",
+    "@timeo/notifications",
   ],
 };
 

@@ -23,8 +23,6 @@ import {
   useTheme,
 } from "@timeo/ui";
 import { OrderStatus } from "@timeo/shared";
-import type { Id } from "@timeo/api";
-
 const STATUS_TABS = [
   "All",
   "Pending",
@@ -65,7 +63,7 @@ export default function OrdersScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as Id<"tenants"> | null;
+  const tenantId = activeTenantId as any | null;
 
   const [activeTab, setActiveTab] = useState<StatusTab>("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -108,7 +106,7 @@ export default function OrdersScreen() {
   }, [orders, activeTab, searchQuery]);
 
   const handleAdvanceStatus = useCallback(
-    async (orderId: Id<"orders">, currentStatus: string) => {
+    async (orderId: any, currentStatus: string) => {
       const nextStatus = NEXT_STATUS[currentStatus];
       if (!nextStatus) return;
 
@@ -134,7 +132,7 @@ export default function OrdersScreen() {
   );
 
   const handleCancelOrder = useCallback(
-    (orderId: Id<"orders">) => {
+    (orderId: any) => {
       Alert.alert(
         "Cancel Order",
         "Are you sure you want to cancel this order?",
@@ -273,7 +271,7 @@ export default function OrdersScreen() {
                       className="flex-1"
                       onPress={() =>
                         handleAdvanceStatus(
-                          item._id as Id<"orders">,
+                          item._id as any,
                           item.status
                         )
                       }
@@ -287,7 +285,7 @@ export default function OrdersScreen() {
                       size="sm"
                       className="flex-1"
                       onPress={() =>
-                        handleCancelOrder(item._id as Id<"orders">)
+                        handleCancelOrder(item._id as any)
                       }
                     >
                       Cancel

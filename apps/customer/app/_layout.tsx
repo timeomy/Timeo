@@ -56,6 +56,10 @@ export default function RootLayout() {
                 name="notifications/index"
                 options={{ presentation: "card" }}
               />
+              <Stack.Screen
+                name="memberships/index"
+                options={{ presentation: "card" }}
+              />
             </Stack>
           </CartProvider>
         </ThemeProvider>

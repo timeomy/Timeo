@@ -14,16 +14,14 @@ import {
   LoadingScreen,
   ImageUploader,
 } from "@timeo/ui";
-import type { Id } from "@timeo/api";
-
 export default function ProductEditScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as Id<"tenants"> | null;
+  const tenantId = activeTenantId as any | null;
 
   const isNew = id === "new";
-  const productId = isNew ? null : (id as Id<"products">);
+  const productId = isNew ? null : (id as any);
 
   const existingProduct = useQuery(
     api.products.getById,

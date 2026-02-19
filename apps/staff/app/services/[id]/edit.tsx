@@ -14,16 +14,14 @@ import {
   LoadingScreen,
   ImageUploader,
 } from "@timeo/ui";
-import type { Id } from "@timeo/api";
-
 export default function ServiceEditScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as Id<"tenants"> | null;
+  const tenantId = activeTenantId as any | null;
 
   const isNew = id === "new";
-  const serviceId = isNew ? null : (id as Id<"services">);
+  const serviceId = isNew ? null : (id as any);
 
   const existingService = useQuery(
     api.services.getById,

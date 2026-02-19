@@ -29,13 +29,11 @@ import {
   formatTime,
   formatRelativeTime,
 } from "@timeo/shared";
-import type { Id } from "@timeo/api";
-
 export default function BookingDetailScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const bookingId = id as Id<"bookings">;
+  const bookingId = id as any;
 
   const booking = useQuery(api.bookings.getById, { bookingId });
   const events = useQuery(api.bookingEvents.listByBooking, { bookingId });

@@ -22,15 +22,13 @@ import {
   EmptyState,
   useTheme,
 } from "@timeo/ui";
-import type { Id } from "@timeo/api";
-
 export default function Dashboard() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId, user, activeOrg, signOut } = useTimeoAuth();
   const [refreshing, setRefreshing] = useState(false);
 
-  const tenantId = activeTenantId as Id<"tenants"> | null;
+  const tenantId = activeTenantId as any;
 
   const bookings = useQuery(
     api.bookings.listByTenant,

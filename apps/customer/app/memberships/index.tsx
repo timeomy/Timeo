@@ -20,7 +20,6 @@ import {
   Crown,
   CheckCircle2,
   Star,
-  ArrowLeft,
 } from "lucide-react-native";
 import { useRouter } from "expo-router";
 
@@ -107,10 +106,7 @@ export default function MembershipsScreen() {
     <Screen scroll={false}>
       <Header
         title="Memberships"
-        leftAction={{
-          icon: ArrowLeft,
-          onPress: () => router.back(),
-        }}
+        onBack={() => router.back()}
       />
       <ScrollView
         className="flex-1 px-4"

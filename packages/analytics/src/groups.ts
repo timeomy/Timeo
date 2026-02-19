@@ -25,9 +25,9 @@ export function setTenantGroup(
   if (!posthog) return;
 
   posthog.group("tenant", props.tenantId, {
-    name: props.tenantName,
-    slug: props.tenantSlug,
-    plan: props.plan,
+    name: props.tenantName ?? "",
+    slug: props.tenantSlug ?? "",
+    plan: props.plan ?? "",
   });
 }
 
@@ -41,8 +41,8 @@ export function setTenantGroupWeb(
   if (!posthog) return;
 
   posthog.group("tenant", props.tenantId, {
-    name: props.tenantName,
-    slug: props.tenantSlug,
-    plan: props.plan,
+    name: props.tenantName ?? "",
+    slug: props.tenantSlug ?? "",
+    plan: props.plan ?? "",
   });
 }

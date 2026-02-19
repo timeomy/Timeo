@@ -21,7 +21,7 @@ export function useTrackEvent() {
 
   return useCallback(
     <E extends TimeoEvent>(event: E, properties: TimeoEventMap[E]) => {
-      posthog.capture(event, properties as unknown as Record<string, unknown>);
+      posthog.capture(event, properties as any);
     },
     [posthog]
   );

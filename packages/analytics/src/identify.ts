@@ -24,9 +24,9 @@ export function identifyUser(
   if (!posthog) return;
 
   posthog.identify(props.clerkUserId, {
-    email: props.email,
-    name: props.name,
-    avatar_url: props.avatarUrl,
+    email: props.email ?? "",
+    name: props.name ?? "",
+    avatar_url: props.avatarUrl ?? "",
   });
 }
 
@@ -40,9 +40,9 @@ export function identifyUserWeb(
   if (!posthog) return;
 
   posthog.identify(props.clerkUserId, {
-    email: props.email,
-    name: props.name,
-    avatar_url: props.avatarUrl,
+    email: props.email ?? "",
+    name: props.name ?? "",
+    avatar_url: props.avatarUrl ?? "",
   });
 }
 

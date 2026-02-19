@@ -14,7 +14,6 @@ import {
 import {
   Screen,
   Header,
-  Avatar,
   Card,
   Separator,
   Spacer,
@@ -23,7 +22,6 @@ import {
   useTheme,
 } from "@timeo/ui";
 import { useTimeoAuth, useTenantSwitcher } from "@timeo/auth";
-import { getInitials } from "@timeo/shared";
 import { api } from "@timeo/api";
 import { useMutation } from "convex/react";
 import { useCart } from "../providers/cart";

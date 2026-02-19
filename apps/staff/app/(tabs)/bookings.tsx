@@ -23,8 +23,6 @@ import {
   useTheme,
 } from "@timeo/ui";
 import { BookingStatus } from "@timeo/shared";
-import type { Id } from "@timeo/api";
-
 const STATUS_TABS = ["All", "Pending", "Confirmed", "Completed", "Cancelled"] as const;
 type StatusTab = (typeof STATUS_TABS)[number];
 
@@ -40,7 +38,7 @@ export default function BookingsScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as Id<"tenants"> | null;
+  const tenantId = activeTenantId as any;
 
   const [activeTab, setActiveTab] = useState<StatusTab>("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -86,7 +84,7 @@ export default function BookingsScreen() {
   }, [bookings, activeTab, searchQuery]);
 
   const handleConfirm = useCallback(
-    async (bookingId: Id<"bookings">) => {
+    async (bookingId: any) => {
       try {
         await confirmBooking({ bookingId });
       } catch (err) {
@@ -100,7 +98,7 @@ export default function BookingsScreen() {
   );
 
   const handleCancel = useCallback(
-    (bookingId: Id<"bookings">) => {
+    (bookingId: any) => {
       Alert.alert(
         "Cancel Booking",
         "Are you sure you want to cancel this booking?",
@@ -129,7 +127,7 @@ export default function BookingsScreen() {
   );
 
   const handleComplete = useCallback(
-    async (bookingId: Id<"bookings">) => {
+    async (bookingId: any) => {
       try {
         await completeBooking({ bookingId });
       } catch (err) {
@@ -245,7 +243,7 @@ export default function BookingsScreen() {
                   <Button
                     size="sm"
                     className="flex-1"
-                    onPress={() => handleConfirm(item._id as Id<"bookings">)}
+                    onPress={() => handleConfirm(item._id as any)}
                   >
                     Confirm
                   </Button>
@@ -254,7 +252,7 @@ export default function BookingsScreen() {
                   <Button
                     size="sm"
                     className="flex-1"
-                    onPress={() => handleComplete(item._id as Id<"bookings">)}
+                    onPress={() => handleComplete(item._id as any)}
                   >
                     Complete
                   </Button>
@@ -263,7 +261,7 @@ export default function BookingsScreen() {
                   variant="destructive"
                   size="sm"
                   className="flex-1"
-                  onPress={() => handleCancel(item._id as Id<"bookings">)}
+                  onPress={() => handleCancel(item._id as any)}
                 >
                   Cancel
                 </Button>

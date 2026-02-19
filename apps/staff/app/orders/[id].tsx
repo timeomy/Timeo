@@ -19,8 +19,6 @@ import {
   useTheme,
 } from "@timeo/ui";
 import { formatDate, formatTime, formatPrice } from "@timeo/shared";
-import type { Id } from "@timeo/api";
-
 // Next valid status for progression
 const NEXT_STATUS: Record<string, string | null> = {
   pending: "confirmed",
@@ -42,7 +40,7 @@ export default function OrderDetailScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const orderId = id as Id<"orders">;
+  const orderId = id as any;
 
   const order = useQuery(api.orders.getById, { orderId });
 

@@ -13,6 +13,9 @@
       ],
       "@timeo/auth": [
         "../../packages/auth/src"
+      ],
+      "@timeo/analytics": [
+        "../../packages/analytics/src"
       ]
     }
   },
