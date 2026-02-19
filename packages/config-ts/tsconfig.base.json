@@ -22,7 +22,9 @@
       "@timeo/shared": ["../../packages/shared/src"],
       "@timeo/shared/*": ["../../packages/shared/src/*"],
       "@timeo/auth": ["../../packages/auth/src"],
-      "@timeo/auth/*": ["../../packages/auth/src/*"]
+      "@timeo/auth/*": ["../../packages/auth/src/*"],
+      "@timeo/notifications": ["../../packages/notifications/src"],
+      "@timeo/notifications/*": ["../../packages/notifications/src/*"]
     }
   },
   "exclude": ["node_modules", "dist", ".turbo"]

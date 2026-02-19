@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -20,6 +20,7 @@ import {
   useTheme,
 } from "@timeo/ui";
 import { useTimeoAuth } from "@timeo/auth";
+import { useTrackEvent } from "@timeo/analytics";
 import { api } from "@timeo/api";
 import { useQuery, useMutation } from "convex/react";
 import { formatDate, formatTime } from "@timeo/shared";
@@ -76,6 +77,21 @@ export default function ServiceDetailScreen() {
   );
 
   const createBooking = useMutation(api.bookings.create);
+  const track = useTrackEvent();
+
+  // Track service view
+  useEffect(() => {
+    if (service && activeTenantId) {
+      track("service_viewed", {
+        service_id: service._id,
+        service_name: service.name,
+        price: service.price,
+        currency: service.currency,
+        duration_minutes: service.durationMinutes,
+        tenant_id: activeTenantId,
+      });
+    }
+  }, [service?._id, activeTenantId]);
 
   const dates = useMemo(() => getNext7Days(), []);
 
@@ -112,11 +128,20 @@ export default function ServiceDetailScreen() {
           onPress: async () => {
             try {
               setIsBooking(true);
-              await createBooking({
+              const bookingResult = await createBooking({
                 tenantId: activeTenantId as any,
                 serviceId: service._id as any,
                 startTime: selectedSlot.startTime,
                 staffId: selectedSlot.staffId as any,
+              });
+              track("booking_created", {
+                booking_id: bookingResult as unknown as string,
+                service_id: service._id,
+                service_name: service.name,
+                staff_id: selectedSlot.staffId,
+                price: service.price,
+                currency: service.currency,
+                tenant_id: activeTenantId,
               });
               setBookingSuccess(true);
               setTimeout(() => {

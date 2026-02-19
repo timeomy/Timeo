@@ -12,7 +12,8 @@
       "@timeo/ui/web": ["../../packages/ui/src/web"],
       "@timeo/shared": ["../../packages/shared/src"],
       "@timeo/auth": ["../../packages/auth/src"],
-      "@timeo/auth/web": ["../../packages/auth/src/web"]
+      "@timeo/auth/web": ["../../packages/auth/src/web"],
+      "@timeo/cms": ["../../packages/cms/src"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

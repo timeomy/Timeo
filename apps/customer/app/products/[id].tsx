@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { View, Text, Image, ScrollView, Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ShoppingBag, CheckCircle } from "lucide-react-native";
@@ -15,6 +15,8 @@ import {
   Spacer,
   useTheme,
 } from "@timeo/ui";
+import { useTimeoAuth } from "@timeo/auth";
+import { useTrackEvent } from "@timeo/analytics";
 import { api } from "@timeo/api";
 import { useQuery } from "convex/react";
 import { useCart } from "../providers/cart";
@@ -25,6 +27,9 @@ export default function ProductDetailScreen() {
   const theme = useTheme();
   const { addItem } = useCart();
 
+  const { activeTenantId } = useTimeoAuth();
+  const track = useTrackEvent();
+
   const [quantity, setQuantity] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
 
@@ -32,6 +37,19 @@ export default function ProductDetailScreen() {
     api.products.getById,
     id ? { productId: id as any } : "skip"
   );
+
+  // Track product view
+  useEffect(() => {
+    if (product && activeTenantId) {
+      track("product_viewed", {
+        product_id: product._id,
+        product_name: product.name,
+        price: product.price,
+        currency: product.currency,
+        tenant_id: activeTenantId,
+      });
+    }
+  }, [product?._id, activeTenantId]);
 
   const handleAddToCart = useCallback(() => {
     if (!product) return;
@@ -45,9 +63,20 @@ export default function ProductDetailScreen() {
       quantity,
     });
 
+    if (activeTenantId) {
+      track("add_to_cart", {
+        product_id: product._id,
+        product_name: product.name,
+        price: product.price,
+        currency: product.currency,
+        quantity,
+        tenant_id: activeTenantId,
+      });
+    }
+
     setAddedToCart(true);
     setTimeout(() => setAddedToCart(false), 2000);
-  }, [product, quantity, addItem]);
+  }, [product, quantity, addItem, activeTenantId, track]);
 
   if (product === undefined) {
     return <LoadingScreen message="Loading product..." />;

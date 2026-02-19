@@ -12,7 +12,51 @@ import {
   paymentReceiptTemplate,
 } from "../lib/emailTemplates";
 
-// ── Email via Resend ─────────────────────────────────────────────────────
+// ── Novu (primary) ──────────────────────────────────────────────────────
+
+function isNovuConfigured(): boolean {
+  return !!process.env.NOVU_API_KEY;
+}
+
+async function novuTrigger(
+  workflowId: string,
+  subscriberId: string,
+  payload: Record<string, unknown>,
+  tenantId?: string
+): Promise<boolean> {
+  const apiKey = process.env.NOVU_API_KEY;
+  if (!apiKey) return false;
+
+  try {
+    // Use Novu REST API directly (avoids bundling @novu/node into Convex)
+    const response = await fetch("https://api.novu.co/v1/events/trigger", {
+      method: "POST",
+      headers: {
+        Authorization: `ApiKey ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: workflowId,
+        to: { subscriberId },
+        payload,
+        ...(tenantId ? { tenant: { identifier: tenantId } } : {}),
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`[Novu] Trigger error for ${workflowId}: ${response.status} - ${error}`);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error(`[Novu] Failed to trigger ${workflowId}:`, error);
+    return false;
+  }
+}
+
+// ── Email via Resend (fallback) ─────────────────────────────────────────
 
 async function sendEmailViaResend(
   to: string,
@@ -53,7 +97,7 @@ async function sendEmailViaResend(
   }
 }
 
-// ── Push via Expo Push API ───────────────────────────────────────────────
+// ── Push via Expo Push API (fallback) ───────────────────────────────────
 
 async function sendExpoPush(
   tokens: string[],
@@ -106,12 +150,7 @@ export const sendBookingConfirmation = internalAction({
     );
     if (!booking) return;
 
-    const prefs = await ctx.runQuery(internal.notifications.getUserPreferences, {
-      userId: booking.customerId,
-      tenantId: booking.tenantId,
-    });
-
-    // Create in-app notification
+    // Always create in-app notification via Convex
     await ctx.runMutation(internal.notifications.createNotification, {
       userId: booking.customerId,
       tenantId: booking.tenantId,
@@ -121,7 +160,32 @@ export const sendBookingConfirmation = internalAction({
       data: { bookingId: args.bookingId },
     });
 
-    // Send email
+    // Try Novu first — it handles email + push + SMS via configured workflows
+    if (isNovuConfigured()) {
+      await novuTrigger(
+        "booking-confirmation",
+        booking.customerId,
+        {
+          customerName: booking.customerName,
+          serviceName: booking.serviceName,
+          staffName: booking.staffName ?? "",
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          tenantName: booking.tenantName,
+          notes: booking.notes ?? "",
+          bookingId: args.bookingId,
+        },
+        booking.tenantId
+      );
+      return;
+    }
+
+    // Fallback: direct Resend + Expo
+    const prefs = await ctx.runQuery(internal.notifications.getUserPreferences, {
+      userId: booking.customerId,
+      tenantId: booking.tenantId,
+    });
+
     if (prefs.emailBookingConfirm && booking.customerEmail) {
       const html = bookingConfirmationTemplate({
         customerName: booking.customerName,
@@ -139,7 +203,6 @@ export const sendBookingConfirmation = internalAction({
       );
     }
 
-    // Send push notification
     if (prefs.pushEnabled) {
       const tokens = await ctx.runQuery(
         internal.notifications.getUserPushTokens,
@@ -170,7 +233,10 @@ export const sendBookingCancellation = internalAction({
     );
     if (!booking) return;
 
-    // Notify the customer
+    const cancelledBy =
+      args.cancelledByUserId === booking.customerId ? "customer" : "staff";
+
+    // In-app notification for customer
     await ctx.runMutation(internal.notifications.createNotification, {
       userId: booking.customerId,
       tenantId: booking.tenantId,
@@ -180,44 +246,60 @@ export const sendBookingCancellation = internalAction({
       data: { bookingId: args.bookingId },
     });
 
-    if (booking.customerEmail) {
-      const html = bookingCancellationTemplate({
-        customerName: booking.customerName,
-        serviceName: booking.serviceName,
-        staffName: booking.staffName ?? undefined,
-        startTime: booking.startTime,
-        endTime: booking.endTime,
-        tenantName: booking.tenantName,
-        reason: args.reason,
-        cancelledBy:
-          args.cancelledByUserId === booking.customerId ? "customer" : "staff",
-      });
-      await sendEmailViaResend(
-        booking.customerEmail,
-        `Booking Cancelled — ${booking.serviceName}`,
-        html
+    // Try Novu first
+    if (isNovuConfigured()) {
+      await novuTrigger(
+        "booking-cancellation",
+        booking.customerId,
+        {
+          customerName: booking.customerName,
+          serviceName: booking.serviceName,
+          staffName: booking.staffName ?? "",
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          tenantName: booking.tenantName,
+          reason: args.reason ?? "",
+          cancelledBy,
+          bookingId: args.bookingId,
+        },
+        booking.tenantId
       );
+    } else {
+      // Fallback: direct Resend + Expo
+      if (booking.customerEmail) {
+        const html = bookingCancellationTemplate({
+          customerName: booking.customerName,
+          serviceName: booking.serviceName,
+          staffName: booking.staffName ?? undefined,
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          tenantName: booking.tenantName,
+          reason: args.reason,
+          cancelledBy,
+        });
+        await sendEmailViaResend(
+          booking.customerEmail,
+          `Booking Cancelled — ${booking.serviceName}`,
+          html
+        );
+      }
+
+      const tokens = await ctx.runQuery(
+        internal.notifications.getUserPushTokens,
+        { userId: booking.customerId }
+      );
+      if (tokens.length > 0) {
+        await sendExpoPush(
+          tokens.map((t: any) => t.token),
+          "Booking Cancelled",
+          `Your ${booking.serviceName} appointment was cancelled.`,
+          { bookingId: args.bookingId, type: "booking_cancelled" }
+        );
+      }
     }
 
-    // Push notification
-    const tokens = await ctx.runQuery(
-      internal.notifications.getUserPushTokens,
-      { userId: booking.customerId }
-    );
-    if (tokens.length > 0) {
-      await sendExpoPush(
-        tokens.map((t: any) => t.token),
-        "Booking Cancelled",
-        `Your ${booking.serviceName} appointment was cancelled.`,
-        { bookingId: args.bookingId, type: "booking_cancelled" }
-      );
-    }
-
-    // If staff cancelled, also notify staff if it was customer-cancelled
-    if (
-      booking.staffId &&
-      args.cancelledByUserId === booking.customerId
-    ) {
+    // Also notify staff if customer cancelled
+    if (booking.staffId && cancelledBy === "customer") {
       await ctx.runMutation(internal.notifications.createNotification, {
         userId: booking.staffId,
         tenantId: booking.tenantId,
@@ -239,11 +321,6 @@ export const sendBookingReminder = internalAction({
     );
     if (!booking) return;
 
-    const prefs = await ctx.runQuery(internal.notifications.getUserPreferences, {
-      userId: booking.customerId,
-      tenantId: booking.tenantId,
-    });
-
     // In-app notification
     await ctx.runMutation(internal.notifications.createNotification, {
       userId: booking.customerId,
@@ -254,7 +331,31 @@ export const sendBookingReminder = internalAction({
       data: { bookingId: args.bookingId },
     });
 
-    // Email
+    // Try Novu first
+    if (isNovuConfigured()) {
+      await novuTrigger(
+        "booking-reminder",
+        booking.customerId,
+        {
+          customerName: booking.customerName,
+          serviceName: booking.serviceName,
+          staffName: booking.staffName ?? "",
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          tenantName: booking.tenantName,
+          bookingId: args.bookingId,
+        },
+        booking.tenantId
+      );
+      return;
+    }
+
+    // Fallback: direct Resend + Expo
+    const prefs = await ctx.runQuery(internal.notifications.getUserPreferences, {
+      userId: booking.customerId,
+      tenantId: booking.tenantId,
+    });
+
     if (prefs.emailBookingReminder && booking.customerEmail) {
       const html = bookingReminderTemplate({
         customerName: booking.customerName,
@@ -271,7 +372,6 @@ export const sendBookingReminder = internalAction({
       );
     }
 
-    // Push
     if (prefs.pushEnabled) {
       const tokens = await ctx.runQuery(
         internal.notifications.getUserPushTokens,
@@ -320,7 +420,31 @@ export const sendOrderUpdate = internalAction({
       data: { orderId: args.orderId, status: args.newStatus },
     });
 
-    // Email
+    // Try Novu first
+    if (isNovuConfigured()) {
+      await novuTrigger(
+        "order-update",
+        order.customerId,
+        {
+          customerName: order.customerName,
+          orderId: args.orderId,
+          totalAmount: order.totalAmount,
+          currency: order.currency,
+          items: (order.items ?? []).map((item: any) => ({
+            name: item.snapshotName,
+            quantity: item.quantity,
+            price: item.snapshotPrice,
+          })),
+          tenantName: order.tenantName,
+          newStatus: args.newStatus,
+          statusLabel: statusText,
+        },
+        order.tenantId
+      );
+      return;
+    }
+
+    // Fallback: direct Resend + Expo
     const prefs = await ctx.runQuery(internal.notifications.getUserPreferences, {
       userId: order.customerId,
       tenantId: order.tenantId,
@@ -349,7 +473,6 @@ export const sendOrderUpdate = internalAction({
       );
     }
 
-    // Push
     if (prefs.pushEnabled) {
       const tokens = await ctx.runQuery(
         internal.notifications.getUserPushTokens,
@@ -391,7 +514,23 @@ export const sendStaffInvitation = internalAction({
       data: { tenantId: args.tenantId, role: args.role },
     });
 
-    // Get invited user's email
+    // Try Novu first
+    if (isNovuConfigured()) {
+      await novuTrigger(
+        "staff-invitation",
+        args.invitedUserId,
+        {
+          tenantName,
+          inviterName: args.inviterName,
+          role: args.role,
+          tenantId: args.tenantId,
+        },
+        args.tenantId
+      );
+      return;
+    }
+
+    // Fallback: direct Resend + Expo
     const invitedUser = await ctx.runQuery(
       internal.notifications.getUserInternal,
       { userId: args.invitedUserId }
@@ -409,7 +548,6 @@ export const sendStaffInvitation = internalAction({
       );
     }
 
-    // Push
     const tokens = await ctx.runQuery(
       internal.notifications.getUserPushTokens,
       { userId: args.invitedUserId }
@@ -454,7 +592,25 @@ export const sendPaymentReceipt = internalAction({
       data: { paymentId: args.paymentId },
     });
 
-    // Email
+    // Try Novu first
+    if (isNovuConfigured()) {
+      await novuTrigger(
+        "payment-receipt",
+        payment.customerId,
+        {
+          customerName: customer.name,
+          amount: payment.amount,
+          currency: payment.currency,
+          tenantName: tenant?.name ?? "Store",
+          description: payment.orderId ? "Order payment" : "Booking payment",
+          paymentId: args.paymentId,
+        },
+        payment.tenantId
+      );
+      return;
+    }
+
+    // Fallback: direct Resend + Expo
     if (customer.email) {
       const html = paymentReceiptTemplate({
         customerName: customer.name,
@@ -470,7 +626,6 @@ export const sendPaymentReceipt = internalAction({
       );
     }
 
-    // Push
     const tokens = await ctx.runQuery(
       internal.notifications.getUserPushTokens,
       { userId: payment.customerId }
