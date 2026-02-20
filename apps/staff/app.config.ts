@@ -30,7 +30,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     package: "my.timeo.staff",
   },
   newArchEnabled: true,
-  plugins: ["expo-router", "expo-secure-store"],
+  plugins: [
+    "expo-router",
+    "expo-secure-store",
+    [
+      "expo-camera",
+      {
+        cameraPermission:
+          "Allow Timeo Staff to use the camera for QR code scanning.",
+      },
+    ],
+  ],
   experiments: {
     typedRoutes: true,
   },

@@ -61,6 +61,38 @@ export default function RootLayout() {
               name="notifications/index"
               options={{ presentation: "card" }}
             />
+            <Stack.Screen
+              name="gift-cards/index"
+              options={{ presentation: "card" }}
+            />
+            <Stack.Screen
+              name="gift-cards/create"
+              options={{ presentation: "card" }}
+            />
+            <Stack.Screen
+              name="gift-cards/[id]"
+              options={{ presentation: "card" }}
+            />
+            <Stack.Screen
+              name="e-invoice/index"
+              options={{ presentation: "card" }}
+            />
+            <Stack.Screen
+              name="e-invoice/[id]"
+              options={{ presentation: "card" }}
+            />
+            <Stack.Screen
+              name="vouchers/index"
+              options={{ presentation: "card" }}
+            />
+            <Stack.Screen
+              name="vouchers/create"
+              options={{ presentation: "card" }}
+            />
+            <Stack.Screen
+              name="vouchers/[id]"
+              options={{ presentation: "card" }}
+            />
           </Stack>
         </ThemeProvider>
       </TimeoAuthProvider>

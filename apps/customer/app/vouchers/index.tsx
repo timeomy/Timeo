@@ -123,6 +123,30 @@ export default function VouchersScreen() {
                 >
                   {formatDiscount(item.voucherType, item.voucherValue)}
                 </Text>
+                {item.voucherSource === "partner" && item.voucherPartnerName ? (
+                  <View className="mt-1 flex-row items-center">
+                    <View
+                      className="rounded-full px-2 py-0.5"
+                      style={{ backgroundColor: theme.colors.info + "15" }}
+                    >
+                      <Text
+                        className="text-xs font-medium"
+                        style={{ color: theme.colors.info }}
+                      >
+                        Partner: {item.voucherPartnerName}
+                      </Text>
+                    </View>
+                  </View>
+                ) : null}
+                {item.voucherDescription ? (
+                  <Text
+                    className="mt-1 text-xs"
+                    style={{ color: theme.colors.textSecondary }}
+                    numberOfLines={2}
+                  >
+                    {item.voucherDescription}
+                  </Text>
+                ) : null}
                 <Text
                   className="mt-1 text-xs"
                   style={{ color: theme.colors.textSecondary }}

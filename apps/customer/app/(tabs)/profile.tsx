@@ -14,6 +14,8 @@ import {
   Dumbbell,
   Ticket,
   Package,
+  Gift,
+  Receipt,
 } from "lucide-react-native";
 import {
   Screen,
@@ -318,6 +320,44 @@ export default function ProfileScreen() {
             style={{ color: theme.colors.text }}
           >
             Notifications
+          </Text>
+          <ChevronRight size={18} color={theme.colors.textSecondary} />
+        </TouchableOpacity>
+        <Separator />
+        <TouchableOpacity
+          onPress={() => router.push("/gift-cards/" as any)}
+          className="flex-row items-center py-3"
+        >
+          <View
+            className="mr-3 rounded-lg p-2"
+            style={{ backgroundColor: theme.colors.info + "15" }}
+          >
+            <Gift size={18} color={theme.colors.info} />
+          </View>
+          <Text
+            className="flex-1 text-base"
+            style={{ color: theme.colors.text }}
+          >
+            Gift Cards
+          </Text>
+          <ChevronRight size={18} color={theme.colors.textSecondary} />
+        </TouchableOpacity>
+        <Separator />
+        <TouchableOpacity
+          onPress={() => router.push("/receipts/" as any)}
+          className="flex-row items-center py-3"
+        >
+          <View
+            className="mr-3 rounded-lg p-2"
+            style={{ backgroundColor: theme.colors.secondary + "15" }}
+          >
+            <Receipt size={18} color={theme.colors.secondary} />
+          </View>
+          <Text
+            className="flex-1 text-base"
+            style={{ color: theme.colors.text }}
+          >
+            Receipts
           </Text>
           <ChevronRight size={18} color={theme.colors.textSecondary} />
         </TouchableOpacity>

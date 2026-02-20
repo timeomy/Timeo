@@ -194,12 +194,7 @@ export default function CheckInsScreen() {
         <Button
           variant="outline"
           className="flex-1"
-          onPress={() =>
-            Alert.alert(
-              "QR Scanner",
-              "Camera-based QR scanning will be available after expo-camera is integrated."
-            )
-          }
+          onPress={() => router.push("/check-ins/scan" as any)}
         >
           <View className="flex-row items-center">
             <QrCode size={16} color={theme.colors.primary} />

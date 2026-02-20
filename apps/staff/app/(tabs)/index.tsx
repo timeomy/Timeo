@@ -9,6 +9,8 @@ import {
   LogOut,
   QrCode,
   Dumbbell,
+  CreditCard,
+  DollarSign,
   ChevronRight,
 } from "lucide-react-native";
 import { useQuery } from "convex/react";
@@ -246,6 +248,62 @@ export default function Dashboard() {
                   style={{ color: theme.colors.textSecondary }}
                 >
                   Log & track client sessions
+                </Text>
+              </View>
+              <ChevronRight size={18} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push("/gift-cards/redeem" as any)}
+              className="flex-row items-center rounded-2xl p-4"
+              style={{ backgroundColor: theme.colors.surface }}
+              activeOpacity={0.7}
+            >
+              <View
+                className="mr-3 rounded-lg p-2"
+                style={{ backgroundColor: theme.colors.warning + "15" }}
+              >
+                <CreditCard size={20} color={theme.colors.warning} />
+              </View>
+              <View className="flex-1">
+                <Text
+                  className="text-base font-semibold"
+                  style={{ color: theme.colors.text }}
+                >
+                  Gift Card
+                </Text>
+                <Text
+                  className="text-xs"
+                  style={{ color: theme.colors.textSecondary }}
+                >
+                  Redeem gift card balance
+                </Text>
+              </View>
+              <ChevronRight size={18} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push("/pos/" as any)}
+              className="flex-row items-center rounded-2xl p-4"
+              style={{ backgroundColor: theme.colors.surface }}
+              activeOpacity={0.7}
+            >
+              <View
+                className="mr-3 rounded-lg p-2"
+                style={{ backgroundColor: theme.colors.primary + "15" }}
+              >
+                <DollarSign size={20} color={theme.colors.primary} />
+              </View>
+              <View className="flex-1">
+                <Text
+                  className="text-base font-semibold"
+                  style={{ color: theme.colors.text }}
+                >
+                  Point of Sale
+                </Text>
+                <Text
+                  className="text-xs"
+                  style={{ color: theme.colors.textSecondary }}
+                >
+                  Process transactions
                 </Text>
               </View>
               <ChevronRight size={18} color={theme.colors.textSecondary} />

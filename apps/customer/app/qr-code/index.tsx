@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { View, Text, TouchableOpacity, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { QrCode, RefreshCw, User, Sun, Clock } from "lucide-react-native";
+import QRCode from "react-native-qrcode-svg";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@timeo/api";
 import { useTimeoAuth } from "@timeo/auth";
@@ -105,7 +106,6 @@ export default function QrCodeScreen() {
       {qrCode ? (
         <Card>
           <View className="items-center py-6">
-            {/* QR Code Placeholder — will be replaced with react-native-qrcode-svg */}
             <View
               className="items-center justify-center rounded-2xl"
               style={{
@@ -114,15 +114,7 @@ export default function QrCodeScreen() {
                 backgroundColor: "#FFFFFF",
               }}
             >
-              <QrCode size={120} color="#000000" />
-              <Spacer size={8} />
-              <Text
-                className="text-xs font-mono"
-                style={{ color: "#666666" }}
-                numberOfLines={1}
-              >
-                {qrCode.code}
-              </Text>
+              <QRCode value={qrCode.code} size={200} />
             </View>
 
             <Spacer size={16} />

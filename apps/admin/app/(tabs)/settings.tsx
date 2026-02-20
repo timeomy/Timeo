@@ -14,6 +14,9 @@ import {
   CheckCircle2,
   AlertCircle,
   ExternalLink,
+  Gift,
+  FileText,
+  Ticket,
 } from "lucide-react-native";
 import { useTimeoAuth } from "@timeo/auth";
 import {
@@ -351,6 +354,57 @@ export default function SettingsScreen() {
                   style={{ color: theme.colors.text }}
                 >
                   Payment History
+                </Text>
+              </Row>
+              <ChevronRight size={20} color={theme.colors.textSecondary} />
+            </Row>
+          </Card>
+          <Spacer size={8} />
+          <Card onPress={() => router.push("/gift-cards/" as any)}>
+            <Row justify="between" align="center">
+              <Row align="center" gap={12}>
+                <View
+                  className="h-10 w-10 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: theme.colors.info + "15" }}
+                >
+                  <Gift size={20} color={theme.colors.info} />
+                </View>
+                <Text className="text-base font-medium" style={{ color: theme.colors.text }}>
+                  Gift Cards
+                </Text>
+              </Row>
+              <ChevronRight size={20} color={theme.colors.textSecondary} />
+            </Row>
+          </Card>
+          <Spacer size={8} />
+          <Card onPress={() => router.push("/e-invoice/" as any)}>
+            <Row justify="between" align="center">
+              <Row align="center" gap={12}>
+                <View
+                  className="h-10 w-10 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: theme.colors.error + "15" }}
+                >
+                  <FileText size={20} color={theme.colors.error} />
+                </View>
+                <Text className="text-base font-medium" style={{ color: theme.colors.text }}>
+                  e-Invoice
+                </Text>
+              </Row>
+              <ChevronRight size={20} color={theme.colors.textSecondary} />
+            </Row>
+          </Card>
+          <Spacer size={8} />
+          <Card onPress={() => router.push("/vouchers/" as any)}>
+            <Row justify="between" align="center">
+              <Row align="center" gap={12}>
+                <View
+                  className="h-10 w-10 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: theme.colors.secondary + "15" }}
+                >
+                  <Ticket size={20} color={theme.colors.secondary} />
+                </View>
+                <Text className="text-base font-medium" style={{ color: theme.colors.text }}>
+                  Vouchers
                 </Text>
               </Row>
               <ChevronRight size={20} color={theme.colors.textSecondary} />

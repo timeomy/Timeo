@@ -104,6 +104,14 @@ export default function RootLayout() {
                 name="packages/index"
                 options={{ presentation: "card" }}
               />
+              <Stack.Screen
+                name="gift-cards/index"
+                options={{ presentation: "card" }}
+              />
+              <Stack.Screen
+                name="receipts/index"
+                options={{ presentation: "card" }}
+              />
             </Stack>
           </CartProvider>
         </ThemeProvider>

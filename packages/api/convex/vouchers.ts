@@ -141,6 +141,9 @@ export const getMyVouchers = query({
           voucherCode: voucher?.code ?? "Unknown",
           voucherType: voucher?.type,
           voucherValue: voucher?.value,
+          voucherDescription: voucher?.description,
+          voucherSource: voucher?.source,
+          voucherPartnerName: voucher?.partnerName,
         };
       })
     );
@@ -157,6 +160,11 @@ export const create = mutation({
     value: v.number(),
     maxUses: v.optional(v.number()),
     expiresAt: v.optional(v.number()),
+    source: v.optional(
+      v.union(v.literal("internal"), v.literal("partner"), v.literal("public"))
+    ),
+    partnerName: v.optional(v.string()),
+    description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { user } = await requireRole(ctx, args.tenantId, ["admin"]);
@@ -182,6 +190,9 @@ export const create = mutation({
       usedCount: 0,
       expiresAt: args.expiresAt,
       isActive: true,
+      source: args.source,
+      partnerName: args.partnerName,
+      description: args.description,
       createdAt: Date.now(),
     });
 
@@ -204,6 +215,11 @@ export const update = mutation({
     value: v.optional(v.number()),
     maxUses: v.optional(v.number()),
     expiresAt: v.optional(v.number()),
+    source: v.optional(
+      v.union(v.literal("internal"), v.literal("partner"), v.literal("public"))
+    ),
+    partnerName: v.optional(v.string()),
+    description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const voucher = await ctx.db.get(args.voucherId);
@@ -215,6 +231,9 @@ export const update = mutation({
     if (args.value !== undefined) updates.value = args.value;
     if (args.maxUses !== undefined) updates.maxUses = args.maxUses;
     if (args.expiresAt !== undefined) updates.expiresAt = args.expiresAt;
+    if (args.source !== undefined) updates.source = args.source;
+    if (args.partnerName !== undefined) updates.partnerName = args.partnerName;
+    if (args.description !== undefined) updates.description = args.description;
 
     await ctx.db.patch(args.voucherId, updates);
 

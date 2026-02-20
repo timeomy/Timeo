@@ -66,11 +66,31 @@ export default function RootLayout() {
               options={{ presentation: "card" }}
             />
             <Stack.Screen
+              name="check-ins/scan"
+              options={{ presentation: "modal" }}
+            />
+            <Stack.Screen
               name="session-logs/index"
               options={{ presentation: "card" }}
             />
             <Stack.Screen
               name="session-logs/create"
+              options={{ presentation: "card" }}
+            />
+            <Stack.Screen
+              name="gift-cards/redeem"
+              options={{ presentation: "card" }}
+            />
+            <Stack.Screen
+              name="pos/index"
+              options={{ presentation: "card" }}
+            />
+            <Stack.Screen
+              name="pos/new"
+              options={{ presentation: "card" }}
+            />
+            <Stack.Screen
+              name="pos/[id]"
               options={{ presentation: "card" }}
             />
           </Stack>
