@@ -35,3 +35,16 @@ export const getById = query({
     };
   },
 });
+
+export const getByEmail = query({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    await authenticateUser(ctx);
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .unique();
+    if (!user) return null;
+    return { _id: user._id, name: user.name, email: user.email };
+  },
+});

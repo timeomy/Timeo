@@ -12,7 +12,7 @@ Notifications.setNotificationHandler({
 });
 
 export function usePushNotifications(
-  registerToken: (token: string, platform: "ios" | "android") => Promise<void>,
+  registerToken: ((token: string, platform: "ios" | "android") => Promise<void>) | undefined,
   onNotificationReceived?: (notification: Notifications.Notification) => void,
   onNotificationResponse?: (
     response: Notifications.NotificationResponse
@@ -23,7 +23,7 @@ export function usePushNotifications(
 
   useEffect(() => {
     async function register() {
-      if (Platform.OS === "web") return;
+      if (Platform.OS === "web" || !registerToken) return;
 
       const { status: existingStatus } =
         await Notifications.getPermissionsAsync();
@@ -50,7 +50,7 @@ export function usePushNotifications(
       });
 
       const platform = Platform.OS === "ios" ? "ios" : "android";
-      await registerToken(tokenData.data, platform);
+      await registerToken?.(tokenData.data, platform);
 
       if (Platform.OS === "android") {
         Notifications.setNotificationChannelAsync("default", {

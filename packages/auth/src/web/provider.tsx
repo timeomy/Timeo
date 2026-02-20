@@ -35,9 +35,11 @@ function TimeoWebAuthInner({ children }: { children: React.ReactNode }) {
       ? { id: organization.id, name: organization.name, slug: organization.slug }
       : null;
 
-    const membership = userMemberships.data?.find(
-      (m: { organization: { id: string }; role: string }) => m.organization.id === organization?.id,
-    );
+    const membership = organization
+      ? userMemberships.data?.find(
+          (m: { organization: { id: string }; role: string }) => m.organization.id === organization.id,
+        )
+      : undefined;
     const activeRole = clerkRoleToTimeo(membership?.role);
 
     return {

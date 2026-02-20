@@ -3,6 +3,18 @@ import { v } from "convex/values";
 import { requireRole, requireTenantAccess } from "./lib/middleware";
 import { insertAuditLog } from "./lib/helpers";
 
+export const listPublic = query({
+  args: { tenantId: v.id("tenants") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("services")
+      .withIndex("by_tenant_active", (q) =>
+        q.eq("tenantId", args.tenantId).eq("isActive", true)
+      )
+      .collect();
+  },
+});
+
 export const list = query({
   args: { tenantId: v.id("tenants") },
   handler: async (ctx, args) => {

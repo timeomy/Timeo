@@ -361,13 +361,13 @@ function StripePaymentForm({
       {/* Payment method info */}
       <div className="flex flex-wrap items-center justify-center gap-3 rounded-lg border border-dashed p-3">
         <span className="text-xs text-muted-foreground">Accepted:</span>
-        <span className="rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+        <span className="rounded bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-400">
           FPX Online Banking
         </span>
-        <span className="rounded bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+        <span className="rounded bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400">
           GrabPay
         </span>
-        <span className="rounded bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-700">
+        <span className="rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
           Visa / Mastercard
         </span>
       </div>

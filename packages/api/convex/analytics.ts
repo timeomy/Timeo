@@ -1,5 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { requireRole, requirePlatformAdmin } from "./lib/middleware";
 import {
   type AnalyticsPeriod,
@@ -339,7 +340,7 @@ export const getTopServices = query({
     return Array.from(serviceStats.entries())
       .map(([serviceId, stats]) => ({
         serviceId,
-        serviceName: serviceMap.get(serviceId as any)?.name ?? "Unknown",
+        serviceName: serviceMap.get(serviceId as Id<"services">)?.name ?? "Unknown",
         bookingCount: stats.bookingCount,
         revenue: stats.revenue,
         percentOfTotal:
@@ -495,10 +496,10 @@ export const getCustomerAnalytics = query({
 
     const topCustomers = await Promise.all(
       topCustomerEntries.map(async ([customerId, stats]) => {
-        const user = await ctx.db.get(customerId as any);
+        const user = await ctx.db.get(customerId as Id<"users">);
         return {
           customerId,
-          name: (user as any)?.name ?? "Unknown",
+          name: user?.name ?? "Unknown",
           totalSpent: stats.totalSpent,
           bookingCount: stats.bookingCount,
         };

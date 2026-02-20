@@ -61,6 +61,18 @@ export default function RootLayout() {
               name="notifications/index"
               options={{ presentation: "card" }}
             />
+            <Stack.Screen
+              name="check-ins/index"
+              options={{ presentation: "card" }}
+            />
+            <Stack.Screen
+              name="session-logs/index"
+              options={{ presentation: "card" }}
+            />
+            <Stack.Screen
+              name="session-logs/create"
+              options={{ presentation: "card" }}
+            />
           </Stack>
         </ThemeProvider>
       </TimeoAuthProvider>

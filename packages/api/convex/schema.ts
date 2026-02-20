@@ -5,6 +5,7 @@ export default defineSchema({
   tenants: defineTable({
     name: v.string(),
     slug: v.string(),
+    clerkOrgId: v.optional(v.string()),
     ownerId: v.id("users"),
     plan: v.union(
       v.literal("free"),
@@ -37,7 +38,8 @@ export default defineSchema({
   })
     .index("by_slug", ["slug"])
     .index("by_ownerId", ["ownerId"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_clerkOrgId", ["clerkOrgId"]),
 
   users: defineTable({
     clerkId: v.string(),
@@ -317,6 +319,11 @@ export default defineSchema({
       v.literal("order_update"),
       v.literal("staff_invitation"),
       v.literal("payment_received"),
+      v.literal("check_in"),
+      v.literal("session_logged"),
+      v.literal("credits_low"),
+      v.literal("voucher_received"),
+      v.literal("receipt"),
       v.literal("system")
     ),
     title: v.string(),
@@ -351,6 +358,185 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_token", ["token"]),
+
+  // ─── WS Fitness: Check-ins & QR Codes ───────────────────────────────
+
+  checkIns: defineTable({
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
+    method: v.union(
+      v.literal("qr"),
+      v.literal("nfc"),
+      v.literal("manual")
+    ),
+    checkedInBy: v.optional(v.id("users")),
+    timestamp: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_user", ["userId"])
+    .index("by_tenant_date", ["tenantId", "timestamp"]),
+
+  memberQrCodes: defineTable({
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
+    code: v.string(),
+    isActive: v.boolean(),
+    expiresAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_user", ["userId"])
+    .index("by_code", ["code"]),
+
+  // ─── WS Fitness: Session Packages & Credits ────────────────────────
+
+  sessionPackages: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    sessionCount: v.number(),
+    price: v.number(),
+    currency: v.string(),
+    serviceId: v.optional(v.id("services")),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_active", ["tenantId", "isActive"]),
+
+  sessionCredits: defineTable({
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
+    packageId: v.id("sessionPackages"),
+    totalSessions: v.number(),
+    usedSessions: v.number(),
+    expiresAt: v.optional(v.number()),
+    purchasedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_user", ["userId"])
+    .index("by_tenant_user", ["tenantId", "userId"]),
+
+  // ─── WS Fitness: Session Logs (Coach Notes) ────────────────────────
+
+  sessionLogs: defineTable({
+    tenantId: v.id("tenants"),
+    clientId: v.id("users"),
+    coachId: v.id("users"),
+    bookingId: v.optional(v.id("bookings")),
+    creditId: v.optional(v.id("sessionCredits")),
+    sessionType: v.union(
+      v.literal("personal_training"),
+      v.literal("group_class"),
+      v.literal("assessment"),
+      v.literal("consultation")
+    ),
+    notes: v.optional(v.string()),
+    exercises: v.array(
+      v.object({
+        name: v.string(),
+        sets: v.optional(v.number()),
+        reps: v.optional(v.number()),
+        weight: v.optional(v.number()),
+        duration: v.optional(v.number()),
+        notes: v.optional(v.string()),
+      })
+    ),
+    metrics: v.optional(
+      v.object({
+        weight: v.optional(v.number()),
+        bodyFat: v.optional(v.number()),
+        heartRate: v.optional(v.number()),
+        bloodPressure: v.optional(v.string()),
+        notes: v.optional(v.string()),
+      })
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_client", ["clientId"])
+    .index("by_coach", ["coachId"])
+    .index("by_tenant_client", ["tenantId", "clientId"]),
+
+  // ─── WS Fitness: Vouchers ──────────────────────────────────────────
+
+  vouchers: defineTable({
+    tenantId: v.id("tenants"),
+    code: v.string(),
+    type: v.union(
+      v.literal("percentage"),
+      v.literal("fixed"),
+      v.literal("free_session")
+    ),
+    value: v.number(),
+    maxUses: v.optional(v.number()),
+    usedCount: v.number(),
+    expiresAt: v.optional(v.number()),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_code", ["code"])
+    .index("by_tenant_active", ["tenantId", "isActive"]),
+
+  voucherRedemptions: defineTable({
+    tenantId: v.id("tenants"),
+    voucherId: v.id("vouchers"),
+    userId: v.id("users"),
+    discountAmount: v.number(),
+    bookingId: v.optional(v.id("bookings")),
+    orderId: v.optional(v.id("orders")),
+    redeemedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_voucher", ["voucherId"])
+    .index("by_user", ["userId"]),
+
+  // ─── WS Fitness: POS Transactions ─────────────────────────────────
+
+  posTransactions: defineTable({
+    tenantId: v.id("tenants"),
+    customerId: v.id("users"),
+    staffId: v.id("users"),
+    items: v.array(
+      v.object({
+        type: v.union(
+          v.literal("membership"),
+          v.literal("session_package"),
+          v.literal("service"),
+          v.literal("product")
+        ),
+        referenceId: v.string(),
+        name: v.string(),
+        price: v.number(),
+        quantity: v.number(),
+      })
+    ),
+    subtotal: v.number(),
+    discount: v.number(),
+    total: v.number(),
+    currency: v.string(),
+    paymentMethod: v.union(
+      v.literal("cash"),
+      v.literal("card"),
+      v.literal("qr_pay"),
+      v.literal("bank_transfer")
+    ),
+    voucherId: v.optional(v.id("vouchers")),
+    status: v.union(
+      v.literal("completed"),
+      v.literal("voided"),
+      v.literal("refunded")
+    ),
+    receiptNumber: v.string(),
+    notes: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_customer", ["customerId"])
+    .index("by_tenant_date", ["tenantId", "createdAt"])
+    .index("by_receipt", ["receiptNumber"]),
 
   files: defineTable({
     tenantId: v.optional(v.id("tenants")),

@@ -7,6 +7,9 @@ import {
   CheckCircle,
   ClipboardList,
   LogOut,
+  QrCode,
+  Dumbbell,
+  ChevronRight,
 } from "lucide-react-native";
 import { useQuery } from "convex/react";
 import { api } from "@timeo/api";
@@ -187,6 +190,68 @@ export default function Dashboard() {
             />
           </View>
         </View>
+
+        {/* Quick Actions */}
+        <Section title="Quick Actions">
+          <View style={{ gap: 8 }}>
+            <TouchableOpacity
+              onPress={() => router.push("/check-ins/" as any)}
+              className="flex-row items-center rounded-2xl p-4"
+              style={{ backgroundColor: theme.colors.surface }}
+              activeOpacity={0.7}
+            >
+              <View
+                className="mr-3 rounded-lg p-2"
+                style={{ backgroundColor: theme.colors.success + "15" }}
+              >
+                <QrCode size={20} color={theme.colors.success} />
+              </View>
+              <View className="flex-1">
+                <Text
+                  className="text-base font-semibold"
+                  style={{ color: theme.colors.text }}
+                >
+                  Check-ins
+                </Text>
+                <Text
+                  className="text-xs"
+                  style={{ color: theme.colors.textSecondary }}
+                >
+                  QR scan & manual check-in
+                </Text>
+              </View>
+              <ChevronRight size={18} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push("/session-logs/" as any)}
+              className="flex-row items-center rounded-2xl p-4"
+              style={{ backgroundColor: theme.colors.surface }}
+              activeOpacity={0.7}
+            >
+              <View
+                className="mr-3 rounded-lg p-2"
+                style={{ backgroundColor: theme.colors.info + "15" }}
+              >
+                <Dumbbell size={20} color={theme.colors.info} />
+              </View>
+              <View className="flex-1">
+                <Text
+                  className="text-base font-semibold"
+                  style={{ color: theme.colors.text }}
+                >
+                  Session Logs
+                </Text>
+                <Text
+                  className="text-xs"
+                  style={{ color: theme.colors.textSecondary }}
+                >
+                  Log & track client sessions
+                </Text>
+              </View>
+              <ChevronRight size={18} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        </Section>
 
         {/* Upcoming Bookings */}
         <Section

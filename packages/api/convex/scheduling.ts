@@ -1,5 +1,7 @@
 import { query, mutation } from "./_generated/server";
+import type { QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import {
   requireRole,
   requireTenantAccess,
@@ -51,6 +53,37 @@ function getDayOfWeek(timestampMs: number, timezone: string): number {
 }
 
 // ── Queries ──────────────────────────────────────────────────────────
+
+export const getBusinessHoursPublic = query({
+  args: { tenantId: v.id("tenants") },
+  handler: async (ctx, args) => {
+    const hours = await ctx.db
+      .query("businessHours")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
+      .collect();
+
+    const result = [];
+    for (let day = 0; day < 7; day++) {
+      const existing = hours.find((h) => h.dayOfWeek === day);
+      if (existing) {
+        result.push({
+          dayOfWeek: existing.dayOfWeek,
+          openTime: existing.openTime,
+          closeTime: existing.closeTime,
+          isOpen: existing.isOpen,
+        });
+      } else {
+        result.push({
+          dayOfWeek: day,
+          openTime: "09:00",
+          closeTime: "17:00",
+          isOpen: day >= 1 && day <= 5,
+        });
+      }
+    }
+    return result;
+  },
+});
 
 export const getBusinessHours = query({
   args: { tenantId: v.id("tenants") },
@@ -173,7 +206,7 @@ export const getAvailableSlots = query({
     const businessCloseMs = dayStart + closeMinutes * 60 * 1000;
 
     // 5. Get staff members for this service (all staff in the tenant, or specific)
-    let staffMembers: Array<{ userId: string; userName: string }> = [];
+    let staffMembers: Array<{ userId: Id<"users">; userName: string }> = [];
     if (args.staffId) {
       const user = await ctx.db.get(args.staffId);
       if (user) {
@@ -241,7 +274,13 @@ export const getAvailableSlots = query({
       )
       .collect();
 
-    // 8. For each staff member, compute available slots
+    // 8. Batch-load all staff availability for this tenant (avoids N+1)
+    const allStaffAvail = await ctx.db
+      .query("staffAvailability")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
+      .collect();
+
+    // For each staff member, compute available slots
     const allSlots: Array<{
       startTime: number;
       endTime: number;
@@ -252,14 +291,13 @@ export const getAvailableSlots = query({
     const now = Date.now();
 
     for (const staff of staffMembers) {
-      // Get staff availability for this day
-      const staffAvail = await ctx.db
-        .query("staffAvailability")
-        .withIndex("by_staff", (q) => q.eq("staffId", staff.userId as any))
-        .collect();
+      // Filter staff availability from batch-loaded data
+      const staffAvail = allStaffAvail.filter(
+        (a) => a.staffId === staff.userId
+      );
 
       const dayAvail = staffAvail.find(
-        (a) => a.tenantId === args.tenantId && a.dayOfWeek === dayOfWeek
+        (a) => a.dayOfWeek === dayOfWeek
       );
 
       // Default: available Mon-Fri 09:00-17:00
@@ -594,13 +632,13 @@ export const deleteBlockedSlot = mutation({
 // ── Internal helpers ─────────────────────────────────────────────────
 
 async function isAdmin(
-  ctx: any,
-  tenantId: any,
-  userId: any
+  ctx: { db: QueryCtx["db"] },
+  tenantId: Id<"tenants">,
+  userId: Id<"users">
 ): Promise<boolean> {
   const membership = await ctx.db
     .query("tenantMemberships")
-    .withIndex("by_tenant_user", (q: any) =>
+    .withIndex("by_tenant_user", (q) =>
       q.eq("tenantId", tenantId).eq("userId", userId)
     )
     .unique();

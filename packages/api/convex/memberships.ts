@@ -4,6 +4,17 @@ import { requireRole, requireTenantAccess } from "./lib/middleware";
 import { insertAuditLog } from "./lib/helpers";
 import { membershipIntervalValidator } from "./validators";
 
+export const listPublic = query({
+  args: { tenantId: v.id("tenants") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("memberships")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+  },
+});
+
 export const listByTenant = query({
   args: { tenantId: v.id("tenants") },
   handler: async (ctx, args) => {

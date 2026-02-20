@@ -10,6 +10,10 @@ import {
   CalendarDays,
   Shield,
   Bell,
+  QrCode,
+  Dumbbell,
+  Ticket,
+  Package,
 } from "lucide-react-native";
 import {
   Screen,
@@ -176,6 +180,25 @@ export default function ProfileScreen() {
           Quick Actions
         </Text>
         <TouchableOpacity
+          onPress={() => router.push("/qr-code/" as any)}
+          className="flex-row items-center py-3"
+        >
+          <View
+            className="mr-3 rounded-lg p-2"
+            style={{ backgroundColor: theme.colors.success + "15" }}
+          >
+            <QrCode size={18} color={theme.colors.success} />
+          </View>
+          <Text
+            className="flex-1 text-base"
+            style={{ color: theme.colors.text }}
+          >
+            My QR Code
+          </Text>
+          <ChevronRight size={18} color={theme.colors.textSecondary} />
+        </TouchableOpacity>
+        <Separator />
+        <TouchableOpacity
           onPress={() => router.push("/(tabs)/bookings")}
           className="flex-row items-center py-3"
         >
@@ -190,6 +213,63 @@ export default function ProfileScreen() {
             style={{ color: theme.colors.text }}
           >
             My Bookings
+          </Text>
+          <ChevronRight size={18} color={theme.colors.textSecondary} />
+        </TouchableOpacity>
+        <Separator />
+        <TouchableOpacity
+          onPress={() => router.push("/sessions/" as any)}
+          className="flex-row items-center py-3"
+        >
+          <View
+            className="mr-3 rounded-lg p-2"
+            style={{ backgroundColor: theme.colors.info + "15" }}
+          >
+            <Dumbbell size={18} color={theme.colors.info} />
+          </View>
+          <Text
+            className="flex-1 text-base"
+            style={{ color: theme.colors.text }}
+          >
+            My Sessions
+          </Text>
+          <ChevronRight size={18} color={theme.colors.textSecondary} />
+        </TouchableOpacity>
+        <Separator />
+        <TouchableOpacity
+          onPress={() => router.push("/vouchers/" as any)}
+          className="flex-row items-center py-3"
+        >
+          <View
+            className="mr-3 rounded-lg p-2"
+            style={{ backgroundColor: theme.colors.error + "15" }}
+          >
+            <Ticket size={18} color={theme.colors.error} />
+          </View>
+          <Text
+            className="flex-1 text-base"
+            style={{ color: theme.colors.text }}
+          >
+            My Vouchers
+          </Text>
+          <ChevronRight size={18} color={theme.colors.textSecondary} />
+        </TouchableOpacity>
+        <Separator />
+        <TouchableOpacity
+          onPress={() => router.push("/packages/" as any)}
+          className="flex-row items-center py-3"
+        >
+          <View
+            className="mr-3 rounded-lg p-2"
+            style={{ backgroundColor: theme.colors.warning + "15" }}
+          >
+            <Package size={18} color={theme.colors.warning} />
+          </View>
+          <Text
+            className="flex-1 text-base"
+            style={{ color: theme.colors.text }}
+          >
+            My Packages
           </Text>
           <ChevronRight size={18} color={theme.colors.textSecondary} />
         </TouchableOpacity>

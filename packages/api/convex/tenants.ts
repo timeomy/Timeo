@@ -13,6 +13,96 @@ import {
   tenantBrandingValidator,
 } from "./validators";
 
+export const getByClerkOrgId = query({
+  args: { clerkOrgId: v.string() },
+  handler: async (ctx, args) => {
+    const tenant = await ctx.db
+      .query("tenants")
+      .withIndex("by_clerkOrgId", (q) => q.eq("clerkOrgId", args.clerkOrgId))
+      .unique();
+    if (!tenant) return null;
+    return tenant;
+  },
+});
+
+export const createFromClerk = mutation({
+  args: {
+    clerkOrgId: v.string(),
+    name: v.string(),
+    slug: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Get Clerk identity
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    // Find or create user from Clerk identity
+    let user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      const userId = await ctx.db.insert("users", {
+        clerkId: identity.subject,
+        email: identity.email ?? "",
+        name: identity.name ?? identity.email ?? "User",
+        avatarUrl: identity.pictureUrl,
+        createdAt: Date.now(),
+      });
+      user = await ctx.db.get(userId);
+      if (!user) throw new Error("Failed to create user");
+    }
+
+    // Check if tenant already exists for this Clerk org
+    const existing = await ctx.db
+      .query("tenants")
+      .withIndex("by_clerkOrgId", (q) => q.eq("clerkOrgId", args.clerkOrgId))
+      .unique();
+    if (existing) return existing._id;
+
+    // Check slug uniqueness
+    const slugExists = await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .unique();
+    if (slugExists) throw new Error("Slug already taken");
+
+    const tenantId = await ctx.db.insert("tenants", {
+      name: args.name,
+      slug: args.slug,
+      clerkOrgId: args.clerkOrgId,
+      ownerId: user._id,
+      plan: "free",
+      status: "active",
+      settings: {
+        timezone: "Asia/Kuala_Lumpur",
+        autoConfirmBookings: false,
+      },
+      branding: {},
+      createdAt: Date.now(),
+    });
+
+    await ctx.db.insert("tenantMemberships", {
+      userId: user._id,
+      tenantId,
+      role: "admin",
+      status: "active",
+      joinedAt: Date.now(),
+    });
+
+    await insertAuditLog(ctx, {
+      tenantId,
+      actorId: user._id,
+      action: "tenant.created",
+      resource: "tenants",
+      resourceId: tenantId,
+    });
+
+    return tenantId;
+  },
+});
+
 export const getBySlug = query({
   args: { slug: v.string() },
   handler: async (ctx, args) => {
