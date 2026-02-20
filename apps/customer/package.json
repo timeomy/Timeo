@@ -2,12 +2,14 @@
   "name": "@timeo/customer",
   "version": "1.0.0",
   "private": true,
-  "main": "expo-router/entry",
+  "main": "./index.js",
   "scripts": {
     "dev": "expo start",
     "build": "expo export",
     "lint": "eslint app/",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
