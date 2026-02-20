@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@timeo/api";
-import { useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
+import { useTimeoWebAuthContext, useTimeoWebTenantContext, isRoleAtLeast } from "@timeo/auth/web";
+import type { TimeoRole } from "@timeo/auth/web";
 import { getInitials } from "@timeo/shared";
 import {
   Button,
@@ -14,6 +15,13 @@ import {
   AvatarFallback,
   Separator,
   Skeleton,
+  Input,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
   cn,
 } from "@timeo/ui/web";
 import {
@@ -41,22 +49,35 @@ import {
   Store,
 } from "lucide-react";
 
-const sidebarLinks = [
+type SidebarLink = {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  minRole?: TimeoRole;
+};
+
+const sidebarLinks: SidebarLink[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/services", label: "Services", icon: Calendar },
-  { href: "/dashboard/products", label: "Products", icon: ShoppingBag },
-  { href: "/dashboard/bookings", label: "Bookings", icon: ClipboardList },
-  { href: "/dashboard/orders", label: "Orders", icon: Package },
-  { href: "/dashboard/team", label: "Team", icon: Users },
-  { href: "/dashboard/scheduling", label: "Scheduling", icon: Clock },
-  { href: "/dashboard/check-ins", label: "Check-ins", icon: ScanLine },
-  { href: "/dashboard/session-logs", label: "Session Logs", icon: NotebookPen },
-  { href: "/dashboard/packages", label: "Packages", icon: CreditCard },
-  { href: "/dashboard/vouchers", label: "Vouchers", icon: Ticket },
-  { href: "/dashboard/members", label: "Members", icon: UserCheck },
-  { href: "/dashboard/pos", label: "POS", icon: Store },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard/services", label: "Services", icon: Calendar, minRole: "admin" },
+  { href: "/dashboard/products", label: "Products", icon: ShoppingBag, minRole: "admin" },
+  { href: "/dashboard/bookings", label: "Bookings", icon: ClipboardList, minRole: "staff" },
+  { href: "/dashboard/orders", label: "Orders", icon: Package, minRole: "admin" },
+  { href: "/dashboard/team", label: "Team", icon: Users, minRole: "admin" },
+  { href: "/dashboard/scheduling", label: "Scheduling", icon: Clock, minRole: "staff" },
+  { href: "/dashboard/check-ins", label: "Check-ins", icon: ScanLine, minRole: "staff" },
+  { href: "/dashboard/session-logs", label: "Session Logs", icon: NotebookPen, minRole: "staff" },
+  { href: "/dashboard/packages", label: "Packages", icon: CreditCard, minRole: "admin" },
+  { href: "/dashboard/vouchers", label: "Vouchers", icon: Ticket, minRole: "admin" },
+  { href: "/dashboard/members", label: "Members", icon: UserCheck, minRole: "staff" },
+  { href: "/dashboard/pos", label: "POS", icon: Store, minRole: "staff" },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings, minRole: "admin" },
 ];
+
+function getVisibleLinks(role: TimeoRole) {
+  return sidebarLinks.filter(
+    (link) => !link.minRole || isRoleAtLeast(role, link.minRole)
+  );
+}
 
 function TenantSwitcher() {
   const { tenants, activeTenant, switchTenant, isLoading } =
@@ -156,7 +177,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {sidebarLinks.map((link) => {
+        {getVisibleLinks(activeRole).map((link) => {
           const isActive =
             pathname === link.href ||
             (link.href !== "/dashboard" && pathname.startsWith(link.href + "/"));
@@ -220,37 +241,31 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { isLoaded, isSignedIn, activeTenantId } = useTimeoWebAuthContext();
+  const { isLoaded, isSignedIn, activeTenantId, activeRole } = useTimeoWebAuthContext();
   const { tenants, activeTenant, isLoading: tenantsLoading } = useTimeoWebTenantContext();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Auto-sync: if Clerk org exists but no Convex tenant, create one
+  // Check if current Clerk org has a matching Convex tenant
   const existingTenant = useQuery(
     api.tenants.getByClerkOrgId,
     activeTenantId ? { clerkOrgId: activeTenantId } : "skip"
   );
-  const createTenant = useMutation(api.tenants.createFromClerk);
-  const syncingRef = useRef<string | null>(null);
+  const linkTenant = useMutation(api.tenants.linkToClerkOrg);
+  const [linkSlug, setLinkSlug] = useState("");
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [linking, setLinking] = useState(false);
+  const [error, setError] = useState("");
 
+  // Show link dialog when Clerk org has no matching Convex tenant
   useEffect(() => {
-    // Only sync when query has resolved (null = not found, undefined = still loading)
     if (
       activeTenantId &&
       existingTenant === null &&
-      existingTenant !== undefined &&
-      activeTenant &&
-      syncingRef.current !== activeTenantId
+      existingTenant !== undefined
     ) {
-      syncingRef.current = activeTenantId;
-      createTenant({
-        clerkOrgId: activeTenantId,
-        name: activeTenant.name,
-        slug: activeTenant.slug ?? activeTenant.name.toLowerCase().replace(/\s+/g, "-"),
-      })
-        .catch(() => {})
-        .finally(() => { syncingRef.current = null; });
+      setShowLinkDialog(true);
     }
-  }, [activeTenantId, existingTenant, activeTenant, createTenant]);
+  }, [activeTenantId, existingTenant]);
 
   // Loading state
   if (!isLoaded || tenantsLoading) {
@@ -280,8 +295,62 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return null;
   }
 
+  // Customers should use the portal, not the admin dashboard
+  if (activeRole === "customer") {
+    router.push("/portal");
+    return null;
+  }
+
+  async function handleLink() {
+    if (!linkSlug.trim() || !activeTenantId) return;
+    setLinking(true);
+    setError("");
+    try {
+      await linkTenant({ tenantSlug: linkSlug.trim().toLowerCase(), clerkOrgId: activeTenantId });
+      setShowLinkDialog(false);
+      setLinkSlug("");
+    } catch (err: any) {
+      const msg = err?.message || "Failed to link business. Check the slug and try again.";
+      setError(msg);
+    } finally {
+      setLinking(false);
+    }
+  }
+
   return (
     <div className="flex h-screen bg-background">
+      {/* Link/Create business dialog — shown when Clerk org has no Convex tenant */}
+      <Dialog open={showLinkDialog && existingTenant === null} onOpenChange={setShowLinkDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Connect Your Business</DialogTitle>
+            <DialogDescription>
+              Your organization{activeTenant ? ` "${activeTenant.name}"` : ""} isn&apos;t linked to a business on Timeo yet.
+              Enter a business slug to link, or create a new business.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              placeholder="e.g. ws-fitness"
+              value={linkSlug}
+              onChange={(e) => setLinkSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+              onKeyDown={(e) => e.key === "Enter" && handleLink()}
+            />
+            {error && <p className="text-sm text-destructive">{error}</p>}
+          </div>
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={() => { setShowLinkDialog(false); router.push("/onboarding"); }}
+            >
+              Create New Business
+            </Button>
+            <Button onClick={handleLink} disabled={linking || !linkSlug.trim()}>
+              {linking ? "Linking..." : "Link Business"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Desktop Sidebar */}
       <aside className="hidden w-64 flex-shrink-0 border-r border-white/[0.06] bg-card/50 lg:block">
         <SidebarContent />

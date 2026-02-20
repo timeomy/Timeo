@@ -43,10 +43,8 @@ export const getSystemHealth = query({
 
     const tenants = await ctx.db.query("tenants").collect();
     const users = await ctx.db.query("users").collect();
-    const bookings = await ctx.db
-      .query("bookings")
-      .filter((q) => q.eq(q.field("status"), "pending"))
-      .collect();
+    const allBookings = await ctx.db.query("bookings").collect();
+    const pendingBookings = allBookings.filter((b) => b.status === "pending");
     const orders = await ctx.db
       .query("orders")
       .filter((q) => q.eq(q.field("status"), "pending"))
@@ -56,9 +54,106 @@ export const getSystemHealth = query({
       totalTenants: tenants.length,
       activeTenants: tenants.filter((t) => t.status === "active").length,
       totalUsers: users.length,
-      pendingBookings: bookings.length,
+      totalBookings: allBookings.length,
+      pendingBookings: pendingBookings.length,
       pendingOrders: orders.length,
       timestamp: Date.now(),
+    };
+  },
+});
+
+export const listAllTenants = query({
+  args: {},
+  handler: async (ctx) => {
+    await requirePlatformAdmin(ctx);
+
+    const tenants = await ctx.db.query("tenants").collect();
+
+    const tenantsWithOwner = await Promise.all(
+      tenants.map(async (tenant) => {
+        const owner = await ctx.db.get(tenant.ownerId);
+        return {
+          _id: tenant._id,
+          name: tenant.name,
+          slug: tenant.slug,
+          plan: tenant.plan,
+          status: tenant.status,
+          createdAt: tenant.createdAt,
+          ownerName: owner?.name ?? "Unknown",
+          ownerEmail: owner?.email ?? "—",
+        };
+      })
+    );
+
+    return tenantsWithOwner;
+  },
+});
+
+export const listAuditLogs = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    await requirePlatformAdmin(ctx);
+
+    const limit = args.limit ?? 100;
+
+    const logs = await ctx.db
+      .query("auditLogs")
+      .order("desc")
+      .take(limit);
+
+    const logsWithActor = await Promise.all(
+      logs.map(async (log) => {
+        const actor = await ctx.db.get(log.actorId);
+        let tenantName: string | null = null;
+        if (log.tenantId) {
+          const tenant = await ctx.db.get(log.tenantId);
+          tenantName = tenant?.name ?? null;
+        }
+        return {
+          _id: log._id,
+          action: log.action,
+          resource: log.resource,
+          resourceId: log.resourceId,
+          metadata: log.metadata,
+          timestamp: log.timestamp,
+          tenantId: log.tenantId ?? null,
+          tenantName,
+          actorName: actor?.name ?? "Unknown",
+          actorEmail: actor?.email ?? "—",
+        };
+      })
+    );
+
+    return logsWithActor;
+  },
+});
+
+export const getTenantStats = query({
+  args: { tenantId: v.id("tenants") },
+  handler: async (ctx, args) => {
+    await requirePlatformAdmin(ctx);
+
+    const members = await ctx.db
+      .query("tenantMemberships")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
+      .collect();
+
+    const bookings = await ctx.db
+      .query("bookings")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
+      .collect();
+
+    const services = await ctx.db
+      .query("services")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
+      .collect();
+
+    return {
+      membersCount: members.length,
+      bookingsCount: bookings.length,
+      servicesCount: services.length,
     };
   },
 });

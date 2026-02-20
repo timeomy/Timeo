@@ -5,6 +5,9 @@ const isProtectedRoute = createRouteMatcher([
   "/settings(.*)",
   "/onboarding(.*)",
   "/admin(.*)",
+  "/portal(.*)",
+  "/post-login(.*)",
+  "/join(.*)",
 ]);
 
 const isPublicRoute = createRouteMatcher([

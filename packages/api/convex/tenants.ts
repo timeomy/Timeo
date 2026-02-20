@@ -1,5 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
 import {
   authenticateUser,
   requireRole,
@@ -66,30 +67,57 @@ export const createFromClerk = mutation({
       .query("tenants")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
       .unique();
-    if (slugExists) throw new Error("Slug already taken");
 
-    const tenantId = await ctx.db.insert("tenants", {
-      name: args.name,
-      slug: args.slug,
-      clerkOrgId: args.clerkOrgId,
-      ownerId: user._id,
-      plan: "free",
-      status: "active",
-      settings: {
-        timezone: "Asia/Kuala_Lumpur",
-        autoConfirmBookings: false,
-      },
-      branding: {},
-      createdAt: Date.now(),
-    });
+    let tenantId: Id<"tenants">;
 
-    await ctx.db.insert("tenantMemberships", {
-      userId: user._id,
-      tenantId,
-      role: "admin",
-      status: "active",
-      joinedAt: Date.now(),
-    });
+    if (slugExists && !slugExists.clerkOrgId) {
+      // Existing unlinked tenant with matching slug — link to this Clerk org
+      await ctx.db.patch(slugExists._id, { clerkOrgId: args.clerkOrgId });
+      tenantId = slugExists._id;
+
+      // Ensure user has membership
+      const existingMembership = await ctx.db
+        .query("tenantMemberships")
+        .withIndex("by_tenant_user", (q) =>
+          q.eq("tenantId", tenantId).eq("userId", user._id)
+        )
+        .unique();
+      if (!existingMembership) {
+        await ctx.db.insert("tenantMemberships", {
+          userId: user._id,
+          tenantId,
+          role: "admin",
+          status: "active",
+          joinedAt: Date.now(),
+        });
+      }
+    } else if (slugExists) {
+      throw new Error("Slug already taken");
+    } else {
+      // Create new tenant
+      tenantId = await ctx.db.insert("tenants", {
+        name: args.name,
+        slug: args.slug,
+        clerkOrgId: args.clerkOrgId,
+        ownerId: user._id,
+        plan: "free",
+        status: "active",
+        settings: {
+          timezone: "Asia/Kuala_Lumpur",
+          autoConfirmBookings: false,
+        },
+        branding: {},
+        createdAt: Date.now(),
+      });
+
+      await ctx.db.insert("tenantMemberships", {
+        userId: user._id,
+        tenantId,
+        role: "admin",
+        status: "active",
+        joinedAt: Date.now(),
+      });
+    }
 
     await insertAuditLog(ctx, {
       tenantId,
@@ -100,6 +128,75 @@ export const createFromClerk = mutation({
     });
 
     return tenantId;
+  },
+});
+
+// Link an existing Convex tenant to the caller's active Clerk organization.
+// Also creates a tenantMembership for the caller if one doesn't exist.
+export const linkToClerkOrg = mutation({
+  args: {
+    tenantSlug: v.string(),
+    clerkOrgId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const clerkOrgId = args.clerkOrgId;
+
+    // Find the Convex tenant by slug
+    const tenant = await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q) => q.eq("slug", args.tenantSlug))
+      .first();
+    if (!tenant) throw new Error(`Tenant not found: ${args.tenantSlug}`);
+
+    // Check if already linked to a different org
+    if (tenant.clerkOrgId && tenant.clerkOrgId !== clerkOrgId) {
+      throw new Error("Tenant already linked to a different Clerk organization");
+    }
+
+    // Link the tenant
+    await ctx.db.patch(tenant._id, { clerkOrgId });
+
+    // Find or create user
+    let user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      const userId = await ctx.db.insert("users", {
+        clerkId: identity.subject,
+        email: identity.email ?? "",
+        name: identity.name ?? "User",
+        avatarUrl: identity.pictureUrl,
+        createdAt: Date.now(),
+      });
+      user = await ctx.db.get(userId);
+    }
+
+    if (user) {
+      // Ensure user has admin membership
+      const existing = await ctx.db
+        .query("tenantMemberships")
+        .withIndex("by_tenant_user", (q) =>
+          q.eq("tenantId", tenant._id).eq("userId", user!._id)
+        )
+        .unique();
+
+      if (!existing) {
+        await ctx.db.insert("tenantMemberships", {
+          userId: user._id,
+          tenantId: tenant._id,
+          role: "admin",
+          status: "active",
+          joinedAt: Date.now(),
+        });
+      }
+    }
+
+    return { tenantId: tenant._id, name: tenant.name, clerkOrgId };
   },
 });
 
@@ -240,5 +337,72 @@ export const updateBranding = mutation({
       resource: "tenants",
       resourceId: args.tenantId,
     });
+  },
+});
+
+/** Customer self-join: find a tenant by slug and create a customer membership */
+export const joinAsCustomer = mutation({
+  args: {
+    tenantSlug: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    // Find tenant by slug
+    const tenant = await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q) => q.eq("slug", args.tenantSlug))
+      .first();
+    if (!tenant) throw new Error(`Business not found: ${args.tenantSlug}`);
+
+    // Find or create user
+    let user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      const userId = await ctx.db.insert("users", {
+        clerkId: identity.subject,
+        email: identity.email ?? "",
+        name: identity.name ?? "Customer",
+        avatarUrl: identity.pictureUrl,
+        createdAt: Date.now(),
+      });
+      user = await ctx.db.get(userId);
+      if (!user) throw new Error("Failed to create user");
+    }
+
+    // Check if already a member
+    const existing = await ctx.db
+      .query("tenantMemberships")
+      .withIndex("by_tenant_user", (q) =>
+        q.eq("tenantId", tenant._id).eq("userId", user!._id)
+      )
+      .unique();
+
+    if (existing) {
+      return { tenantId: tenant._id, name: tenant.name, alreadyMember: true };
+    }
+
+    // Create customer membership
+    await ctx.db.insert("tenantMemberships", {
+      userId: user._id,
+      tenantId: tenant._id,
+      role: "customer",
+      status: "active",
+      joinedAt: Date.now(),
+    });
+
+    await insertAuditLog(ctx, {
+      tenantId: tenant._id,
+      actorId: user._id,
+      action: "member.joined",
+      resource: "tenantMemberships",
+      resourceId: tenant._id,
+    });
+
+    return { tenantId: tenant._id, name: tenant.name, alreadyMember: false };
   },
 });

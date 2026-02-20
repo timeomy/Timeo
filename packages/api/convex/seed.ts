@@ -11,6 +11,37 @@ export const listUsers = internalQuery({
   },
 });
 
+export const listTenants = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const tenants = await ctx.db.query("tenants").collect();
+    return tenants.map((t) => ({
+      _id: t._id,
+      name: t.name,
+      slug: t.slug,
+      clerkOrgId: t.clerkOrgId ?? null,
+      plan: t.plan,
+      status: t.status,
+    }));
+  },
+});
+
+export const linkTenantToClerkOrg = internalMutation({
+  args: {
+    tenantSlug: v.string(),
+    clerkOrgId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const tenant = await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q) => q.eq("slug", args.tenantSlug))
+      .first();
+    if (!tenant) throw new Error(`Tenant not found: ${args.tenantSlug}`);
+    await ctx.db.patch(tenant._id, { clerkOrgId: args.clerkOrgId });
+    return { tenantId: tenant._id, name: tenant.name, linked: true };
+  },
+});
+
 // ─── Step 1: Create WS Fitness tenant with real data ─────────────────────
 
 export const seedWsFitness = internalMutation({
