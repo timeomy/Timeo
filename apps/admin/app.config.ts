@@ -4,6 +4,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "Timeo Admin",
   slug: "timeo-admin",
+  owner: "oxloz",
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/icon.png",
@@ -16,15 +17,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   ios: {
     supportsTablet: true,
-    bundleIdentifier: "com.timeo.admin",
+    bundleIdentifier: "my.timeo.admin",
   },
   android: {
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
       backgroundColor: "#1A56DB",
     },
-    package: "com.timeo.admin",
+    package: "my.timeo.admin",
   },
+  newArchEnabled: true,
   plugins: ["expo-router", "expo-secure-store"],
   experiments: {
     typedRoutes: true,
@@ -35,7 +37,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     posthogKey: process.env.EXPO_PUBLIC_POSTHOG_KEY,
     posthogHost: process.env.EXPO_PUBLIC_POSTHOG_HOST,
     eas: {
-      projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID,
+      projectId: "b05aca04-f736-4a1a-9c76-4f5ea0fcdc58",
     },
   },
 });
