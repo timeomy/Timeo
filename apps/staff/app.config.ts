@@ -29,7 +29,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     package: "my.timeo.staff",
   },
-  newArchEnabled: true,
   plugins: [
     "expo-router",
     "expo-secure-store",
