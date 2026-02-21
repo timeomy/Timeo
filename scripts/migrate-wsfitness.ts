@@ -16,7 +16,7 @@ import { api, internal } from "../packages/api/convex/_generated/api";
 import fs from "fs";
 import path from "path";
 
-const CONVEX_URL = process.env.CONVEX_URL || "https://prestigious-aardvark-541.convex.cloud";
+const CONVEX_URL = process.env.CONVEX_URL || "https://mild-gnat-567.convex.cloud";
 const DATA_DIR = "/Users/jabez/Downloads/wsfitnessmk2";
 
 const client = new ConvexHttpClient(CONVEX_URL);
