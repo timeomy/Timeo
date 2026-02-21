@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+*.log
+.env*.local
+.turbo
+dist
+apps/customer/ios
+apps/customer/android
+apps/staff/ios
+apps/staff/android
+apps/admin/ios
+apps/admin/android
+apps/platform/ios
+apps/platform/android
