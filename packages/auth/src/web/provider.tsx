@@ -3,8 +3,9 @@
 import React, { createContext, useContext, useMemo } from "react";
 import { ClerkProvider, useAuth, useUser, useOrganization, useOrganizationList } from "@clerk/nextjs";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
-import { ConvexReactClient } from "convex/react";
-import type { TimeoAuthContext, TenantSwitcherContext, TenantInfo } from "../types";
+import { ConvexReactClient, useQuery } from "convex/react";
+import { api } from "@timeo/api";
+import type { TimeoAuthContext, TenantSwitcherContext, TenantInfo, TimeoRole } from "../types";
 import { clerkRoleToTimeo } from "../types";
 
 // ─── Contexts ───────────────────────────────────────────────────────
@@ -19,6 +20,14 @@ function TimeoWebAuthInner({ children }: { children: React.ReactNode }) {
   const { userMemberships, setActive } = useOrganizationList({
     userMemberships: { infinite: true },
   });
+
+  // Fallback: query Convex tenants when user has no active Clerk org
+  const hasClerkOrg = !!organization;
+  const hasAnyClerkMemberships = (userMemberships.data?.length ?? 0) > 0;
+  const convexTenants = useQuery(
+    api.tenants.getMyTenants,
+    (!hasClerkOrg || !hasAnyClerkMemberships) && isSignedIn ? {} : "skip"
+  );
 
   const authContext = useMemo<TimeoAuthContext>(() => {
     const timeoUser = user
@@ -35,12 +44,17 @@ function TimeoWebAuthInner({ children }: { children: React.ReactNode }) {
       ? { id: organization.id, name: organization.name, slug: organization.slug }
       : null;
 
-    const membership = organization
-      ? userMemberships.data?.find(
-          (m: { organization: { id: string }; role: string }) => m.organization.id === organization.id,
-        )
-      : undefined;
-    const activeRole = clerkRoleToTimeo(membership?.role);
+    // Determine role: Clerk org role takes priority, fallback to Convex membership role
+    let activeRole: TimeoRole = "customer";
+    if (organization) {
+      const membership = userMemberships.data?.find(
+        (m: { organization: { id: string }; role: string }) => m.organization.id === organization.id,
+      );
+      activeRole = clerkRoleToTimeo(membership?.role);
+    } else if (convexTenants && convexTenants.length > 0) {
+      // Legacy user without Clerk org — use Convex role
+      activeRole = (convexTenants[0]!.role as TimeoRole) ?? "customer";
+    }
 
     return {
       user: timeoUser,
@@ -51,10 +65,10 @@ function TimeoWebAuthInner({ children }: { children: React.ReactNode }) {
       activeTenantId: organization?.id ?? null,
       activeRole,
     };
-  }, [user, organization, authLoaded, isSignedIn, signOut, userMemberships.data]);
+  }, [user, organization, authLoaded, isSignedIn, signOut, userMemberships.data, convexTenants]);
 
   const tenantSwitcher = useMemo<TenantSwitcherContext>(() => {
-    const tenants: TenantInfo[] =
+    const clerkTenants: TenantInfo[] =
       userMemberships.data?.map(
         (m: { organization: { id: string; name: string; slug: string | null }; role: string }) => ({
           id: m.organization.id,
@@ -64,7 +78,22 @@ function TimeoWebAuthInner({ children }: { children: React.ReactNode }) {
         }),
       ) ?? [];
 
-    const activeTenant = tenants.find((t) => t.id === organization?.id) ?? null;
+    // Fallback: use Convex tenants for legacy users without Clerk orgs
+    const tenants: TenantInfo[] =
+      clerkTenants.length > 0
+        ? clerkTenants
+        : (convexTenants ?? [])
+            .filter((t): t is NonNullable<typeof t> => t != null)
+            .map((t) => ({
+              id: t._id,
+              name: t.name,
+              slug: t.slug,
+              role: (t.role as TimeoRole) ?? "customer",
+            }));
+
+    const activeTenant =
+      tenants.find((t) => t.id === organization?.id) ??
+      (clerkTenants.length === 0 && tenants.length > 0 ? tenants[0]! : null);
 
     return {
       tenants,
@@ -72,9 +101,9 @@ function TimeoWebAuthInner({ children }: { children: React.ReactNode }) {
       switchTenant: async (orgId: string) => {
         await setActive?.({ organization: orgId });
       },
-      isLoading: userMemberships.isLoading,
+      isLoading: userMemberships.isLoading && !convexTenants,
     };
-  }, [userMemberships.data, userMemberships.isLoading, organization?.id, setActive]);
+  }, [userMemberships.data, userMemberships.isLoading, organization?.id, setActive, convexTenants]);
 
   return (
     <TimeoWebAuthCtx.Provider value={authContext}>

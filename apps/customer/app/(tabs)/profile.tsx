@@ -306,7 +306,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
         <Separator />
         <TouchableOpacity
-          onPress={() => router.push("/notifications/")}
+          onPress={() => router.push("/notifications" as any)}
           className="flex-row items-center py-3"
         >
           <View

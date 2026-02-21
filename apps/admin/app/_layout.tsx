@@ -74,6 +74,14 @@ export default function RootLayout() {
               options={{ presentation: "card" }}
             />
             <Stack.Screen
+              name="analytics/index"
+              options={{ presentation: "card" }}
+            />
+            <Stack.Screen
+              name="payments/index"
+              options={{ presentation: "card" }}
+            />
+            <Stack.Screen
               name="e-invoice/index"
               options={{ presentation: "card" }}
             />

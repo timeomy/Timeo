@@ -24,19 +24,26 @@ export default function PortalHomePage() {
   const { user } = useTimeoWebAuthContext();
   const { tenantId, tenant } = useTenantId();
 
+  // Wait for user + membership to exist before querying tenant-scoped data
+  const access = useQuery(
+    api.auth.checkAccess,
+    tenantId ? { tenantId } : "skip"
+  );
+  const ready = tenantId && access?.ready;
+
   const bookings = useQuery(
     api.bookings.listByCustomer,
-    tenantId ? { tenantId } : "skip"
+    ready ? { tenantId } : "skip"
   );
 
   const creditBalance = useQuery(
     api.sessionCredits.getBalance,
-    tenantId ? { tenantId } : "skip"
+    ready ? { tenantId } : "skip"
   );
 
   const vouchers = useQuery(
     api.vouchers.getMyVouchers,
-    tenantId ? { tenantId } : "skip"
+    ready ? { tenantId } : "skip"
   );
 
   const firstName = user?.firstName ?? "there";

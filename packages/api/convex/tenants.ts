@@ -229,6 +229,42 @@ export const getById = query({
   },
 });
 
+/** Returns all tenants the current user is a member of (via Convex memberships) */
+export const getMyTenants = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    if (!user) return [];
+
+    const memberships = await ctx.db
+      .query("tenantMemberships")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .collect();
+
+    const tenants = await Promise.all(
+      memberships.map(async (m) => {
+        const tenant = await ctx.db.get(m.tenantId);
+        if (!tenant) return null;
+        return {
+          _id: tenant._id,
+          name: tenant.name,
+          slug: tenant.slug,
+          role: m.role,
+        };
+      })
+    );
+
+    return tenants.filter(Boolean);
+  },
+});
+
 export const list = query({
   args: {},
   handler: async (ctx) => {

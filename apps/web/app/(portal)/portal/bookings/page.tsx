@@ -22,9 +22,12 @@ export default function MyBookingsPage() {
   const { tenantId } = useTenantId();
   const [activeTab, setActiveTab] = useState<BookingStatus>("all");
 
+  const access = useQuery(api.auth.checkAccess, tenantId ? { tenantId } : "skip");
+  const ready = tenantId && access?.ready;
+
   const bookings = useQuery(
     api.bookings.listByCustomer,
-    tenantId ? { tenantId } : "skip"
+    ready ? { tenantId } : "skip"
   );
 
   const now = Date.now();

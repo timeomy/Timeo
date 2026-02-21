@@ -123,6 +123,21 @@ export const updateRole = mutation({
       resourceId: args.membershipId,
       metadata: { oldRole, newRole: args.role },
     });
+
+    // Sync role to Clerk if the tenant has a Clerk org
+    const tenant = await ctx.db.get(args.tenantId);
+    const targetUser = await ctx.db.get(membership.userId);
+    if (tenant?.clerkOrgId && targetUser?.clerkId && !targetUser.clerkId.startsWith("legacy_")) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.clerkSync.syncRoleToClerk,
+        {
+          clerkUserId: targetUser.clerkId,
+          clerkOrgId: tenant.clerkOrgId,
+          newRole: args.role,
+        }
+      );
+    }
   },
 });
 
@@ -151,6 +166,66 @@ export const suspend = mutation({
       resource: "tenantMemberships",
       resourceId: args.membershipId,
     });
+  },
+});
+
+export const inviteByEmail = mutation({
+  args: {
+    tenantId: v.id("tenants"),
+    email: v.string(),
+    role: memberRoleValidator,
+  },
+  handler: async (ctx, args) => {
+    const { user } = await requireRole(ctx, args.tenantId, ["admin"]);
+
+    const targetUser = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email.toLowerCase()))
+      .unique();
+
+    if (!targetUser) {
+      throw new Error(
+        "No user found with that email. They must sign up first before being invited."
+      );
+    }
+
+    const existing = await ctx.db
+      .query("tenantMemberships")
+      .withIndex("by_tenant_user", (q) =>
+        q.eq("tenantId", args.tenantId).eq("userId", targetUser._id)
+      )
+      .unique();
+    if (existing) throw new Error("User already has a membership in this tenant");
+
+    const membershipId = await ctx.db.insert("tenantMemberships", {
+      userId: targetUser._id,
+      tenantId: args.tenantId,
+      role: args.role,
+      status: "invited",
+      joinedAt: Date.now(),
+    });
+
+    await insertAuditLog(ctx, {
+      tenantId: args.tenantId,
+      actorId: user._id,
+      action: "membership.invited",
+      resource: "tenantMemberships",
+      resourceId: membershipId,
+      metadata: { invitedUserId: targetUser._id, role: args.role },
+    });
+
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.notifications.sendStaffInvitation,
+      {
+        invitedUserId: targetUser._id,
+        tenantId: args.tenantId,
+        inviterName: user.name,
+        role: args.role,
+      }
+    );
+
+    return membershipId;
   },
 });
 

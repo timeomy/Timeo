@@ -93,6 +93,10 @@ export default function RootLayout() {
               name="pos/[id]"
               options={{ presentation: "card" }}
             />
+            <Stack.Screen
+              name="schedule/index"
+              options={{ presentation: "card" }}
+            />
           </Stack>
         </ThemeProvider>
       </TimeoAuthProvider>

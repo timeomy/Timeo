@@ -5,16 +5,33 @@ import { api } from "@timeo/api";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
 
 /**
- * Resolves the Clerk Organization ID to a Convex tenant ID.
- * Returns { tenantId, tenant, isLoading } where tenantId is the Convex Id<"tenants">.
+ * Resolves the current tenant for the user.
+ *
+ * Priority:
+ * 1. Clerk org → Convex tenant (via getByClerkOrgId)
+ * 2. Fallback: first Convex tenant membership (for legacy users without Clerk orgs)
  */
 export function useTenantId() {
   const { activeTenantId } = useTimeoWebAuthContext();
 
-  const tenant = useQuery(
+  // Primary: resolve via Clerk org
+  const tenantFromClerk = useQuery(
     api.tenants.getByClerkOrgId,
     activeTenantId ? { clerkOrgId: activeTenantId } : "skip"
   );
+
+  // Fallback: resolve via Convex memberships (legacy users without Clerk orgs)
+  const myTenants = useQuery(
+    api.tenants.getMyTenants,
+    !activeTenantId ? {} : "skip"
+  );
+
+  // Pick the resolved tenant
+  const tenant = activeTenantId ? tenantFromClerk : (myTenants?.[0] ?? null);
+
+  const isLoading = activeTenantId
+    ? tenantFromClerk === undefined
+    : myTenants === undefined;
 
   return {
     /** Convex tenant _id (use this for all API calls) */
@@ -24,8 +41,8 @@ export function useTenantId() {
     /** Clerk Organization ID */
     clerkOrgId: activeTenantId,
     /** Still loading the tenant lookup */
-    isLoading: activeTenantId ? tenant === undefined : false,
+    isLoading,
     /** Clerk org exists but no Convex tenant (needs onboarding sync) */
-    needsSync: activeTenantId ? tenant === null : false,
+    needsSync: activeTenantId ? tenantFromClerk === null : false,
   };
 }

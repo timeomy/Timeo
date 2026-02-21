@@ -1,1 +1,1 @@
-/// <reference types="nativewind/types" />
+/// <reference path="../../packages/ui/nativewind-env.d.ts" />

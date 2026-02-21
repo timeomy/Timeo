@@ -146,7 +146,7 @@ export const getRevenueOverview = query({
 export const getBookingAnalytics = query({
   args: { tenantId: v.id("tenants"), period: periodValidator },
   handler: async (ctx, args) => {
-    await requireRole(ctx, args.tenantId, ["admin"]);
+    await requireRole(ctx, args.tenantId, ["admin", "staff"]);
 
     const range = getPeriodRange(args.period as AnalyticsPeriod);
 

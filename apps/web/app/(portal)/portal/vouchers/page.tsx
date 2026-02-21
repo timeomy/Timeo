@@ -14,9 +14,12 @@ import { Ticket, AlertCircle } from "lucide-react";
 export default function MyVouchersPage() {
   const { tenantId } = useTenantId();
 
+  const access = useQuery(api.auth.checkAccess, tenantId ? { tenantId } : "skip");
+  const ready = tenantId && access?.ready;
+
   const vouchers = useQuery(
     api.vouchers.getMyVouchers,
-    tenantId ? { tenantId } : "skip"
+    ready ? { tenantId } : "skip"
   );
 
   return (

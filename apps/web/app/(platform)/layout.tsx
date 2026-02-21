@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
 import { getInitials } from "@timeo/shared";
+import { useEnsureUser } from "@/hooks/use-ensure-user";
 import {
   Button,
   Avatar,
@@ -161,6 +162,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 export default function PlatformLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isLoaded, isSignedIn, activeRole } = useTimeoWebAuthContext();
+  useEnsureUser(!!isSignedIn);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // Loading state

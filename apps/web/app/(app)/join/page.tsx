@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
 import { api } from "@timeo/api";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
+import { useEnsureUser } from "@/hooks/use-ensure-user";
 import {
   Button,
   Card,
@@ -18,6 +19,7 @@ import { Zap, UserPlus, ArrowRight, Loader2, Check, Building2 } from "lucide-rea
 export default function JoinBusinessPage() {
   const router = useRouter();
   const { isLoaded, isSignedIn, user } = useTimeoWebAuthContext();
+  useEnsureUser(!!isSignedIn);
   const joinAsCustomer = useMutation(api.tenants.joinAsCustomer);
 
   const [slug, setSlug] = useState("");

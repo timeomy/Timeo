@@ -222,7 +222,8 @@ export const voidTransaction = mutation({
     const transaction = await ctx.db.get(args.transactionId);
     if (!transaction) throw new Error("Transaction not found");
 
-    const { user } = await requireRole(ctx, transaction.tenantId, ["admin"]);
+    // Staff and admin can void transactions
+    const { user } = await requireRole(ctx, transaction.tenantId, ["admin", "staff"]);
 
     if (transaction.status !== "completed") {
       throw new Error("Only completed transactions can be voided");
@@ -238,6 +239,125 @@ export const voidTransaction = mutation({
       resourceId: args.transactionId,
       metadata: { reason: args.reason, receiptNumber: transaction.receiptNumber },
     });
+  },
+});
+
+export const deleteTransaction = mutation({
+  args: {
+    transactionId: v.id("posTransactions"),
+  },
+  handler: async (ctx, args) => {
+    const transaction = await ctx.db.get(args.transactionId);
+    if (!transaction) throw new Error("Transaction not found");
+
+    // Only admin can permanently delete transactions
+    const { user } = await requireRole(ctx, transaction.tenantId, ["admin"]);
+
+    await ctx.db.delete(args.transactionId);
+
+    await insertAuditLog(ctx, {
+      tenantId: transaction.tenantId,
+      actorId: user._id,
+      action: "pos.transaction_deleted",
+      resource: "posTransactions",
+      resourceId: args.transactionId,
+      metadata: {
+        receiptNumber: transaction.receiptNumber,
+        total: transaction.total,
+      },
+    });
+  },
+});
+
+export const listByCustomer = query({
+  args: { tenantId: v.id("tenants") },
+  handler: async (ctx, args) => {
+    const user = await authenticateUser(ctx);
+
+    const transactions = await ctx.db
+      .query("posTransactions")
+      .withIndex("by_customer", (q) => q.eq("customerId", user._id))
+      .order("desc")
+      .collect();
+
+    // Filter to the current tenant
+    const tenantTransactions = transactions.filter(
+      (t) => t.tenantId === args.tenantId
+    );
+
+    return await Promise.all(
+      tenantTransactions.map(async (t) => {
+        const staff = await ctx.db.get(t.staffId);
+        const tenant = await ctx.db.get(t.tenantId);
+        return {
+          ...t,
+          staffName: staff?.name ?? "Unknown",
+          tenantName: tenant?.name ?? "Unknown",
+        };
+      })
+    );
+  },
+});
+
+export const getMonthlyStatement = query({
+  args: {
+    tenantId: v.id("tenants"),
+    year: v.number(),
+    month: v.number(), // 0-11
+  },
+  handler: async (ctx, args) => {
+    await requireRole(ctx, args.tenantId, ["admin", "staff"]);
+
+    const startDate = new Date(args.year, args.month, 1).getTime();
+    const endDate = new Date(args.year, args.month + 1, 1).getTime();
+
+    const transactions = await ctx.db
+      .query("posTransactions")
+      .withIndex("by_tenant_date", (q) =>
+        q
+          .eq("tenantId", args.tenantId)
+          .gte("createdAt", startDate)
+          .lt("createdAt", endDate)
+      )
+      .order("desc")
+      .collect();
+
+    const completed = transactions.filter((t) => t.status === "completed");
+    const voided = transactions.filter((t) => t.status === "voided");
+
+    const byPaymentMethod = { cash: 0, card: 0, qr_pay: 0, bank_transfer: 0 };
+    const byItemType = { membership: 0, session_package: 0, service: 0, product: 0 };
+
+    for (const t of completed) {
+      byPaymentMethod[t.paymentMethod] += t.total;
+      for (const item of t.items) {
+        byItemType[item.type as keyof typeof byItemType] += item.price * item.quantity;
+      }
+    }
+
+    const enriched = await Promise.all(
+      transactions.map(async (t) => {
+        const customer = await ctx.db.get(t.customerId);
+        const staff = await ctx.db.get(t.staffId);
+        return {
+          ...t,
+          customerName: customer?.name ?? "Unknown",
+          staffName: staff?.name ?? "Unknown",
+        };
+      })
+    );
+
+    return {
+      period: { year: args.year, month: args.month },
+      totalTransactions: completed.length,
+      totalRevenue: completed.reduce((sum, t) => sum + t.total, 0),
+      totalDiscount: completed.reduce((sum, t) => sum + t.discount, 0),
+      voidedCount: voided.length,
+      voidedTotal: voided.reduce((sum, t) => sum + t.total, 0),
+      byPaymentMethod,
+      byItemType,
+      transactions: enriched,
+    };
   },
 });
 

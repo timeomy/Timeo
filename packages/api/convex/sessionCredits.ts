@@ -189,6 +189,50 @@ export const consume = mutation({
   },
 });
 
+export const adjustCredits = mutation({
+  args: {
+    creditId: v.id("sessionCredits"),
+    totalSessions: v.optional(v.number()),
+    usedSessions: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const credit = await ctx.db.get(args.creditId);
+    if (!credit) throw new Error("Session credit not found");
+
+    const { user } = await requireRole(ctx, credit.tenantId, ["admin"]);
+
+    const updates: Record<string, number> = {};
+    if (args.totalSessions !== undefined) {
+      if (args.totalSessions < 0) throw new Error("Total sessions cannot be negative");
+      updates.totalSessions = args.totalSessions;
+    }
+    if (args.usedSessions !== undefined) {
+      if (args.usedSessions < 0) throw new Error("Used sessions cannot be negative");
+      const total = args.totalSessions ?? credit.totalSessions;
+      if (args.usedSessions > total) throw new Error("Used sessions cannot exceed total");
+      updates.usedSessions = args.usedSessions;
+    }
+
+    if (Object.keys(updates).length === 0) return;
+
+    await ctx.db.patch(args.creditId, updates);
+
+    await insertAuditLog(ctx, {
+      tenantId: credit.tenantId,
+      actorId: user._id,
+      action: "session_credits.adjusted",
+      resource: "sessionCredits",
+      resourceId: args.creditId,
+      metadata: {
+        oldTotal: credit.totalSessions,
+        oldUsed: credit.usedSessions,
+        newTotal: updates.totalSessions ?? credit.totalSessions,
+        newUsed: updates.usedSessions ?? credit.usedSessions,
+      },
+    });
+  },
+});
+
 export const refund = mutation({
   args: {
     creditId: v.id("sessionCredits"),

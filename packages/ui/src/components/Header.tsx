@@ -3,9 +3,16 @@ import { View, Text, TouchableOpacity } from "react-native";
 import { ChevronLeft } from "lucide-react-native";
 import { useTheme } from "../theme";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type IconComponent = React.ComponentType<any>;
+
 export interface HeaderProps {
   title: string;
   onBack?: () => void;
+  leftAction?: {
+    icon?: IconComponent;
+    onPress: () => void;
+  };
   rightActions?: React.ReactNode;
   className?: string;
 }
@@ -13,10 +20,14 @@ export interface HeaderProps {
 export function Header({
   title,
   onBack,
+  leftAction,
   rightActions,
   className,
 }: HeaderProps) {
   const theme = useTheme();
+
+  const backHandler = leftAction?.onPress ?? onBack;
+  const BackIcon = leftAction?.icon ?? ChevronLeft;
 
   return (
     <View
@@ -24,13 +35,13 @@ export function Header({
       style={{ backgroundColor: theme.colors.background }}
     >
       <View className="min-w-[40px]">
-        {onBack ? (
+        {backHandler ? (
           <TouchableOpacity
-            onPress={onBack}
+            onPress={backHandler}
             className="h-10 w-10 items-center justify-center rounded-full"
             style={{ backgroundColor: theme.colors.surface }}
           >
-            <ChevronLeft size={22} color={theme.colors.text} />
+            <BackIcon size={22} color={theme.colors.text} />
           </TouchableOpacity>
         ) : null}
       </View>

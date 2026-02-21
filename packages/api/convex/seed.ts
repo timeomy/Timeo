@@ -26,6 +26,131 @@ export const listTenants = internalQuery({
   },
 });
 
+/** Make a user a platform admin — creates a special membership if needed */
+export const setPlatformAdmin = internalMutation({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    let user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .first();
+
+    if (!user) {
+      // Create user record for this email
+      const userId = await ctx.db.insert("users", {
+        clerkId: `pending_${args.email}`,
+        email: args.email,
+        name: args.email.split("@")[0],
+        createdAt: Date.now(),
+      });
+      user = await ctx.db.get(userId);
+      if (!user) throw new Error("Failed to create user");
+    }
+
+    // Get or create the first tenant for platform admin membership
+    const tenants = await ctx.db.query("tenants").first();
+    if (!tenants) throw new Error("No tenants exist. Create a tenant first.");
+
+    // Check for existing platform_admin membership
+    const existing = await ctx.db
+      .query("tenantMemberships")
+      .withIndex("by_user", (q) => q.eq("userId", user!._id))
+      .filter((q) => q.eq(q.field("role"), "platform_admin"))
+      .first();
+
+    if (existing) {
+      return { userId: user._id, message: "Already a platform admin" };
+    }
+
+    await ctx.db.insert("tenantMemberships", {
+      userId: user._id,
+      tenantId: tenants._id,
+      role: "platform_admin",
+      status: "active",
+      joinedAt: Date.now(),
+    });
+
+    return { userId: user._id, message: `${args.email} is now a platform admin` };
+  },
+});
+
+/** Update a user's role by email for a given tenant */
+export const setRoleByEmail = internalMutation({
+  args: {
+    email: v.string(),
+    tenantSlug: v.string(),
+    role: v.union(
+      v.literal("customer"),
+      v.literal("staff"),
+      v.literal("admin"),
+      v.literal("platform_admin")
+    ),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .first();
+    if (!user) throw new Error(`User not found: ${args.email}`);
+
+    const tenant = await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q) => q.eq("slug", args.tenantSlug))
+      .unique();
+    if (!tenant) throw new Error(`Tenant not found: ${args.tenantSlug}`);
+
+    const membership = await ctx.db
+      .query("tenantMemberships")
+      .withIndex("by_tenant_user", (q) =>
+        q.eq("tenantId", tenant._id).eq("userId", user._id)
+      )
+      .first();
+
+    if (!membership) {
+      throw new Error(`No membership found for ${args.email} in ${args.tenantSlug}`);
+    }
+
+    const oldRole = membership.role;
+    await ctx.db.patch(membership._id, { role: args.role });
+
+    return {
+      message: `${args.email} role updated: ${oldRole} → ${args.role} in ${args.tenantSlug}`,
+    };
+  },
+});
+
+/** Remove duplicate tenantMemberships — keeps the highest-role one per tenant+user */
+export const deduplicateMemberships = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query("tenantMemberships").collect();
+    const seen = new Map<string, typeof all>();
+
+    for (const m of all) {
+      const key = `${m.tenantId}:${m.userId}`;
+      if (!seen.has(key)) seen.set(key, []);
+      seen.get(key)!.push(m);
+    }
+
+    const roleRank: Record<string, number> = {
+      platform_admin: 4, admin: 3, staff: 2, customer: 1,
+    };
+
+    let removed = 0;
+    for (const [, memberships] of seen) {
+      if (memberships.length <= 1) continue;
+      // Sort by role rank descending — keep the first (highest)
+      memberships.sort((a, b) => (roleRank[b.role] ?? 0) - (roleRank[a.role] ?? 0));
+      for (let i = 1; i < memberships.length; i++) {
+        await ctx.db.delete(memberships[i]._id);
+        removed++;
+      }
+    }
+
+    return { removed, total: all.length };
+  },
+});
+
 export const linkTenantToClerkOrg = internalMutation({
   args: {
     tenantSlug: v.string(),

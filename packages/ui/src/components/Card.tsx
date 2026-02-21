@@ -2,7 +2,7 @@ import React from "react";
 import { View, TouchableOpacity, type ViewProps } from "react-native";
 import { useTheme } from "../theme";
 
-export interface CardProps extends Omit<ViewProps, "style"> {
+export interface CardProps extends ViewProps {
   variant?: "default" | "outlined" | "elevated";
   onPress?: () => void;
   children: React.ReactNode;

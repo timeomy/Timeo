@@ -3,8 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@timeo/api";
 import { useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
 import { getInitials } from "@timeo/shared";
+import { useEnsureUser } from "@/hooks/use-ensure-user";
+import { useEnsureMembership } from "@/hooks/use-ensure-membership";
+import { useTenantId } from "@/hooks/use-tenant-id";
 import {
   Avatar,
   AvatarImage,
@@ -18,6 +23,7 @@ import {
   Package,
   Ticket,
   QrCode,
+  Receipt,
   Menu,
   X,
   LogOut,
@@ -37,6 +43,7 @@ const navLinks: NavLink[] = [
   { href: "/portal/bookings", label: "Bookings", icon: Calendar },
   { href: "/portal/packages", label: "Packages", icon: Package },
   { href: "/portal/vouchers", label: "Vouchers", icon: Ticket },
+  { href: "/portal/transactions", label: "Transactions", icon: Receipt },
   { href: "/portal/qr-code", label: "QR Code", icon: QrCode },
 ];
 
@@ -50,8 +57,14 @@ export default function PortalLayout({
   const { isLoaded, isSignedIn, user, signOut, activeRole } =
     useTimeoWebAuthContext();
   const { tenants, isLoading: tenantsLoading } = useTimeoWebTenantContext();
+  useEnsureUser(!!isSignedIn);
+  const { tenantId } = useTenantId();
+  useEnsureMembership(tenantId);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  // Fallback: check Convex memberships for legacy users without Clerk orgs
+  const myTenants = useQuery(api.tenants.getMyTenants);
 
   const displayName = user
     ? [user.firstName, user.lastName].filter(Boolean).join(" ") ||
@@ -81,10 +94,36 @@ export default function PortalLayout({
     return null;
   }
 
-  // No businesses
+  // No Clerk orgs — check Convex memberships before redirecting
   if (tenants.length === 0) {
-    router.push("/join");
-    return null;
+    if (myTenants && myTenants.length > 0) {
+      // Legacy user with Convex membership — check role before allowing portal access
+      const convexRole = myTenants[0]!.role;
+      if (convexRole !== "customer") {
+        // Staff/admin should use the dashboard, not the portal
+        router.push("/dashboard");
+        return null;
+      }
+      // Customer — stay on portal (useTenantId resolves via Convex)
+    } else if (myTenants !== undefined) {
+      // No Convex memberships either — go to join page
+      router.push("/join");
+      return null;
+    } else {
+      // Still loading myTenants — show loading spinner
+      return (
+        <div className="flex h-screen items-center justify-center bg-background">
+          <div className="flex flex-col items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
+              <Zap className="h-7 w-7 text-primary-foreground" />
+            </div>
+            <div className="h-1 w-32 overflow-hidden rounded-full bg-muted">
+              <div className="h-full w-1/2 animate-pulse rounded-full bg-primary" />
+            </div>
+          </div>
+        </div>
+      );
+    }
   }
 
   // Role guard: non-customers should go to dashboard

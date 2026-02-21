@@ -29,7 +29,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     package: "my.timeo.admin",
   },
-  plugins: ["expo-router", "expo-secure-store"],
+  plugins: [
+    "expo-router",
+    "expo-secure-store",
+  ],
   experiments: {
     typedRoutes: true,
   },

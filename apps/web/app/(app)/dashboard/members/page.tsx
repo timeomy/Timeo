@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@timeo/api";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import {
@@ -17,20 +17,36 @@ import {
   TableHeader,
   TableRow,
   Skeleton,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  Separator,
+  Select,
   cn,
 } from "@timeo/ui/web";
 import {
   Search,
   UserCheck,
-  AlertCircle,
   CreditCard,
   ScanLine,
+  Settings2,
+  Plus,
+  Minus,
+  Package,
+  Pencil,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 const ROLE_BADGE: Record<string, string> = {
   admin: "bg-primary/20 text-primary border-primary/30",
   staff: "bg-blue-500/20 text-blue-400 border-blue-500/30",
   customer: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
+  platform_admin: "bg-purple-500/20 text-purple-400 border-purple-500/30",
 };
 
 const STATUS_BADGE: Record<string, string> = {
@@ -44,18 +60,28 @@ export default function MembersPage() {
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // Credit management dialog state
+  const [manageMember, setManageMember] = useState<any>(null);
+  const [assignPackageOpen, setAssignPackageOpen] = useState(false);
+  const [adjustCreditId, setAdjustCreditId] = useState<string | null>(null);
+
   const members = useQuery(
     api.tenantMemberships.listByTenant,
     tenantId ? { tenantId } : "skip",
   );
 
-  const credits = useQuery(
+  const allCredits = useQuery(
     api.sessionCredits.listByTenant,
     tenantId ? { tenantId } : "skip",
   );
 
   const checkIns = useQuery(
     api.checkIns.listByTenant,
+    tenantId ? { tenantId } : "skip",
+  );
+
+  const packages = useQuery(
+    api.sessionPackages.listByTenant,
     tenantId ? { tenantId } : "skip",
   );
 
@@ -70,13 +96,12 @@ export default function MembersPage() {
           .includes(search.toLowerCase()),
     ) ?? [];
 
-  // Build per-user credit/check-in summaries
   function getUserCredits(userId: string) {
-    if (!credits) return { total: 0, used: 0, remaining: 0 };
-    const userCredits = credits.filter((c: any) => c.userId === userId);
+    if (!allCredits) return { total: 0, used: 0, remaining: 0, items: [] };
+    const userCredits = allCredits.filter((c: any) => c.userId === userId);
     const total = userCredits.reduce((s: number, c: any) => s + c.totalSessions, 0);
     const used = userCredits.reduce((s: number, c: any) => s + c.usedSessions, 0);
-    return { total, used, remaining: total - used };
+    return { total, used, remaining: total - used, items: userCredits };
   }
 
   function getLastCheckIn(userId: string) {
@@ -150,6 +175,7 @@ export default function MembersPage() {
                   </TableHead>
                   <TableHead className="text-white/50">Last Check-in</TableHead>
                   <TableHead className="text-white/50">Joined</TableHead>
+                  <TableHead className="text-white/50 w-10"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -184,7 +210,7 @@ export default function MembersPage() {
                                 {member.userName ?? "Unknown"}
                               </p>
                               <p className="text-xs text-white/40">
-                                {member.userEmail ?? "—"}
+                                {member.userEmail ?? "\u2014"}
                               </p>
                             </div>
                           </div>
@@ -241,7 +267,20 @@ export default function MembersPage() {
                         <TableCell className="text-white/70">
                           {member.joinedAt
                             ? formatDate(member.joinedAt)
-                            : "—"}
+                            : "\u2014"}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-white/40 hover:text-white"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setManageMember(member);
+                            }}
+                          >
+                            <Settings2 className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
 
@@ -251,7 +290,7 @@ export default function MembersPage() {
                           key={`${member._id}-detail`}
                           className="border-white/[0.06] bg-white/[0.01]"
                         >
-                          <TableCell colSpan={6}>
+                          <TableCell colSpan={7}>
                             <div className="grid gap-4 py-2 sm:grid-cols-3">
                               <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
                                 <p className="text-xs text-white/40 mb-1">
@@ -293,9 +332,77 @@ export default function MembersPage() {
                                   {member.status} since{" "}
                                   {member.joinedAt
                                     ? formatDate(member.joinedAt)
-                                    : "—"}
+                                    : "\u2014"}
                                 </p>
                               </div>
+                            </div>
+
+                            {/* Per-package credit breakdown */}
+                            {userCred.items.length > 0 && (
+                              <div className="mt-3 space-y-2">
+                                <p className="text-xs font-medium text-white/50">
+                                  Credit Breakdown
+                                </p>
+                                {userCred.items.map((credit: any) => (
+                                  <div
+                                    key={credit._id}
+                                    className="flex items-center justify-between rounded-md border border-white/[0.06] bg-white/[0.02] px-3 py-2"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <Package className="h-3.5 w-3.5 text-white/40" />
+                                      <span className="text-sm text-white">
+                                        {credit.packageName}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-sm text-white/70">
+                                        {credit.remaining}/{credit.totalSessions} remaining
+                                      </span>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 gap-1 px-2 text-xs text-white/40 hover:text-white"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setManageMember(member);
+                                          setAdjustCreditId(credit._id);
+                                        }}
+                                      >
+                                        <Pencil className="h-3 w-3" />
+                                        Adjust
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            <div className="mt-3 flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1.5 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setManageMember(member);
+                                  setAssignPackageOpen(true);
+                                }}
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                                Assign Package
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1.5 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setManageMember(member);
+                                }}
+                              >
+                                <Settings2 className="h-3.5 w-3.5" />
+                                Manage
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -308,9 +415,432 @@ export default function MembersPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Manage Member Dialog — always re-derive from live query data */}
+      {manageMember && tenantId && (() => {
+        const liveMember = members?.find((m: any) => m._id === manageMember._id) ?? manageMember;
+        return (
+          <ManageMemberDialog
+            member={liveMember}
+            tenantId={tenantId}
+            credits={getUserCredits(liveMember.userId).items}
+            packages={packages ?? []}
+            initialAssignOpen={assignPackageOpen}
+            initialAdjustCreditId={adjustCreditId}
+            onClose={() => {
+              setManageMember(null);
+              setAssignPackageOpen(false);
+              setAdjustCreditId(null);
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
+
+// ─── Manage Member Dialog ──────────────────────────────────────────────────
+
+function ManageMemberDialog({
+  member,
+  tenantId,
+  credits,
+  packages,
+  initialAssignOpen,
+  initialAdjustCreditId,
+  onClose,
+}: {
+  member: any;
+  tenantId: any;
+  credits: any[];
+  packages: any[];
+  initialAssignOpen: boolean;
+  initialAdjustCreditId: string | null;
+  onClose: () => void;
+}) {
+  const updateRole = useMutation(api.tenantMemberships.updateRole);
+  const purchaseCredits = useMutation(api.sessionCredits.purchase);
+  const adjustCredits = useMutation(api.sessionCredits.adjustCredits);
+
+  const [view, setView] = useState<"main" | "assign" | "adjust">(
+    initialAssignOpen ? "assign" : initialAdjustCreditId ? "adjust" : "main"
+  );
+  const [selectedPackageId, setSelectedPackageId] = useState("");
+  const [editCreditId, setEditCreditId] = useState<string | null>(initialAdjustCreditId);
+  const [editTotal, setEditTotal] = useState("");
+  const [editUsed, setEditUsed] = useState("");
+  const [roleValue, setRoleValue] = useState(member.role);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const activePackages = packages.filter((p: any) => p.isActive);
+
+  async function handleRoleChange(newRole: string) {
+    if (newRole === member.role) return;
+    setSaving(true);
+    setError("");
+    try {
+      await updateRole({
+        tenantId,
+        membershipId: member._id,
+        role: newRole as any,
+      });
+      setRoleValue(newRole);
+      setSuccess("Role updated");
+      setTimeout(() => setSuccess(""), 2000);
+    } catch (err: any) {
+      setError(err?.message || "Failed to update role");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleAssignPackage() {
+    if (!selectedPackageId) return;
+    setSaving(true);
+    setError("");
+    try {
+      await purchaseCredits({
+        tenantId,
+        userId: member.userId,
+        packageId: selectedPackageId as any,
+      });
+      setSuccess("Package assigned");
+      setSelectedPackageId("");
+      setTimeout(() => {
+        setSuccess("");
+        setView("main");
+      }, 1500);
+    } catch (err: any) {
+      setError(err?.message || "Failed to assign package");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleAdjustCredits() {
+    if (!editCreditId) return;
+    setSaving(true);
+    setError("");
+    try {
+      const updates: { creditId: any; totalSessions?: number; usedSessions?: number } = {
+        creditId: editCreditId as any,
+      };
+      if (editTotal !== "") updates.totalSessions = parseInt(editTotal, 10);
+      if (editUsed !== "") updates.usedSessions = parseInt(editUsed, 10);
+
+      await adjustCredits(updates);
+      setSuccess("Credits adjusted");
+      setTimeout(() => {
+        setSuccess("");
+        setView("main");
+        setEditCreditId(null);
+      }, 1500);
+    } catch (err: any) {
+      setError(err?.message || "Failed to adjust credits");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function startAdjust(credit: any) {
+    setEditCreditId(credit._id);
+    setEditTotal(String(credit.totalSessions));
+    setEditUsed(String(credit.usedSessions));
+    setError("");
+    setSuccess("");
+    setView("adjust");
+  }
+
+  return (
+    <Dialog open onOpenChange={() => onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+              {(member.userName?.[0] ?? "?").toUpperCase()}
+            </div>
+            <div>
+              <span>{member.userName ?? "Unknown"}</span>
+              <p className="text-xs font-normal text-muted-foreground">
+                {member.userEmail}
+              </p>
+            </div>
+          </DialogTitle>
+        </DialogHeader>
+
+        {error && (
+          <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="rounded-md bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
+            {success}
+          </div>
+        )}
+
+        {view === "main" && (
+          <div className="space-y-4">
+            {/* Role */}
+            <Select
+              label="Role"
+              value={roleValue}
+              onChange={handleRoleChange}
+              disabled={saving}
+              options={[
+                { label: "Customer", value: "customer" },
+                { label: "Staff", value: "staff" },
+                { label: "Admin", value: "admin" },
+              ]}
+            />
+
+            <Separator className="bg-white/[0.06]" />
+
+            {/* Session Credits */}
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Session Credits
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1 px-2 text-xs"
+                  onClick={() => {
+                    setError("");
+                    setSuccess("");
+                    setView("assign");
+                  }}
+                >
+                  <Plus className="h-3 w-3" />
+                  Assign Package
+                </Button>
+              </div>
+
+              {credits.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  No credits assigned yet
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {credits.map((credit: any) => {
+                    const remaining = credit.totalSessions - credit.usedSessions;
+                    const pct = credit.totalSessions > 0
+                      ? (remaining / credit.totalSessions) * 100
+                      : 0;
+                    return (
+                      <div
+                        key={credit._id}
+                        className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Package className="h-4 w-4 text-primary" />
+                            <span className="text-sm font-medium">
+                              {credit.packageName}
+                            </span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+                            onClick={() => startAdjust(credit)}
+                          >
+                            <Pencil className="h-3 w-3" />
+                            Adjust
+                          </Button>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            {credit.usedSessions} used / {credit.totalSessions} total
+                          </span>
+                          <span
+                            className={cn(
+                              "font-semibold",
+                              remaining > 0 ? "text-emerald-400" : "text-red-400"
+                            )}
+                          >
+                            {remaining} left
+                          </span>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+                          <div
+                            className={cn(
+                              "h-full rounded-full transition-all",
+                              pct > 50
+                                ? "bg-emerald-500"
+                                : pct > 20
+                                  ? "bg-yellow-500"
+                                  : "bg-red-500"
+                            )}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        {credit.expiresAt && (
+                          <p className="mt-1.5 text-xs text-muted-foreground">
+                            Expires: {new Date(credit.expiresAt).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {view === "assign" && (
+          <div className="space-y-4">
+            <DialogDescription>
+              Assign a session package to {member.userName ?? "this member"}.
+            </DialogDescription>
+
+            {activePackages.length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">
+                No active packages available. Create one in the Packages page first.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {activePackages.map((pkg: any) => (
+                  <button
+                    key={pkg._id}
+                    onClick={() => setSelectedPackageId(pkg._id)}
+                    className={cn(
+                      "flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors",
+                      selectedPackageId === pkg._id
+                        ? "border-primary bg-primary/5"
+                        : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]"
+                    )}
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{pkg.name}</p>
+                      {pkg.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {pkg.description}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-primary">
+                        {pkg.sessionCount} sessions
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {pkg.currency} {pkg.price.toFixed(2)}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setView("main");
+                  setError("");
+                  setSuccess("");
+                }}
+              >
+                Back
+              </Button>
+              <Button
+                onClick={handleAssignPackage}
+                disabled={saving || !selectedPackageId}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Assigning...
+                  </>
+                ) : (
+                  "Assign Package"
+                )}
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+
+        {view === "adjust" && editCreditId && (
+          <div className="space-y-4">
+            <DialogDescription>
+              Adjust session credit balance for {member.userName ?? "this member"}.
+            </DialogDescription>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                  Total Sessions
+                </label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={editTotal}
+                  onChange={(e) => setEditTotal(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                  Used Sessions
+                </label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={editTotal ? parseInt(editTotal) : undefined}
+                  value={editUsed}
+                  onChange={(e) => setEditUsed(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {editTotal && editUsed && (
+              <div className="rounded-md bg-white/[0.02] border border-white/[0.06] px-3 py-2 text-sm">
+                Remaining:{" "}
+                <span className="font-semibold text-emerald-400">
+                  {Math.max(0, parseInt(editTotal || "0") - parseInt(editUsed || "0"))}
+                </span>{" "}
+                sessions
+              </div>
+            )}
+
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setView("main");
+                  setEditCreditId(null);
+                  setError("");
+                  setSuccess("");
+                }}
+              >
+                Back
+              </Button>
+              <Button
+                onClick={handleAdjustCredits}
+                disabled={saving || (!editTotal && !editUsed)}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Supporting Components ─────────────────────────────────────────────────
 
 function LoadingSkeleton() {
   return (

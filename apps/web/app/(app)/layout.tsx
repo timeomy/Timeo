@@ -8,6 +8,7 @@ import { api } from "@timeo/api";
 import { useTimeoWebAuthContext, useTimeoWebTenantContext, isRoleAtLeast } from "@timeo/auth/web";
 import type { TimeoRole } from "@timeo/auth/web";
 import { getInitials } from "@timeo/shared";
+import { useEnsureUser } from "@/hooks/use-ensure-user";
 import {
   Button,
   Avatar,
@@ -47,6 +48,7 @@ import {
   Ticket,
   UserCheck,
   Store,
+  FileText,
 } from "lucide-react";
 
 type SidebarLink = {
@@ -67,9 +69,10 @@ const sidebarLinks: SidebarLink[] = [
   { href: "/dashboard/check-ins", label: "Check-ins", icon: ScanLine, minRole: "staff" },
   { href: "/dashboard/session-logs", label: "Session Logs", icon: NotebookPen, minRole: "staff" },
   { href: "/dashboard/packages", label: "Packages", icon: CreditCard, minRole: "admin" },
-  { href: "/dashboard/vouchers", label: "Vouchers", icon: Ticket, minRole: "admin" },
+  { href: "/dashboard/vouchers", label: "Gift Cards & Vouchers", icon: Ticket, minRole: "admin" },
   { href: "/dashboard/members", label: "Members", icon: UserCheck, minRole: "staff" },
   { href: "/dashboard/pos", label: "POS", icon: Store, minRole: "staff" },
+  { href: "/dashboard/e-invoice", label: "e-Invoice", icon: FileText, minRole: "admin" },
   { href: "/dashboard/settings", label: "Settings", icon: Settings, minRole: "admin" },
 ];
 
@@ -243,6 +246,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isLoaded, isSignedIn, activeTenantId, activeRole } = useTimeoWebAuthContext();
   const { tenants, activeTenant, isLoading: tenantsLoading } = useTimeoWebTenantContext();
+  useEnsureUser(!!isSignedIn);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // Check if current Clerk org has a matching Convex tenant
@@ -256,16 +260,31 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [linking, setLinking] = useState(false);
   const [error, setError] = useState("");
 
-  // Show link dialog when Clerk org has no matching Convex tenant
+  // Check if user has any Convex tenant memberships (fallback for users without proper Clerk org)
+  const myTenants = useQuery(api.tenants.getMyTenants);
+
+  // When Clerk org has no matching Convex tenant, decide what to show
   useEffect(() => {
     if (
       activeTenantId &&
       existingTenant === null &&
-      existingTenant !== undefined
+      existingTenant !== undefined &&
+      myTenants !== undefined
     ) {
-      setShowLinkDialog(true);
+      if (myTenants.length > 0) {
+        // User has Convex memberships but Clerk org isn't linked — show link dialog for admins
+        if (activeRole === "admin" || activeRole === "platform_admin") {
+          setShowLinkDialog(true);
+        } else {
+          // Customer/staff with Convex membership — send to portal/dashboard
+          router.push(activeRole === "customer" ? "/portal" : "/dashboard");
+        }
+      } else {
+        // No Convex memberships at all — send to join page
+        router.push("/join");
+      }
     }
-  }, [activeTenantId, existingTenant]);
+  }, [activeTenantId, existingTenant, myTenants, activeRole, router]);
 
   // Loading state
   if (!isLoaded || tenantsLoading) {
@@ -289,10 +308,37 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  // No businesses — redirect to onboarding
+  // No Clerk orgs — check Convex memberships before redirecting
   if (tenants.length === 0) {
-    router.push("/onboarding");
-    return null;
+    // If myTenants is still loading, show loading spinner (handled above)
+    // If user has Convex memberships (legacy user), route by role
+    if (myTenants && myTenants.length > 0) {
+      const firstTenant = myTenants[0]!;
+      if (firstTenant.role === "customer") {
+        router.push("/portal");
+        return null;
+      }
+      // Staff/admin with Convex membership but no Clerk org — stay on dashboard
+      // useTenantId will resolve via Convex memberships
+    } else if (myTenants !== undefined) {
+      // No Convex memberships either — go to join page
+      router.push("/join");
+      return null;
+    } else {
+      // Still loading myTenants — show loading
+      return (
+        <div className="flex h-screen items-center justify-center bg-background">
+          <div className="flex flex-col items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
+              <Zap className="h-7 w-7 text-primary-foreground" />
+            </div>
+            <div className="h-1 w-32 overflow-hidden rounded-full bg-muted">
+              <div className="h-full w-1/2 animate-pulse rounded-full bg-primary" />
+            </div>
+          </div>
+        </div>
+      );
+    }
   }
 
   // Customers should use the portal, not the admin dashboard

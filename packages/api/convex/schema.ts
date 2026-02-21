@@ -34,6 +34,38 @@ export default defineSchema({
       logoUrl: v.optional(v.string()),
       businessName: v.optional(v.string()),
     }),
+    // e-Invoice taxpayer profile (LHDN MyInvois seller/supplier details)
+    eInvoiceProfile: v.optional(
+      v.object({
+        taxpayerName: v.string(),
+        tin: v.string(), // Tax Identification Number
+        msicCode: v.string(), // Malaysia Standard Industrial Classification
+        msicDescription: v.optional(v.string()),
+        idType: v.union(
+          v.literal("brn"), // Business Registration Number (SSM)
+          v.literal("nric"),
+          v.literal("passport"),
+          v.literal("army")
+        ),
+        idNumber: v.string(),
+        sstRegNo: v.optional(v.string()), // SST Registration Number
+        tourismRegNo: v.optional(v.string()), // Tourism Tax Registration Number
+        address: v.object({
+          line1: v.string(),
+          line2: v.optional(v.string()),
+          line3: v.optional(v.string()),
+          city: v.string(),
+          state: v.string(),
+          postcode: v.string(),
+          country: v.string(), // ISO 3166-1 alpha-3 (e.g. "MYS")
+        }),
+        notificationEmail: v.string(),
+        notificationPhone: v.string(),
+        // LHDN MyInvois API credentials (for future auto-submission)
+        lhdnClientId: v.optional(v.string()),
+        lhdnClientSecret: v.optional(v.string()),
+      })
+    ),
     createdAt: v.number(),
   })
     .index("by_slug", ["slug"])
@@ -459,7 +491,7 @@ export default defineSchema({
     .index("by_coach", ["coachId"])
     .index("by_tenant_client", ["tenantId", "clientId"]),
 
-  // ─── WS Fitness: Vouchers ──────────────────────────────────────────
+  // ─── Vouchers ────────────────────────────────────────────────────────
 
   vouchers: defineTable({
     tenantId: v.id("tenants"),
@@ -474,11 +506,67 @@ export default defineSchema({
     usedCount: v.number(),
     expiresAt: v.optional(v.number()),
     isActive: v.boolean(),
+    // Partner / distribution fields
+    source: v.optional(
+      v.union(
+        v.literal("internal"),
+        v.literal("partner"),
+        v.literal("public")
+      )
+    ),
+    partnerName: v.optional(v.string()),
+    partnerLogo: v.optional(v.string()),
+    description: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_tenant", ["tenantId"])
     .index("by_code", ["code"])
     .index("by_tenant_active", ["tenantId", "isActive"]),
+
+  // ─── Gift Cards ─────────────────────────────────────────────────────
+
+  giftCards: defineTable({
+    tenantId: v.id("tenants"),
+    code: v.string(),
+    initialBalance: v.number(), // cents
+    currentBalance: v.number(), // cents
+    currency: v.string(),
+    purchaserName: v.optional(v.string()),
+    purchaserEmail: v.optional(v.string()),
+    recipientName: v.optional(v.string()),
+    recipientEmail: v.optional(v.string()),
+    message: v.optional(v.string()),
+    status: v.union(
+      v.literal("active"),
+      v.literal("depleted"),
+      v.literal("expired"),
+      v.literal("cancelled")
+    ),
+    expiresAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_code", ["code"])
+    .index("by_tenant_status", ["tenantId", "status"]),
+
+  giftCardTransactions: defineTable({
+    giftCardId: v.id("giftCards"),
+    tenantId: v.id("tenants"),
+    type: v.union(
+      v.literal("purchase"),
+      v.literal("redemption"),
+      v.literal("refund"),
+      v.literal("topup")
+    ),
+    amount: v.number(), // cents (positive)
+    balanceAfter: v.number(),
+    posTransactionId: v.optional(v.id("posTransactions")),
+    note: v.optional(v.string()),
+    createdBy: v.optional(v.id("users")),
+    createdAt: v.number(),
+  })
+    .index("by_gift_card", ["giftCardId"])
+    .index("by_tenant", ["tenantId"]),
 
   voucherRedemptions: defineTable({
     tenantId: v.id("tenants"),
@@ -537,6 +625,49 @@ export default defineSchema({
     .index("by_customer", ["customerId"])
     .index("by_tenant_date", ["tenantId", "createdAt"])
     .index("by_receipt", ["receiptNumber"]),
+
+  // ─── e-Invoice Requests ──────────────────────────────────────────
+
+  eInvoiceRequests: defineTable({
+    tenantId: v.id("tenants"),
+    transactionId: v.id("posTransactions"),
+    receiptNumber: v.string(),
+    // Buyer details (filled by customer)
+    buyerTin: v.string(), // Tax Identification Number
+    buyerIdType: v.union(
+      v.literal("nric"),
+      v.literal("passport"),
+      v.literal("brn"), // Business Registration Number
+      v.literal("army")
+    ),
+    buyerIdValue: v.string(),
+    buyerName: v.string(),
+    buyerEmail: v.string(),
+    buyerPhone: v.optional(v.string()),
+    buyerAddress: v.object({
+      line1: v.string(),
+      line2: v.optional(v.string()),
+      city: v.string(),
+      state: v.string(),
+      postcode: v.string(),
+      country: v.string(),
+    }),
+    buyerSstRegNo: v.optional(v.string()),
+    // Status tracking
+    status: v.union(
+      v.literal("pending"),
+      v.literal("submitted"),
+      v.literal("rejected")
+    ),
+    submittedAt: v.optional(v.number()),
+    lhdnSubmissionId: v.optional(v.string()),
+    rejectionReason: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_transaction", ["transactionId"])
+    .index("by_receipt", ["receiptNumber"])
+    .index("by_tenant_status", ["tenantId", "status"]),
 
   files: defineTable({
     tenantId: v.optional(v.id("tenants")),

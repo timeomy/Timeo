@@ -295,7 +295,7 @@ export default function SettingsScreen() {
         {/* Quick Links */}
         <View className="mb-4">
           <Card
-            onPress={() => router.push("/customers/")}
+            onPress={() => router.push("/customers" as any)}
           >
             <Row justify="between" align="center">
               <Row align="center" gap={12}>
@@ -317,7 +317,7 @@ export default function SettingsScreen() {
           </Card>
           <Spacer size={8} />
           <Card
-            onPress={() => router.push("/memberships/")}
+            onPress={() => router.push("/memberships" as any)}
           >
             <Row justify="between" align="center">
               <Row align="center" gap={12}>
@@ -339,7 +339,7 @@ export default function SettingsScreen() {
           </Card>
           <Spacer size={8} />
           <Card
-            onPress={() => router.push("/payments/")}
+            onPress={() => router.push("/payments" as any)}
           >
             <Row justify="between" align="center">
               <Row align="center" gap={12}>

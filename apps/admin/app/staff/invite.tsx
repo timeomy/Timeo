@@ -29,7 +29,7 @@ export default function InviteStaffScreen() {
 
   const tenantId = activeTenantId as string;
 
-  const inviteMember = useMutation(api.tenantMemberships.invite);
+  const inviteByEmail = useMutation(api.tenantMemberships.inviteByEmail);
 
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("staff");
@@ -62,12 +62,9 @@ export default function InviteStaffScreen() {
 
     setLoading(true);
     try {
-      // Note: The invite mutation expects a userId, not an email.
-      // In a full implementation, you would first look up or create the user by email.
-      // For now, we pass the email as a placeholder that the backend can resolve.
-      await inviteMember({
+      await inviteByEmail({
         tenantId: tenantId as any,
-        userId: email.trim() as any,
+        email: email.trim().toLowerCase(),
         role: role as any,
       });
       setSuccess(true);
@@ -78,7 +75,7 @@ export default function InviteStaffScreen() {
     } finally {
       setLoading(false);
     }
-  }, [email, role, tenantId, inviteMember]);
+  }, [email, role, tenantId, inviteByEmail]);
 
   const handleInviteAnother = useCallback(() => {
     setEmail("");

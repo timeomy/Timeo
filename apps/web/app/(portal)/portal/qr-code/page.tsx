@@ -19,9 +19,12 @@ export default function QrCodePage() {
   const { tenantId, tenant } = useTenantId();
   const [generating, setGenerating] = useState(false);
 
+  const access = useQuery(api.auth.checkAccess, tenantId ? { tenantId } : "skip");
+  const ready = tenantId && access?.ready;
+
   const qrCode = useQuery(
     api.checkIns.getMyQrCode,
-    tenantId ? { tenantId } : "skip"
+    ready ? { tenantId } : "skip"
   );
 
   const generateQrCode = useMutation(api.checkIns.generateQrCode);

@@ -1,7 +1,6 @@
 {
   "extends": "@timeo/config-ts/tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "src",
     "outDir": "./dist"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]

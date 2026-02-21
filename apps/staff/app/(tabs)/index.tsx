@@ -12,6 +12,9 @@ import {
   CreditCard,
   DollarSign,
   ChevronRight,
+  CalendarClock,
+  Bell,
+  Wrench,
 } from "lucide-react-native";
 import { useQuery } from "convex/react";
 import { api } from "@timeo/api";
@@ -304,6 +307,90 @@ export default function Dashboard() {
                   style={{ color: theme.colors.textSecondary }}
                 >
                   Process transactions
+                </Text>
+              </View>
+              <ChevronRight size={18} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push("/services/" as any)}
+              className="flex-row items-center rounded-2xl p-4"
+              style={{ backgroundColor: theme.colors.surface }}
+              activeOpacity={0.7}
+            >
+              <View
+                className="mr-3 rounded-lg p-2"
+                style={{ backgroundColor: theme.colors.info + "15" }}
+              >
+                <Wrench size={20} color={theme.colors.info} />
+              </View>
+              <View className="flex-1">
+                <Text
+                  className="text-base font-semibold"
+                  style={{ color: theme.colors.text }}
+                >
+                  Services
+                </Text>
+                <Text
+                  className="text-xs"
+                  style={{ color: theme.colors.textSecondary }}
+                >
+                  Manage service offerings
+                </Text>
+              </View>
+              <ChevronRight size={18} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push("/schedule/" as any)}
+              className="flex-row items-center rounded-2xl p-4"
+              style={{ backgroundColor: theme.colors.surface }}
+              activeOpacity={0.7}
+            >
+              <View
+                className="mr-3 rounded-lg p-2"
+                style={{ backgroundColor: theme.colors.warning + "15" }}
+              >
+                <CalendarClock size={20} color={theme.colors.warning} />
+              </View>
+              <View className="flex-1">
+                <Text
+                  className="text-base font-semibold"
+                  style={{ color: theme.colors.text }}
+                >
+                  My Schedule
+                </Text>
+                <Text
+                  className="text-xs"
+                  style={{ color: theme.colors.textSecondary }}
+                >
+                  View & manage your schedule
+                </Text>
+              </View>
+              <ChevronRight size={18} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push("/notifications/" as any)}
+              className="flex-row items-center rounded-2xl p-4"
+              style={{ backgroundColor: theme.colors.surface }}
+              activeOpacity={0.7}
+            >
+              <View
+                className="mr-3 rounded-lg p-2"
+                style={{ backgroundColor: theme.colors.error + "15" }}
+              >
+                <Bell size={20} color={theme.colors.error} />
+              </View>
+              <View className="flex-1">
+                <Text
+                  className="text-base font-semibold"
+                  style={{ color: theme.colors.text }}
+                >
+                  Notifications
+                </Text>
+                <Text
+                  className="text-xs"
+                  style={{ color: theme.colors.textSecondary }}
+                >
+                  View alerts & messages
                 </Text>
               </View>
               <ChevronRight size={18} color={theme.colors.textSecondary} />

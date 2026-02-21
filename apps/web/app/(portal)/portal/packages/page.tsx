@@ -14,9 +14,12 @@ import { CreditCard, AlertCircle } from "lucide-react";
 export default function MyPackagesPage() {
   const { tenantId } = useTenantId();
 
+  const access = useQuery(api.auth.checkAccess, tenantId ? { tenantId } : "skip");
+  const ready = tenantId && access?.ready;
+
   const credits = useQuery(
     api.sessionCredits.getByUser,
-    tenantId ? { tenantId } : "skip"
+    ready ? { tenantId } : "skip"
   );
 
   return (
