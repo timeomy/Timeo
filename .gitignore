@@ -9,8 +9,8 @@ node_modules/
 # Turborepo
 .turbo/
 
-# Convex
-packages/api/convex/_generated/
+# Convex (generated files are committed for Docker builds)
+# packages/api/convex/_generated/
 
 # Expo
 ios/
