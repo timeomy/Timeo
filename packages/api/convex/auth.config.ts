@@ -1,7 +1,7 @@
 const authConfig = {
   providers: [
     {
-      domain: "https://ideal-giraffe-73.clerk.accounts.dev",
+      domain: "https://clerk.timeo.my",
       applicationID: "convex",
     },
   ],

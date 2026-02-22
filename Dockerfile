@@ -16,7 +16,7 @@ COPY packages/cms/package.json ./packages/cms/package.json
 COPY packages/notifications/package.json ./packages/notifications/package.json
 COPY packages/config-ts/package.json ./packages/config-ts/package.json
 COPY packages/config-eslint/package.json ./packages/config-eslint/package.json
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # --- Builder ---
 FROM base AS builder
