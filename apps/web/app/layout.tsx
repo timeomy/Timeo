@@ -8,6 +8,10 @@ export const metadata: Metadata = {
   title: "Timeo - Business Operating System",
   description:
     "Multi-tenant platform for bookings and commerce operations",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-icon.svg",
+  },
 };
 
 export default function RootLayout({
