@@ -2,8 +2,6 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
 import { useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
 import { getRoleHomePath } from "@/hooks/use-role-redirect";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
@@ -15,9 +13,6 @@ export default function PostLoginPage() {
   const { tenants, isLoading } = useTimeoWebTenantContext();
   useEnsureUser(!!isSignedIn);
 
-  // Fallback: check Convex memberships for legacy users without Clerk orgs
-  const myTenants = useQuery(api.tenants.getMyTenants);
-
   useEffect(() => {
     if (!isLoaded || isLoading) return;
 
@@ -26,30 +21,16 @@ export default function PostLoginPage() {
       return;
     }
 
-    // No Clerk org memberships — check Convex memberships
+    // No tenant memberships — go to onboarding
     if (tenants.length === 0) {
-      if (myTenants === undefined) return; // still loading
-
-      if (myTenants.length > 0) {
-        // Legacy user with Convex membership — route by role
-        const role = myTenants[0]!.role;
-        if (role === "customer") {
-          router.replace("/portal");
-        } else {
-          router.replace("/dashboard");
-        }
-        return;
-      }
-
-      // No memberships at all — go to join page
-      router.replace("/join");
+      router.replace("/onboarding");
       return;
     }
 
     // Route based on role
     const homePath = getRoleHomePath(activeRole, tenants.length > 0);
     router.replace(homePath);
-  }, [isLoaded, isLoading, isSignedIn, activeRole, tenants, myTenants, router]);
+  }, [isLoaded, isLoading, isSignedIn, activeRole, tenants, router]);
 
   return (
     <div className="flex h-screen items-center justify-center bg-background">

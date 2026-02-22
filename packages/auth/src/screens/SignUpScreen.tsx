@@ -9,41 +9,39 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { useSignUp } from "@clerk/clerk-expo";
+import { authClient } from "../auth-client";
 
 interface SignUpScreenProps {
   /** Navigate to sign-in screen */
   onSignIn?: () => void;
-  /** Called after successful sign-up + verification */
+  /** Called after successful sign-up */
   onSuccess?: () => void;
 }
 
 export function SignUpScreen({ onSignIn, onSuccess }: SignUpScreenProps) {
-  const { signUp, setActive, isLoaded } = useSignUp();
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
-  const [pendingVerification, setPendingVerification] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleSignUp = useCallback(async () => {
-    if (!isLoaded || !signUp) return;
     setError(null);
     setLoading(true);
 
     try {
-      await signUp.create({
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        emailAddress: email.trim(),
+      const result = await authClient.signUp.email({
+        name: name.trim(),
+        email: email.trim(),
         password,
       });
 
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-      setPendingVerification(true);
+      if (result.error) {
+        setError(result.error.message ?? "Sign-up failed. Please try again.");
+        return;
+      }
+
+      onSuccess?.();
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Sign-up failed. Please try again.";
@@ -51,83 +49,8 @@ export function SignUpScreen({ onSignIn, onSuccess }: SignUpScreenProps) {
     } finally {
       setLoading(false);
     }
-  }, [isLoaded, signUp, firstName, lastName, email, password]);
+  }, [name, email, password, onSuccess]);
 
-  const handleVerify = useCallback(async () => {
-    if (!isLoaded || !signUp) return;
-    setError(null);
-    setLoading(true);
-
-    try {
-      const result = await signUp.attemptEmailAddressVerification({
-        code: code.trim(),
-      });
-
-      if (result.status === "complete" && result.createdSessionId) {
-        await setActive({ session: result.createdSessionId });
-        onSuccess?.();
-      } else {
-        setError("Verification incomplete. Please try again.");
-      }
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Verification failed. Check your code.";
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [isLoaded, signUp, code, setActive, onSuccess]);
-
-  if (!isLoaded) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
-
-  // ─── Verification Step ──────────────────────────────────────────────
-  if (pendingVerification) {
-    return (
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        <View style={styles.content}>
-          <Text style={styles.title}>Verify your email</Text>
-          <Text style={styles.subtitle}>
-            Enter the code sent to {email}
-          </Text>
-
-          {error && <Text style={styles.error}>{error}</Text>}
-
-          <TextInput
-            style={styles.input}
-            placeholder="Verification code"
-            placeholderTextColor="#9ca3af"
-            value={code}
-            onChangeText={setCode}
-            keyboardType="number-pad"
-            autoComplete="one-time-code"
-          />
-
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleVerify}
-            disabled={loading || !code.trim()}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Verify</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-    );
-  }
-
-  // ─── Sign-Up Form ───────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -139,26 +62,15 @@ export function SignUpScreen({ onSignIn, onSuccess }: SignUpScreenProps) {
 
         {error && <Text style={styles.error}>{error}</Text>}
 
-        <View style={styles.nameRow}>
-          <TextInput
-            style={[styles.input, styles.nameInput]}
-            placeholder="First name"
-            placeholderTextColor="#9ca3af"
-            value={firstName}
-            onChangeText={setFirstName}
-            textContentType="givenName"
-            autoComplete="given-name"
-          />
-          <TextInput
-            style={[styles.input, styles.nameInput]}
-            placeholder="Last name"
-            placeholderTextColor="#9ca3af"
-            value={lastName}
-            onChangeText={setLastName}
-            textContentType="familyName"
-            autoComplete="family-name"
-          />
-        </View>
+        <TextInput
+          style={styles.input}
+          placeholder="Full name"
+          placeholderTextColor="#9ca3af"
+          value={name}
+          onChangeText={setName}
+          textContentType="name"
+          autoComplete="name"
+        />
 
         <TextInput
           style={styles.input}
@@ -186,7 +98,7 @@ export function SignUpScreen({ onSignIn, onSuccess }: SignUpScreenProps) {
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleSignUp}
-          disabled={loading || !email.trim() || !password}
+          disabled={loading || !name.trim() || !email.trim() || !password}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
@@ -212,11 +124,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
   },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   content: {
     flex: 1,
     justifyContent: "center",
@@ -241,13 +148,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 16,
     textAlign: "center",
-  },
-  nameRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  nameInput: {
-    flex: 1,
   },
   input: {
     borderWidth: 1,

@@ -27,7 +27,7 @@ export default function ProfilePage() {
   const { tenant } = useTenantId();
 
   const displayName = user
-    ? [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+    ? user.name ||
       user.email ||
       "User"
     : "";

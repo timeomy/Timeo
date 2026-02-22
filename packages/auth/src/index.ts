@@ -3,6 +3,9 @@
 // Provider
 export { TimeoAuthProvider } from "./provider";
 
+// Auth client
+export { authClient } from "./auth-client";
+
 // Hooks
 export { useTimeoAuth, useRequireAuth, useTenantSwitcher, useRole, usePermission } from "./hooks";
 
@@ -23,7 +26,7 @@ export type {
   TenantSwitcherContext,
   RoleContext,
 } from "./types";
-export { ROLES, clerkRoleToTimeo, isRoleAtLeast } from "./types";
+export { ROLES, isRoleAtLeast } from "./types";
 
 // Permissions
 export { hasPermission, PERMISSIONS } from "./permissions";

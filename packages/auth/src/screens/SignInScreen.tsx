@@ -9,7 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { useSignIn } from "@clerk/clerk-expo";
+import { authClient } from "../auth-client";
 
 interface SignInScreenProps {
   /** Navigate to sign-up screen */
@@ -19,29 +19,27 @@ interface SignInScreenProps {
 }
 
 export function SignInScreen({ onSignUp, onSuccess }: SignInScreenProps) {
-  const { signIn, setActive, isLoaded } = useSignIn();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleSignIn = useCallback(async () => {
-    if (!isLoaded || !signIn) return;
     setError(null);
     setLoading(true);
 
     try {
-      const result = await signIn.create({
-        identifier: email.trim(),
+      const result = await authClient.signIn.email({
+        email: email.trim(),
         password,
       });
 
-      if (result.status === "complete" && result.createdSessionId) {
-        await setActive({ session: result.createdSessionId });
-        onSuccess?.();
-      } else {
-        setError("Sign-in incomplete. Please try again.");
+      if (result.error) {
+        setError(result.error.message ?? "Invalid email or password");
+        return;
       }
+
+      onSuccess?.();
     } catch (err: unknown) {
       const message =
         err instanceof Error
@@ -51,15 +49,7 @@ export function SignInScreen({ onSignUp, onSuccess }: SignInScreenProps) {
     } finally {
       setLoading(false);
     }
-  }, [isLoaded, signIn, email, password, setActive, onSuccess]);
-
-  if (!isLoaded) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
+  }, [email, password, onSuccess]);
 
   return (
     <KeyboardAvoidingView
@@ -123,11 +113,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
-  },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
   },
   content: {
     flex: 1,

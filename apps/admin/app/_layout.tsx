@@ -28,7 +28,6 @@ export default function RootLayout() {
       host={Constants.expoConfig?.extra?.posthogHost}
     >
       <TimeoAuthProvider
-        publishableKey={Constants.expoConfig?.extra?.clerkPublishableKey ?? ""}
         convexUrl={Constants.expoConfig?.extra?.convexUrl ?? ""}
       >
         <ThemeProvider>

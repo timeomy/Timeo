@@ -18,7 +18,7 @@ import {
   FileText,
   Ticket,
 } from "lucide-react-native";
-import { useTimeoAuth } from "@timeo/auth";
+import { useTimeoAuth, useTenantSwitcher } from "@timeo/auth";
 import {
   Screen,
   Header,
@@ -50,7 +50,8 @@ interface DayHours {
 export default function SettingsScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { activeTenantId, signOut, activeOrg } = useTimeoAuth();
+  const { activeTenantId, signOut } = useTimeoAuth();
+  const { activeTenant } = useTenantSwitcher();
 
   const tenantId = activeTenantId as string;
 

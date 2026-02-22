@@ -30,7 +30,7 @@ export default function QrCodePage() {
   const generateQrCode = useMutation(api.checkIns.generateQrCode);
 
   const displayName = user
-    ? [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+    ? user.name ||
       user.email ||
       "Member"
     : "Member";

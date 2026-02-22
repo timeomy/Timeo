@@ -38,7 +38,7 @@ export const setPlatformAdmin = internalMutation({
     if (!user) {
       // Create user record for this email
       const userId = await ctx.db.insert("users", {
-        clerkId: `pending_${args.email}`,
+        authId: `pending_${args.email}`,
         email: args.email,
         name: args.email.split("@")[0],
         createdAt: Date.now(),
@@ -151,22 +151,6 @@ export const deduplicateMemberships = internalMutation({
   },
 });
 
-export const linkTenantToClerkOrg = internalMutation({
-  args: {
-    tenantSlug: v.string(),
-    clerkOrgId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const tenant = await ctx.db
-      .query("tenants")
-      .withIndex("by_slug", (q) => q.eq("slug", args.tenantSlug))
-      .first();
-    if (!tenant) throw new Error(`Tenant not found: ${args.tenantSlug}`);
-    await ctx.db.patch(tenant._id, { clerkOrgId: args.clerkOrgId });
-    return { tenantId: tenant._id, name: tenant.name, linked: true };
-  },
-});
-
 // ─── Step 1: Create WS Fitness tenant with real data ─────────────────────
 
 export const seedWsFitness = internalMutation({
@@ -201,7 +185,7 @@ export const seedWsFitness = internalMutation({
     if (!ownerId) {
       const email = args.ownerEmail || "admin@wsfitness.my";
       ownerId = await ctx.db.insert("users", {
-        clerkId: `legacy_wsf_${email}`,
+        authId: `legacy_wsf_${email}`,
         email,
         name: "WS Fitness Admin",
         createdAt: now,
@@ -374,9 +358,9 @@ export const importMembers = internalMutation({
       if (existingUser) {
         userId = existingUser._id;
       } else {
-        // Create placeholder user (no clerkId yet — they'll link when they sign up)
+        // Create placeholder user (no authId yet — they'll link when they sign up)
         userId = await ctx.db.insert("users", {
-          clerkId: `legacy_wsf_${member.email}`,
+          authId: `legacy_wsf_${member.email}`,
           email: member.email,
           name: member.name,
           avatarUrl: member.avatarUrl || undefined,
@@ -468,7 +452,7 @@ export const importCoaches = internalMutation({
         userId = existingUser._id;
       } else {
         userId = await ctx.db.insert("users", {
-          clerkId: `legacy_wsf_${coach.email}`,
+          authId: `legacy_wsf_${coach.email}`,
           email: coach.email,
           name: coach.name,
           createdAt: now,
@@ -567,7 +551,7 @@ export const importSessionCredits = internalMutation({
       if (!userId) {
         // Create user with name and phone (no email link)
         userId = await ctx.db.insert("users", {
-          clerkId: `legacy_wsf_client_${client.phone || client.name.replace(/\s+/g, "_").toLowerCase()}`,
+          authId: `legacy_wsf_client_${client.phone || client.name.replace(/\s+/g, "_").toLowerCase()}`,
           email: client.email || `${client.name.replace(/\s+/g, ".").toLowerCase()}@wsfitness.placeholder`,
           name: client.name,
           createdAt: now,

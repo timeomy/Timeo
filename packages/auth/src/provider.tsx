@@ -1,91 +1,82 @@
-import React, { createContext, useContext, useMemo } from "react";
-import { ClerkProvider, useAuth, useUser, useOrganization, useOrganizationList } from "@clerk/clerk-expo";
-import { ConvexProviderWithClerk } from "convex/react-clerk";
-import { ConvexReactClient } from "convex/react";
-import * as SecureStore from "expo-secure-store";
-import type { TimeoAuthContext, TenantSwitcherContext, TenantInfo } from "./types";
-import { clerkRoleToTimeo } from "./types";
-
-// ─── Secure Token Cache (Expo) ──────────────────────────────────────
-const tokenCache = {
-  async getToken(key: string): Promise<string | null> {
-    try {
-      return await SecureStore.getItemAsync(key);
-    } catch {
-      return null;
-    }
-  },
-  async saveToken(key: string, value: string): Promise<void> {
-    try {
-      await SecureStore.setItemAsync(key, value);
-    } catch {
-      // Silently fail — token will be refetched
-    }
-  },
-};
+import React, { createContext, useContext, useMemo, useState, useCallback } from "react";
+import { ConvexReactClient, useQuery } from "convex/react";
+import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
+import { authClient } from "./auth-client";
+import { api } from "@timeo/api";
+import type { TimeoAuthContext, TenantSwitcherContext, TenantInfo, TimeoRole } from "./types";
 
 // ─── Contexts ───────────────────────────────────────────────────────
 const TimeoAuthCtx = createContext<TimeoAuthContext | null>(null);
 const TenantSwitcherCtx = createContext<TenantSwitcherContext | null>(null);
 
-// ─── Inner Provider (needs to be inside ClerkProvider) ──────────────
+// ─── Inner Provider (needs to be inside ConvexBetterAuthProvider) ──
 function TimeoAuthInner({ children }: { children: React.ReactNode }) {
-  const { isLoaded: authLoaded, isSignedIn, signOut } = useAuth();
-  const { user } = useUser();
-  const { organization } = useOrganization();
-  const { userMemberships, setActive } = useOrganizationList({
-    userMemberships: { infinite: true },
-  });
+  const session = authClient.useSession();
+  const [activeTenantId, setActiveTenantId] = useState<string | null>(null);
+
+  const isSignedIn = !!session.data?.user;
+  const isLoaded = !session.isPending;
+
+  // Query Convex for user's tenants
+  const convexTenants = useQuery(api.tenants.getMyTenants, isSignedIn ? {} : "skip");
 
   const authContext = useMemo<TimeoAuthContext>(() => {
+    const user = session.data?.user;
     const timeoUser = user
       ? {
           id: user.id,
-          email: user.primaryEmailAddress?.emailAddress,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          imageUrl: user.imageUrl,
+          email: user.email,
+          name: user.name,
+          imageUrl: user.image ?? undefined,
         }
       : null;
 
-    const activeOrg = organization
-      ? { id: organization.id, name: organization.name, slug: organization.slug }
-      : null;
-
-    const membership = userMemberships.data?.find((m) => m.organization.id === organization?.id);
-    const activeRole = clerkRoleToTimeo(membership?.role);
+    // Find role from Convex tenants
+    const activeTenant = convexTenants?.find(
+      (t) => t && t._id === activeTenantId
+    );
+    const activeRole: TimeoRole = (activeTenant?.role as TimeoRole) ?? "customer";
 
     return {
       user: timeoUser,
-      isLoaded: authLoaded,
-      isSignedIn: !!isSignedIn,
-      signOut: async () => { await signOut(); },
-      activeOrg,
-      activeTenantId: organization?.id ?? null,
+      isLoaded,
+      isSignedIn,
+      signOut: async () => {
+        await authClient.signOut();
+      },
+      activeTenantId,
       activeRole,
+      setActiveTenant: setActiveTenantId,
     };
-  }, [user, organization, authLoaded, isSignedIn, signOut, userMemberships.data]);
+  }, [session.data, isLoaded, isSignedIn, activeTenantId, convexTenants]);
 
   const tenantSwitcher = useMemo<TenantSwitcherContext>(() => {
-    const tenants: TenantInfo[] =
-      userMemberships.data?.map((m) => ({
-        id: m.organization.id,
-        name: m.organization.name,
-        slug: m.organization.slug,
-        role: clerkRoleToTimeo(m.role),
-      })) ?? [];
+    const tenants: TenantInfo[] = (convexTenants ?? [])
+      .filter((t): t is NonNullable<typeof t> => t != null)
+      .map((t) => ({
+        id: t._id,
+        name: t.name,
+        slug: t.slug,
+        role: (t.role as TimeoRole) ?? "customer",
+      }));
 
-    const activeTenant = tenants.find((t) => t.id === organization?.id) ?? null;
+    const activeTenant = tenants.find((t) => t.id === activeTenantId) ?? null;
 
     return {
       tenants,
       activeTenant,
-      switchTenant: async (orgId: string) => {
-        await setActive?.({ organization: orgId });
-      },
-      isLoading: userMemberships.isLoading,
+      switchTenant: setActiveTenantId,
+      isLoading: convexTenants === undefined,
     };
-  }, [userMemberships.data, userMemberships.isLoading, organization?.id, setActive]);
+  }, [convexTenants, activeTenantId]);
+
+  // Auto-select first tenant if none selected
+  React.useEffect(() => {
+    if (!activeTenantId && convexTenants && convexTenants.length > 0) {
+      const first = convexTenants[0];
+      if (first) setActiveTenantId(first._id);
+    }
+  }, [activeTenantId, convexTenants]);
 
   return (
     <TimeoAuthCtx.Provider value={authContext}>
@@ -99,19 +90,19 @@ function TimeoAuthInner({ children }: { children: React.ReactNode }) {
 // ─── Main Provider ──────────────────────────────────────────────────
 interface TimeoAuthProviderProps {
   children: React.ReactNode;
-  publishableKey: string;
   convexUrl: string;
 }
 
-export function TimeoAuthProvider({ children, publishableKey, convexUrl }: TimeoAuthProviderProps) {
-  const convex = useMemo(() => new ConvexReactClient(convexUrl), [convexUrl]);
+export function TimeoAuthProvider({ children, convexUrl }: TimeoAuthProviderProps) {
+  const convex = useMemo(
+    () => new ConvexReactClient(convexUrl, { unsavedChangesWarning: false }),
+    [convexUrl]
+  );
 
   return (
-    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-        <TimeoAuthInner>{children}</TimeoAuthInner>
-      </ConvexProviderWithClerk>
-    </ClerkProvider>
+    <ConvexBetterAuthProvider client={convex} authClient={authClient}>
+      <TimeoAuthInner>{children}</TimeoAuthInner>
+    </ConvexBetterAuthProvider>
   );
 }
 

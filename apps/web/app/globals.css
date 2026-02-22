@@ -1,29 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 3%;
-    --foreground: 60 9% 93%;
-    --card: 0 0% 6%;
-    --card-foreground: 60 9% 93%;
-    --popover: 0 0% 6%;
-    --popover-foreground: 60 9% 93%;
-    --primary: 48 96% 53%;
-    --primary-foreground: 0 0% 3%;
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 60 9% 93%;
-    --muted: 0 0% 10%;
-    --muted-foreground: 0 0% 55%;
-    --accent: 48 96% 53%;
-    --accent-foreground: 0 0% 3%;
+    --background: 240 15% 5%;
+    --foreground: 40 10% 92%;
+
+    --card: 240 12% 8%;
+    --card-foreground: 40 10% 92%;
+
+    --popover: 240 12% 8%;
+    --popover-foreground: 40 10% 92%;
+
+    --primary: 42 100% 50%;
+    --primary-foreground: 240 15% 5%;
+
+    --secondary: 240 10% 14%;
+    --secondary-foreground: 40 10% 92%;
+
+    --muted: 240 10% 14%;
+    --muted-foreground: 240 8% 55%;
+
+    --accent: 42 100% 50%;
+    --accent-foreground: 240 15% 5%;
+
     --destructive: 0 84% 60%;
-    --destructive-foreground: 60 9% 93%;
-    --border: 0 0% 14%;
-    --input: 0 0% 14%;
-    --ring: 48 96% 53%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 240 10% 16%;
+    --input: 240 10% 16%;
+    --ring: 42 100% 50%;
+
     --radius: 0.75rem;
+
+    /* Premium tokens */
+    --gold: 42 100% 50%;
+    --gold-light: 42 100% 65%;
+    --gold-dark: 42 80% 38%;
+    --surface-glass: 240 12% 10%;
+    --surface-elevated: 240 12% 12%;
+    --glow-gold: 0 0 60px hsla(42, 100%, 50%, 0.15);
+    --glow-gold-strong: 0 0 120px hsla(42, 100%, 50%, 0.25);
+    --gradient-gold: linear-gradient(135deg, hsl(42, 100%, 50%), hsl(32, 100%, 55%));
+    --gradient-dark: linear-gradient(180deg, hsl(240, 15%, 5%) 0%, hsl(240, 12%, 8%) 100%);
+    --gradient-card: linear-gradient(145deg, hsla(240, 12%, 12%, 0.8), hsla(240, 12%, 8%, 0.6));
+    --gradient-border: linear-gradient(145deg, hsla(42, 100%, 50%, 0.3), hsla(42, 100%, 50%, 0.05));
+
+    --sidebar-background: 240 12% 8%;
+    --sidebar-foreground: 40 10% 92%;
+    --sidebar-primary: 42 100% 50%;
+    --sidebar-primary-foreground: 240 15% 5%;
+    --sidebar-accent: 240 10% 14%;
+    --sidebar-accent-foreground: 40 10% 92%;
+    --sidebar-border: 240 10% 16%;
+    --sidebar-ring: 42 100% 50%;
   }
 }
 
@@ -31,20 +64,96 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground antialiased;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', sans-serif;
   }
 }
 
-/* Liquid Glass Effect */
 @layer components {
+  .glass-card {
+    @apply relative overflow-hidden rounded-2xl border border-border/50;
+    background: linear-gradient(145deg, hsla(240, 12%, 12%, 0.6), hsla(240, 12%, 8%, 0.4));
+    backdrop-filter: blur(20px);
+  }
+
+  .glass-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(145deg, hsla(42, 100%, 50%, 0.15), hsla(42, 100%, 50%, 0.02));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .text-gradient-gold {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, hsl(42, 100%, 50%), hsl(32, 100%, 60%));
+  }
+
+  .glow-gold {
+    box-shadow: var(--glow-gold);
+  }
+
+  .glow-gold-strong {
+    box-shadow: var(--glow-gold-strong);
+  }
+
+  .nav-glass {
+    @apply border-b border-border/30;
+    background: hsla(240, 15%, 5%, 0.8);
+    backdrop-filter: blur(20px);
+  }
+
+  .btn-gold {
+    @apply relative inline-flex items-center justify-center gap-2 px-8 py-3.5 font-semibold rounded-xl transition-all duration-300;
+    background: linear-gradient(135deg, hsl(42, 100%, 50%), hsl(32, 100%, 50%));
+    color: hsl(240, 15%, 5%);
+    box-shadow: 0 0 30px hsla(42, 100%, 50%, 0.3), 0 4px 12px hsla(0, 0%, 0%, 0.3);
+  }
+
+  .btn-gold:hover {
+    box-shadow: 0 0 50px hsla(42, 100%, 50%, 0.45), 0 8px 24px hsla(0, 0%, 0%, 0.4);
+    transform: translateY(-2px);
+  }
+
+  .btn-outline-gold {
+    @apply relative inline-flex items-center justify-center gap-2 px-8 py-3.5 font-semibold rounded-xl transition-all duration-300 border;
+    border-color: hsla(42, 100%, 50%, 0.3);
+    color: hsl(40, 10%, 92%);
+  }
+
+  .btn-outline-gold:hover {
+    border-color: hsla(42, 100%, 50%, 0.6);
+    background: hsla(42, 100%, 50%, 0.08);
+  }
+
+  .section-heading {
+    @apply text-4xl md:text-5xl font-bold tracking-tight;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  .grid-pattern {
+    background-image:
+      linear-gradient(hsla(42, 100%, 50%, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, hsla(42, 100%, 50%, 0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* Legacy glass classes (used by authenticated app pages) */
   .glass {
     @apply relative overflow-hidden rounded-2xl border border-white/[0.08];
-    background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.03) 0%,
-      rgba(255, 255, 255, 0.01) 100%
-    );
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
     backdrop-filter: blur(20px) saturate(1.2);
     -webkit-backdrop-filter: blur(20px) saturate(1.2);
   }
@@ -54,34 +163,8 @@
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: radial-gradient(
-      ellipse at 30% 0%,
-      rgba(255, 255, 255, 0.06) 0%,
-      transparent 60%
-    );
+    background: radial-gradient(ellipse at 30% 0%, rgba(255, 255, 255, 0.06) 0%, transparent 60%);
     pointer-events: none;
-  }
-
-  .glass-card {
-    @apply relative overflow-hidden rounded-2xl border border-white/[0.06];
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.04) 0%,
-      rgba(255, 255, 255, 0.01) 100%
-    );
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    transition: all 0.3s ease;
-  }
-
-  .glass-card:hover {
-    border-color: rgba(250, 204, 21, 0.2);
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.06) 0%,
-      rgba(255, 255, 255, 0.02) 100%
-    );
-    box-shadow: 0 0 40px -12px rgba(250, 204, 21, 0.15);
   }
 
   .glass-nav {
@@ -93,22 +176,14 @@
 
   .glass-button {
     @apply relative overflow-hidden rounded-xl border border-white/[0.1] px-6 py-3 text-sm font-medium transition-all;
-    background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.06) 0%,
-      rgba(255, 255, 255, 0.02) 100%
-    );
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }
 
   .glass-button:hover {
     border-color: rgba(255, 255, 255, 0.15);
-    background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.1) 0%,
-      rgba(255, 255, 255, 0.04) 100%
-    );
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%);
   }
 
   .glow-yellow {
@@ -129,15 +204,9 @@
       radial-gradient(ellipse at 80% 20%, rgba(250, 204, 21, 0.05) 0%, transparent 50%),
       radial-gradient(ellipse at 50% 80%, rgba(120, 119, 198, 0.04) 0%, transparent 50%);
   }
-
-  .grid-pattern {
-    background-image:
-      linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-    background-size: 60px 60px;
-  }
 }
 
+/* Smooth scroll */
 html {
   scroll-behavior: smooth;
 }
@@ -145,4 +214,22 @@ html {
 ::selection {
   background: rgba(250, 204, 21, 0.3);
   color: white;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(240, 15%, 5%);
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(240, 10%, 20%);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(42, 100%, 50%);
 }

@@ -5,7 +5,7 @@ import { useMutation } from "convex/react";
 import { api } from "@timeo/api";
 
 /**
- * Ensures the authenticated Clerk user has a corresponding Convex user record.
+ * Ensures the authenticated user has a corresponding Convex user record.
  * Calls `auth.ensureUser` once per mount so downstream queries never
  * hit "User not found".
  */

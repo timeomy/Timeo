@@ -18,7 +18,7 @@ import {
 } from "lucide-react-native";
 import { useQuery } from "convex/react";
 import { api } from "@timeo/api";
-import { useTimeoAuth } from "@timeo/auth";
+import { useTimeoAuth, useTenantSwitcher } from "@timeo/auth";
 import {
   Screen,
   StatCard,
@@ -33,7 +33,8 @@ import {
 export default function Dashboard() {
   const theme = useTheme();
   const router = useRouter();
-  const { activeTenantId, user, activeOrg, signOut } = useTimeoAuth();
+  const { activeTenantId, user, signOut } = useTimeoAuth();
+  const { activeTenant } = useTenantSwitcher();
   const [refreshing, setRefreshing] = useState(false);
 
   const tenantId = activeTenantId as any;
@@ -123,7 +124,7 @@ export default function Dashboard() {
     return <LoadingScreen message="Loading dashboard..." />;
   }
 
-  const greeting = user?.firstName ? `Hi, ${user.firstName}` : "Dashboard";
+  const greeting = user?.name ? `Hi, ${user.name.split(" ")[0]}` : "Dashboard";
 
   return (
     <Screen padded={false}>
@@ -144,12 +145,12 @@ export default function Dashboard() {
             >
               {greeting}
             </Text>
-            {activeOrg ? (
+            {activeTenant ? (
               <Text
                 className="mt-0.5 text-sm"
                 style={{ color: theme.colors.textSecondary }}
               >
-                {activeOrg.name}
+                {activeTenant.name}
               </Text>
             ) : null}
           </View>

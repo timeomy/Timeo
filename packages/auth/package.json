@@ -6,23 +6,30 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./web": "./src/web/index.ts"
+    "./web": "./src/web/index.ts",
+    "./web/server": "./src/web/auth-server.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@clerk/clerk-expo": "^2.19.25",
-    "@clerk/clerk-react": "^5.61.0",
-    "@clerk/nextjs": "^6.9.0",
+    "@convex-dev/better-auth": "^0.10.11",
+    "@better-auth/expo": "^1.4.18",
+    "better-auth": "^1.4.18",
     "convex": "^1.17.0",
     "expo-secure-store": "~15.0.8"
   },
   "peerDependencies": {
     "expo": "*",
     "react": "*",
-    "react-native": "*"
+    "react-native": "*",
+    "next": "*"
+  },
+  "peerDependenciesMeta": {
+    "expo": { "optional": true },
+    "react-native": { "optional": true },
+    "next": { "optional": true }
   },
   "devDependencies": {
     "@timeo/config-ts": "workspace:*",

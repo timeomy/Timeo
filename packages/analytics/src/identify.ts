@@ -1,14 +1,14 @@
 /**
  * PostHog user identification helpers.
  *
- * Links Clerk userId to PostHog distinct_id so that events from
+ * Links auth userId to PostHog distinct_id so that events from
  * anonymous sessions can be merged with authenticated users.
  */
 import type PostHog from "posthog-react-native";
 import type { PostHog as PostHogWeb } from "posthog-js";
 
 export interface IdentifyUserProps {
-  clerkUserId: string;
+  userId: string;
   email?: string;
   name?: string;
   avatarUrl?: string;
@@ -23,7 +23,7 @@ export function identifyUser(
 ) {
   if (!posthog) return;
 
-  posthog.identify(props.clerkUserId, {
+  posthog.identify(props.userId, {
     email: props.email ?? "",
     name: props.name ?? "",
     avatar_url: props.avatarUrl ?? "",
@@ -39,7 +39,7 @@ export function identifyUserWeb(
 ) {
   if (!posthog) return;
 
-  posthog.identify(props.clerkUserId, {
+  posthog.identify(props.userId, {
     email: props.email ?? "",
     name: props.name ?? "",
     avatar_url: props.avatarUrl ?? "",

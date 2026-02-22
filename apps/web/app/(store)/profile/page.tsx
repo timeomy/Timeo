@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 
 export default function ProfilePage() {
-  const { user, isLoaded, isSignedIn, signOut, activeOrg, activeRole } =
+  const { user, isLoaded, isSignedIn, signOut, activeRole } =
     useTimeoWebAuthContext();
   const { tenants, activeTenant, switchTenant } = useTimeoWebTenantContext();
 
@@ -58,8 +58,7 @@ export default function ProfilePage() {
     );
   }
 
-  const displayName =
-    [user.firstName, user.lastName].filter(Boolean).join(" ") || "User";
+  const displayName = user.name || "User";
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -100,7 +99,7 @@ export default function ProfilePage() {
       </Card>
 
       {/* Active Organization */}
-      {activeOrg && (
+      {activeTenant && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -111,10 +110,10 @@ export default function ProfilePage() {
           <CardContent>
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-semibold">{activeOrg.name}</p>
-                {activeOrg.slug && (
+                <p className="font-semibold">{activeTenant.name}</p>
+                {activeTenant.slug && (
                   <p className="text-sm text-muted-foreground">
-                    @{activeOrg.slug}
+                    @{activeTenant.slug}
                   </p>
                 )}
               </div>

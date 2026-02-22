@@ -46,7 +46,7 @@ export default function PortalHomePage() {
     ready ? { tenantId } : "skip"
   );
 
-  const firstName = user?.firstName ?? "there";
+  const firstName = user?.name?.split(" ")[0] ?? "there";
 
   // Count upcoming bookings (status is pending or confirmed, startTime in the future)
   const now = Date.now();

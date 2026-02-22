@@ -11,7 +11,6 @@ import { api } from "@timeo/api";
 import { useCallback } from "react";
 import { View, Text } from "react-native";
 
-const clerkKey = Constants.expoConfig?.extra?.clerkPublishableKey ?? "";
 const convexUrl = Constants.expoConfig?.extra?.convexUrl ?? "";
 
 function PushRegistration() {
@@ -32,15 +31,14 @@ function PushRegistration() {
 }
 
 export default function RootLayout() {
-  if (!clerkKey || !convexUrl) {
+  if (!convexUrl) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0a0a0a", padding: 24 }}>
         <Text style={{ color: "#fff", fontSize: 18, fontWeight: "bold", marginBottom: 8 }}>
           Configuration Error
         </Text>
         <Text style={{ color: "#999", fontSize: 14, textAlign: "center" }}>
-          {!clerkKey && "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is missing.\n"}
-          {!convexUrl && "EXPO_PUBLIC_CONVEX_URL is missing.\n"}
+          EXPO_PUBLIC_CONVEX_URL is missing.{"\n"}
           Check your .env file and restart the dev server.
         </Text>
       </View>
@@ -53,7 +51,6 @@ export default function RootLayout() {
       host={Constants.expoConfig?.extra?.posthogHost}
     >
       <TimeoAuthProvider
-        publishableKey={clerkKey}
         convexUrl={convexUrl}
       >
         <ThemeProvider>

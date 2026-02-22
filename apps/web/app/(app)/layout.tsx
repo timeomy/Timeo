@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
 import { useTimeoWebAuthContext, useTimeoWebTenantContext, isRoleAtLeast } from "@timeo/auth/web";
 import type { TimeoRole } from "@timeo/auth/web";
 import { getInitials } from "@timeo/shared";
@@ -16,13 +14,6 @@ import {
   AvatarFallback,
   Separator,
   Skeleton,
-  Input,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
   cn,
 } from "@timeo/ui/web";
 import {
@@ -153,11 +144,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user, signOut, activeRole } = useTimeoWebAuthContext();
 
-  const displayName = user
-    ? [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-      user.email ||
-      "User"
-    : "";
+  const displayName = user?.name || user?.email || "User";
 
   return (
     <div className="flex h-full flex-col">
@@ -244,47 +231,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { isLoaded, isSignedIn, activeTenantId, activeRole } = useTimeoWebAuthContext();
-  const { tenants, activeTenant, isLoading: tenantsLoading } = useTimeoWebTenantContext();
+  const { isLoaded, isSignedIn, activeRole } = useTimeoWebAuthContext();
+  const { tenants, isLoading: tenantsLoading } = useTimeoWebTenantContext();
   useEnsureUser(!!isSignedIn);
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  // Check if current Clerk org has a matching Convex tenant
-  const existingTenant = useQuery(
-    api.tenants.getByClerkOrgId,
-    activeTenantId ? { clerkOrgId: activeTenantId } : "skip"
-  );
-  const linkTenant = useMutation(api.tenants.linkToClerkOrg);
-  const [linkSlug, setLinkSlug] = useState("");
-  const [showLinkDialog, setShowLinkDialog] = useState(false);
-  const [linking, setLinking] = useState(false);
-  const [error, setError] = useState("");
-
-  // Check if user has any Convex tenant memberships (fallback for users without proper Clerk org)
-  const myTenants = useQuery(api.tenants.getMyTenants);
-
-  // When Clerk org has no matching Convex tenant, decide what to show
-  useEffect(() => {
-    if (
-      activeTenantId &&
-      existingTenant === null &&
-      existingTenant !== undefined &&
-      myTenants !== undefined
-    ) {
-      if (myTenants.length > 0) {
-        // User has Convex memberships but Clerk org isn't linked — show link dialog for admins
-        if (activeRole === "admin" || activeRole === "platform_admin") {
-          setShowLinkDialog(true);
-        } else {
-          // Customer/staff with Convex membership — send to portal/dashboard
-          router.push(activeRole === "customer" ? "/portal" : "/dashboard");
-        }
-      } else {
-        // No Convex memberships at all — send to join page
-        router.push("/join");
-      }
-    }
-  }, [activeTenantId, existingTenant, myTenants, activeRole, router]);
 
   // Loading state
   if (!isLoaded || tenantsLoading) {
@@ -308,37 +258,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  // No Clerk orgs — check Convex memberships before redirecting
+  // No tenants — redirect to onboarding
   if (tenants.length === 0) {
-    // If myTenants is still loading, show loading spinner (handled above)
-    // If user has Convex memberships (legacy user), route by role
-    if (myTenants && myTenants.length > 0) {
-      const firstTenant = myTenants[0]!;
-      if (firstTenant.role === "customer") {
-        router.push("/portal");
-        return null;
-      }
-      // Staff/admin with Convex membership but no Clerk org — stay on dashboard
-      // useTenantId will resolve via Convex memberships
-    } else if (myTenants !== undefined) {
-      // No Convex memberships either — go to join page
-      router.push("/join");
-      return null;
-    } else {
-      // Still loading myTenants — show loading
-      return (
-        <div className="flex h-screen items-center justify-center bg-background">
-          <div className="flex flex-col items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-              <Zap className="h-7 w-7 text-primary-foreground" />
-            </div>
-            <div className="h-1 w-32 overflow-hidden rounded-full bg-muted">
-              <div className="h-full w-1/2 animate-pulse rounded-full bg-primary" />
-            </div>
-          </div>
-        </div>
-      );
-    }
+    router.push("/onboarding");
+    return null;
   }
 
   // Customers should use the portal, not the admin dashboard
@@ -347,56 +270,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  async function handleLink() {
-    if (!linkSlug.trim() || !activeTenantId) return;
-    setLinking(true);
-    setError("");
-    try {
-      await linkTenant({ tenantSlug: linkSlug.trim().toLowerCase(), clerkOrgId: activeTenantId });
-      setShowLinkDialog(false);
-      setLinkSlug("");
-    } catch (err: any) {
-      const msg = err?.message || "Failed to link business. Check the slug and try again.";
-      setError(msg);
-    } finally {
-      setLinking(false);
-    }
-  }
-
   return (
     <div className="flex h-screen bg-background">
-      {/* Link/Create business dialog — shown when Clerk org has no Convex tenant */}
-      <Dialog open={showLinkDialog && existingTenant === null} onOpenChange={setShowLinkDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Connect Your Business</DialogTitle>
-            <DialogDescription>
-              Your organization{activeTenant ? ` "${activeTenant.name}"` : ""} isn&apos;t linked to a business on Timeo yet.
-              Enter a business slug to link, or create a new business.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <Input
-              placeholder="e.g. ws-fitness"
-              value={linkSlug}
-              onChange={(e) => setLinkSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-              onKeyDown={(e) => e.key === "Enter" && handleLink()}
-            />
-            {error && <p className="text-sm text-destructive">{error}</p>}
-          </div>
-          <DialogFooter className="flex-col gap-2 sm:flex-row">
-            <Button
-              variant="outline"
-              onClick={() => { setShowLinkDialog(false); router.push("/onboarding"); }}
-            >
-              Create New Business
-            </Button>
-            <Button onClick={handleLink} disabled={linking || !linkSlug.trim()}>
-              {linking ? "Linking..." : "Link Business"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       {/* Desktop Sidebar */}
       <aside className="hidden w-64 flex-shrink-0 border-r border-white/[0.06] bg-card/50 lg:block">
         <SidebarContent />

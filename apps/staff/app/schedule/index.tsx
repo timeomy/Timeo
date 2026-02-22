@@ -79,13 +79,8 @@ export default function StaffScheduleScreen() {
     return { start: weekStart.getTime(), end: weekEnd.getTime() };
   }, [weekOffset]);
 
-  const currentUserId = user?.id;
-
   // Get the Convex user to find internal userId
-  const convexUser = useQuery(
-    api.users.getByClerkId,
-    currentUserId ? { clerkId: currentUserId } : "skip"
-  );
+  const convexUser = useQuery(api.users.getCurrent);
 
   const staffSchedule = useQuery(
     api.scheduling.getStaffSchedule,

@@ -35,7 +35,7 @@ import { useCart } from "../providers/cart";
 export default function ProfileScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { user, activeOrg, activeRole, signOut } = useTimeoAuth();
+  const { user, activeRole, signOut } = useTimeoAuth();
   const { tenants, activeTenant, switchTenant, isLoading } =
     useTenantSwitcher();
   const { totalItems } = useCart();
@@ -146,14 +146,14 @@ export default function ProfileScreen() {
               </Text>
             </View>
           ) : null}
-          {activeOrg ? (
+          {activeTenant ? (
             <View className="mt-1 flex-row items-center">
               <Building2 size={14} color={theme.colors.primary} />
               <Text
                 className="ml-1.5 text-sm font-medium"
                 style={{ color: theme.colors.primary }}
               >
-                {activeOrg.name}
+                {activeTenant.name}
               </Text>
             </View>
           ) : null}

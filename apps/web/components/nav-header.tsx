@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useUser, useClerk } from "@clerk/nextjs";
+import { useTimeoWebAuthContext } from "@timeo/auth/web";
 import {
   Button,
   Avatar,
@@ -98,16 +98,11 @@ function NotificationBellWidget() {
 
 export function NavHeader() {
   const pathname = usePathname();
-  const { isSignedIn, user, isLoaded } = useUser();
-  const { signOut } = useClerk();
+  const { user, isLoaded, isSignedIn, signOut } = useTimeoWebAuthContext();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
-  const displayName = user
-    ? [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-      user.primaryEmailAddress?.emailAddress ||
-      "User"
-    : "";
+  const displayName = user?.name || user?.email || "User";
 
   return (
     <header className="glass-nav sticky top-0 z-50">
@@ -155,7 +150,7 @@ export function NavHeader() {
                   className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent"
                 >
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={user.imageUrl} alt={displayName} />
+                  <AvatarImage src={user?.imageUrl} alt={displayName} />
                   <AvatarFallback className="text-xs">
                     {getInitials(displayName)}
                   </AvatarFallback>
@@ -176,7 +171,7 @@ export function NavHeader() {
                     <div className="px-3 py-2">
                       <p className="text-sm font-medium">{displayName}</p>
                       <p className="text-xs text-muted-foreground">
-                        {user.primaryEmailAddress?.emailAddress}
+                        {user?.email}
                       </p>
                     </div>
                     <Separator className="my-1" />
@@ -276,7 +271,7 @@ export function NavHeader() {
                   className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                 >
                   <Avatar className="h-6 w-6">
-                    <AvatarImage src={user.imageUrl} alt={displayName} />
+                    <AvatarImage src={user?.imageUrl} alt={displayName} />
                     <AvatarFallback className="text-xs">
                       {getInitials(displayName)}
                     </AvatarFallback>

@@ -14,7 +14,7 @@ import {
   Avatar,
   Spacer,
 } from "@timeo/ui";
-import { useTimeoAuth } from "@timeo/auth";
+import { useTimeoAuth, useTenantSwitcher } from "@timeo/auth";
 import { api } from "@timeo/api";
 import { useQuery } from "convex/react";
 import { useCart } from "../providers/cart";
@@ -22,7 +22,8 @@ import { useCart } from "../providers/cart";
 export default function HomeScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { user, activeOrg, activeTenantId } = useTimeoAuth();
+  const { user, activeTenantId } = useTimeoAuth();
+  const { activeTenant } = useTenantSwitcher();
   const { addItem } = useCart();
 
   const services = useQuery(
@@ -35,8 +36,8 @@ export default function HomeScreen() {
     activeTenantId ? { tenantId: activeTenantId as any } : "skip"
   );
 
-  const displayName = user?.firstName ?? "there";
-  const orgName = activeOrg?.name ?? "Timeo";
+  const displayName = user?.name?.split(" ")[0] ?? "there";
+  const orgName = activeTenant?.name ?? "Timeo";
 
   return (
     <Screen scroll>

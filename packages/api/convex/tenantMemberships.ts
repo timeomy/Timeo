@@ -1,4 +1,5 @@
 import { query, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import {
   authenticateUser,
@@ -7,7 +8,7 @@ import {
 } from "./lib/middleware";
 import { insertAuditLog } from "./lib/helpers";
 import { memberRoleValidator } from "./validators";
-import { internal } from "./_generated/api";
+
 
 export const listByTenant = query({
   args: { tenantId: v.id("tenants") },
@@ -124,20 +125,6 @@ export const updateRole = mutation({
       metadata: { oldRole, newRole: args.role },
     });
 
-    // Sync role to Clerk if the tenant has a Clerk org
-    const tenant = await ctx.db.get(args.tenantId);
-    const targetUser = await ctx.db.get(membership.userId);
-    if (tenant?.clerkOrgId && targetUser?.clerkId && !targetUser.clerkId.startsWith("legacy_")) {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.actions.clerkSync.syncRoleToClerk,
-        {
-          clerkUserId: targetUser.clerkId,
-          clerkOrgId: tenant.clerkOrgId,
-          newRole: args.role,
-        }
-      );
-    }
   },
 });
 

@@ -3,8 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
 import { useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
 import { getInitials } from "@timeo/shared";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
@@ -63,14 +61,7 @@ export default function PortalLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  // Fallback: check Convex memberships for legacy users without Clerk orgs
-  const myTenants = useQuery(api.tenants.getMyTenants);
-
-  const displayName = user
-    ? [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-      user.email ||
-      "User"
-    : "";
+  const displayName = user?.name || user?.email || "User";
 
   // Loading state
   if (!isLoaded || tenantsLoading) {
@@ -94,36 +85,10 @@ export default function PortalLayout({
     return null;
   }
 
-  // No Clerk orgs — check Convex memberships before redirecting
+  // No tenant memberships — redirect to onboarding
   if (tenants.length === 0) {
-    if (myTenants && myTenants.length > 0) {
-      // Legacy user with Convex membership — check role before allowing portal access
-      const convexRole = myTenants[0]!.role;
-      if (convexRole !== "customer") {
-        // Staff/admin should use the dashboard, not the portal
-        router.push("/dashboard");
-        return null;
-      }
-      // Customer — stay on portal (useTenantId resolves via Convex)
-    } else if (myTenants !== undefined) {
-      // No Convex memberships either — go to join page
-      router.push("/join");
-      return null;
-    } else {
-      // Still loading myTenants — show loading spinner
-      return (
-        <div className="flex h-screen items-center justify-center bg-background">
-          <div className="flex flex-col items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-              <Zap className="h-7 w-7 text-primary-foreground" />
-            </div>
-            <div className="h-1 w-32 overflow-hidden rounded-full bg-muted">
-              <div className="h-full w-1/2 animate-pulse rounded-full bg-primary" />
-            </div>
-          </div>
-        </div>
-      );
-    }
+    router.push("/onboarding");
+    return null;
   }
 
   // Role guard: non-customers should go to dashboard

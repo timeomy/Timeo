@@ -11,7 +11,7 @@ import {
   BarChart3,
   ChevronRight,
 } from "lucide-react-native";
-import { useTimeoAuth } from "@timeo/auth";
+import { useTimeoAuth, useTenantSwitcher } from "@timeo/auth";
 import {
   Screen,
   Header,
@@ -40,7 +40,8 @@ const PERIOD_OPTIONS: { label: string; value: AnalyticsPeriod }[] = [
 export default function AdminDashboard() {
   const theme = useTheme();
   const router = useRouter();
-  const { activeTenantId, activeOrg } = useTimeoAuth();
+  const { activeTenantId } = useTimeoAuth();
+  const { activeTenant } = useTenantSwitcher();
   const [refreshing, setRefreshing] = useState(false);
   const [period, setPeriod] = useState<AnalyticsPeriod>("month");
 
@@ -87,7 +88,7 @@ export default function AdminDashboard() {
 
   return (
     <Screen scroll={false}>
-      <Header title={activeOrg?.name ?? "Dashboard"} />
+      <Header title={activeTenant?.name ?? "Dashboard"} />
       <ScrollView
         className="flex-1 px-4"
         showsVerticalScrollIndicator={false}

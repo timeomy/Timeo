@@ -47,7 +47,7 @@ export interface TenantBranding {
 }
 
 export interface User extends ConvexDocument {
-  clerkId: string;
+  authId: string;
   email: string;
   name: string;
   avatarUrl?: string;

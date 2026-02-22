@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@convex-dev/better-auth": "^0.10.11",
+    "better-auth": "^1.4.18",
     "convex": "^1.17.0",
     "stripe": "^17.5.0"
   },

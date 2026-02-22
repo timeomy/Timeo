@@ -5,7 +5,7 @@ export default defineSchema({
   tenants: defineTable({
     name: v.string(),
     slug: v.string(),
-    clerkOrgId: v.optional(v.string()),
+    clerkOrgId: v.optional(v.string()), // deprecated: kept for data compat
     ownerId: v.id("users"),
     plan: v.union(
       v.literal("free"),
@@ -74,13 +74,13 @@ export default defineSchema({
     .index("by_clerkOrgId", ["clerkOrgId"]),
 
   users: defineTable({
-    clerkId: v.string(),
+    authId: v.string(),
     email: v.string(),
     name: v.string(),
     avatarUrl: v.optional(v.string()),
     createdAt: v.number(),
   })
-    .index("by_clerkId", ["clerkId"])
+    .index("by_authId", ["authId"])
     .index("by_email", ["email"]),
 
   tenantMemberships: defineTable({

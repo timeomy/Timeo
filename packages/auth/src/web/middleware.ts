@@ -1,41 +1,66 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 /**
- * Routes that require authentication.
- * Add patterns here as new protected routes are added.
+ * Protected route patterns that require authentication.
  */
-const isProtectedRoute = createRouteMatcher([
-  "/dashboard(.*)",
-  "/settings(.*)",
-  "/onboarding(.*)",
-  "/admin(.*)",
-]);
+const PROTECTED_PATTERNS = [
+  /^\/dashboard/,
+  /^\/settings/,
+  /^\/onboarding/,
+  /^\/admin/,
+  /^\/portal/,
+  /^\/post-login/,
+  /^\/join/,
+];
 
 /**
- * Routes that are always public (no auth required).
+ * Public route patterns — always accessible without auth.
  */
-const isPublicRoute = createRouteMatcher([
-  "/",
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/store(.*)",
-  "/api/webhooks(.*)",
-]);
+const PUBLIC_PATTERNS = [
+  /^\/$/,
+  /^\/sign-in/,
+  /^\/sign-up/,
+  /^\/store/,
+  /^\/api\/webhooks/,
+  /^\/api\/auth/,
+];
+
+function isProtectedRoute(pathname: string): boolean {
+  return PROTECTED_PATTERNS.some((p) => p.test(pathname));
+}
+
+function isPublicRoute(pathname: string): boolean {
+  return PUBLIC_PATTERNS.some((p) => p.test(pathname));
+}
 
 /**
- * Clerk middleware for Next.js.
- *
- * Usage in your app's middleware.ts:
- * ```ts
- * export { timeoMiddleware as default } from "@timeo/auth/web";
- * export const config = { matcher: middlewareMatcher };
- * ```
+ * Better Auth middleware for Next.js.
+ * Checks for session token cookie and redirects unauthenticated users.
  */
-export const timeoMiddleware = clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req) && !isPublicRoute(req)) {
-    await auth.protect();
+export function timeoMiddleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+
+  // Public routes are always accessible
+  if (isPublicRoute(pathname)) {
+    return NextResponse.next();
   }
-});
+
+  // Protected routes require a session
+  if (isProtectedRoute(pathname)) {
+    const sessionToken =
+      req.cookies.get("better-auth.session_token")?.value ||
+      req.cookies.get("__Secure-better-auth.session_token")?.value;
+
+    if (!sessionToken) {
+      const signInUrl = new URL("/sign-in", req.url);
+      signInUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(signInUrl);
+    }
+  }
+
+  return NextResponse.next();
+}
 
 /**
  * Next.js middleware matcher config.

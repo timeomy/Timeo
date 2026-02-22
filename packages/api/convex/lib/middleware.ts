@@ -16,7 +16,7 @@ export async function authenticateUser(ctx: QueryCtx | MutationCtx) {
 
   const user = await ctx.db
     .query("users")
-    .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+    .withIndex("by_authId", (q) => q.eq("authId", identity.subject))
     .unique();
 
   if (!user) {
@@ -32,8 +32,6 @@ export async function requireTenantAccess(
 ) {
   const user = await authenticateUser(ctx);
 
-  // Use .first() — a user may have multiple memberships for the same tenant
-  // (e.g. platform_admin + customer). Pick the highest-privilege active one.
   const memberships = await ctx.db
     .query("tenantMemberships")
     .withIndex("by_tenant_user", (q) =>
@@ -60,7 +58,6 @@ export async function requireRole(
 ) {
   const { user, membership } = await requireTenantAccess(ctx, tenantId);
 
-  // Hierarchy check: user's role must be >= the minimum required role
   const userRank = ROLE_RANK[membership.role] ?? 0;
   const minRequiredRank = Math.min(...roles.map((r) => ROLE_RANK[r] ?? 0));
 

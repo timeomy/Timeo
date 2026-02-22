@@ -41,11 +41,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user, signOut } = useTimeoWebAuthContext();
 
-  const displayName = user
-    ? [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-      user.email ||
-      "User"
-    : "";
+  const displayName = user?.name || user?.email || "User";
 
   return (
     <div className="flex h-full flex-col">

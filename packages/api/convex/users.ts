@@ -10,17 +10,6 @@ export const getCurrent = query({
   },
 });
 
-export const getByClerkId = query({
-  args: { clerkId: v.string() },
-  handler: async (ctx, args) => {
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", args.clerkId))
-      .unique();
-    return user;
-  },
-});
-
 export const getById = query({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {

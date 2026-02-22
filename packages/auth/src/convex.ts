@@ -1,28 +1,20 @@
 import type { TimeoRole } from "./types";
-import { clerkRoleToTimeo } from "./types";
 
 /**
  * Auth info extracted from Convex mutation/query context.
- *
- * Usage in a Convex function:
- *   const auth = await getAuthInfo(ctx);
- *   if (!auth) throw new Error("Not authenticated");
  */
 export interface ConvexAuthInfo {
-  /** Clerk user ID (sub claim) */
+  /** Better Auth user ID (subject claim) */
   userId: string;
-  /** Active tenant/org ID (org_id claim) — null if no org selected */
+  /** Active tenant ID — null if no tenant selected */
   tenantId: string | null;
-  /** Mapped Timeo role for the active org */
+  /** Mapped Timeo role for the active tenant */
   role: TimeoRole;
 }
 
 /**
- * Reads the Clerk JWT custom claims from ctx.auth and returns
+ * Reads the Better Auth JWT claims from ctx.auth and returns
  * typed auth info. Returns null if not authenticated.
- *
- * Expects the Clerk JWT template "convex" to include:
- *   { sub, org_id, org_role, org_slug }
  */
 export async function getAuthInfo(ctx: {
   auth: { getUserIdentity: () => Promise<{ subject: string; [k: string]: unknown } | null> };
@@ -31,11 +23,8 @@ export async function getAuthInfo(ctx: {
   if (!identity) return null;
 
   const userId = identity.subject;
-  const tenantId = (identity as Record<string, unknown>).org_id as string | undefined ?? null;
-  const orgRole = (identity as Record<string, unknown>).org_role as string | undefined;
-  const role = clerkRoleToTimeo(orgRole);
 
-  return { userId, tenantId, role };
+  return { userId, tenantId: null, role: "customer" };
 }
 
 /**
