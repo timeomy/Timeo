@@ -109,7 +109,7 @@ importers:
         specifier: ~15.15.3
         version: 15.15.3(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0)
       react-native-worklets:
-        specifier: ~0.7.4
+        specifier: ~0.7.2
         version: 0.7.4(@babel/core@7.29.0)(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0)
     devDependencies:
       '@expo/config':
@@ -124,6 +124,9 @@ importers:
       '@types/react':
         specifier: ^18.3.0
         version: 18.3.28
+      '@types/react-dom':
+        specifier: ^18.3.0
+        version: 18.3.7(@types/react@18.3.28)
       babel-preset-expo:
         specifier: ~55.0.6
         version: 55.0.6(@babel/core@7.29.0)(@babel/runtime@7.28.6)(expo@55.0.0-preview.12)(react-refresh@0.14.2)
@@ -227,7 +230,7 @@ importers:
         specifier: ~15.15.3
         version: 15.15.3(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0)
       react-native-worklets:
-        specifier: ~0.7.4
+        specifier: ~0.7.2
         version: 0.7.4(@babel/core@7.29.0)(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0)
     devDependencies:
       '@expo/config':
@@ -257,6 +260,9 @@ importers:
 
   apps/platform:
     dependencies:
+      '@expo/metro-runtime':
+        specifier: ~55.0.6
+        version: 55.0.6(@expo/dom-webview@55.0.3)(expo@55.0.0-preview.12)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0)
       '@timeo/analytics':
         specifier: workspace:*
         version: link:../../packages/analytics
@@ -278,6 +284,9 @@ importers:
       expo:
         specifier: ~55.0.0-preview.12
         version: 55.0.0-preview.12(@babel/core@7.29.0)(@expo/dom-webview@55.0.3)(@expo/metro-runtime@55.0.6)(bufferutil@4.1.0)(expo-router@55.0.0-preview.9)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
+      expo-build-properties:
+        specifier: ~55.0.8
+        version: 55.0.8(expo@55.0.0-preview.12)
       expo-constants:
         specifier: ~55.0.6
         version: 55.0.6(expo@55.0.0-preview.12)(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(typescript@5.9.3)
@@ -314,6 +323,9 @@ importers:
       react:
         specifier: 19.2.0
         version: 19.2.0
+      react-dom:
+        specifier: 19.2.0
+        version: 19.2.0(react@19.2.0)
       react-native:
         specifier: 0.83.2
         version: 0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10)
@@ -336,7 +348,7 @@ importers:
         specifier: ~15.15.3
         version: 15.15.3(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0)
       react-native-worklets:
-        specifier: ~0.7.4
+        specifier: ~0.7.2
         version: 0.7.4(@babel/core@7.29.0)(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0)
     devDependencies:
       '@expo/config':
@@ -351,6 +363,9 @@ importers:
       '@types/react':
         specifier: ^18.3.0
         version: 18.3.28
+      '@types/react-dom':
+        specifier: ^18.3.0
+        version: 18.3.7(@types/react@18.3.28)
       babel-preset-expo:
         specifier: ~55.0.6
         version: 55.0.6(@babel/core@7.29.0)(@babel/runtime@7.28.6)(expo@55.0.0-preview.12)(react-refresh@0.14.2)
@@ -454,7 +469,7 @@ importers:
         specifier: ~15.15.3
         version: 15.15.3(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0)
       react-native-worklets:
-        specifier: ~0.7.4
+        specifier: ~0.7.2
         version: 0.7.4(@babel/core@7.29.0)(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0)
     devDependencies:
       '@expo/config':
@@ -469,6 +484,9 @@ importers:
       '@types/react':
         specifier: ^18.3.0
         version: 18.3.28
+      '@types/react-dom':
+        specifier: ^18.3.0
+        version: 18.3.7(@types/react@18.3.28)
       babel-preset-expo:
         specifier: ~55.0.6
         version: 55.0.6(@babel/core@7.29.0)(@babel/runtime@7.28.6)(expo@55.0.0-preview.12)(react-refresh@0.14.2)
