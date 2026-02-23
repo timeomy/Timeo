@@ -6,7 +6,7 @@ import { useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/we
 import type { TimeoRole } from "@timeo/auth/web";
 
 export function getRoleHomePath(role: TimeoRole, hasTenant: boolean): string {
-  if (role === "platform_admin" && !hasTenant) return "/admin";
+  if (role === "platform_admin" && !hasTenant) return "/platform";
   if (role === "customer") return "/portal";
   return "/dashboard";
 }

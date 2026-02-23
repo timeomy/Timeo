@@ -269,7 +269,7 @@ export default function ServiceDetailScreen() {
                   <Text
                     className="text-xs font-medium"
                     style={{
-                      color: isSelected ? "#FFFFFF" : theme.colors.textSecondary,
+                      color: isSelected ? (theme.dark ? "#0B0B0F" : "#FFFFFF") : theme.colors.textSecondary,
                     }}
                   >
                     {d.toLocaleDateString("en-US", { weekday: "short" })}
@@ -277,7 +277,7 @@ export default function ServiceDetailScreen() {
                   <Text
                     className="mt-1 text-lg font-bold"
                     style={{
-                      color: isSelected ? "#FFFFFF" : theme.colors.text,
+                      color: isSelected ? (theme.dark ? "#0B0B0F" : "#FFFFFF") : theme.colors.text,
                     }}
                   >
                     {d.getDate()}
@@ -285,7 +285,7 @@ export default function ServiceDetailScreen() {
                   <Text
                     className="text-xs"
                     style={{
-                      color: isSelected ? "#FFFFFF" : theme.colors.textSecondary,
+                      color: isSelected ? (theme.dark ? "#0B0B0F" : "#FFFFFF") : theme.colors.textSecondary,
                     }}
                   >
                     {d.toLocaleDateString("en-US", { month: "short" })}
@@ -365,7 +365,7 @@ export default function ServiceDetailScreen() {
                     <Text
                       className="text-sm font-semibold"
                       style={{
-                        color: isSelected ? "#FFFFFF" : theme.colors.text,
+                        color: isSelected ? (theme.dark ? "#0B0B0F" : "#FFFFFF") : theme.colors.text,
                       }}
                     >
                       {formatSlotTime(slot.startTime)}
@@ -375,7 +375,7 @@ export default function ServiceDetailScreen() {
                         className="mt-0.5 text-xs"
                         style={{
                           color: isSelected
-                            ? "#FFFFFF"
+                            ? (theme.dark ? "#0B0B0F" : "#FFFFFF")
                             : theme.colors.textSecondary,
                         }}
                       >
@@ -386,7 +386,7 @@ export default function ServiceDetailScreen() {
                         className="mt-0.5 text-xs"
                         style={{
                           color: isSelected
-                            ? "#FFFFFF"
+                            ? (theme.dark ? "#0B0B0F" : "#FFFFFF")
                             : theme.colors.textSecondary,
                         }}
                       >

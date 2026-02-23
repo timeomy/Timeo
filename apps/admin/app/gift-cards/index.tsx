@@ -161,8 +161,8 @@ export default function GiftCardsScreen() {
       <View className="px-4">
         <Button onPress={() => router.push("/gift-cards/create" as any)}>
           <Row align="center" gap={8}>
-            <Plus size={18} color="#FFFFFF" />
-            <Text className="text-base font-semibold text-white">
+            <Plus size={18} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
+            <Text className="text-base font-semibold" style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}>
               Issue New Gift Card
             </Text>
           </Row>
@@ -213,7 +213,7 @@ export default function GiftCardsScreen() {
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
         }
         ListEmptyComponent={
           <EmptyState

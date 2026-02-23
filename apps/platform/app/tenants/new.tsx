@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useEffect } from "react";
-import { View, Text, ScrollView, Alert } from "react-native";
+import { useState, useCallback, useEffect } from "react";
+import { Text, ScrollView, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import {
   Screen,
@@ -8,15 +8,16 @@ import {
   Input,
   Select,
   Button,
-  Section,
   Spacer,
   useTheme,
 } from "@timeo/ui";
 import { api } from "@timeo/api";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import { slugify } from "@timeo/shared";
 
-const PLAN_OPTIONS = [
+type TenantPlan = "free" | "starter" | "pro" | "enterprise";
+
+const PLAN_OPTIONS: { label: string; value: TenantPlan }[] = [
   { label: "Free", value: "free" },
   { label: "Starter", value: "starter" },
   { label: "Pro", value: "pro" },
@@ -30,12 +31,12 @@ export default function CreateTenantScreen() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
-  const [plan, setPlan] = useState("free");
+  const [plan, setPlan] = useState<TenantPlan>("free");
   const [ownerEmail, setOwnerEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const createTenant = useMutation(api.platform.createTenant);
+  const createTenant = useMutation(api.platform.createTenantByEmail);
 
   // Auto-generate slug from name unless manually edited
   useEffect(() => {
@@ -75,21 +76,11 @@ export default function CreateTenantScreen() {
 
     setLoading(true);
     try {
-      // Note: The platform.createTenant mutation requires ownerId (user ID),
-      // not an email. In a production flow, you would first look up the user
-      // by email. For now, we pass the email as a lookup step.
-      // Since we don't have a user lookup by email mutation that returns an ID
-      // from the client, we attempt creation with the assumption that backend
-      // handles the resolution or we use the email as a reference.
-      //
-      // The actual API requires ownerId as v.id("users"). In a real integration,
-      // an admin would either select from existing users or the backend resolves
-      // the email to a user ID. Here we show the form structure.
       await createTenant({
         name: name.trim(),
         slug: slug.trim(),
-        plan: plan as any,
-        ownerId: ownerEmail.trim() as any, // In production, resolve email to user ID
+        plan,
+        ownerEmail: ownerEmail.trim().toLowerCase(),
       });
 
       Alert.alert("Success", `Tenant "${name}" has been created.`, [
@@ -156,7 +147,7 @@ export default function CreateTenantScreen() {
           <Select
             options={PLAN_OPTIONS}
             value={plan}
-            onChange={setPlan}
+            onChange={(v: string) => setPlan(v as TenantPlan)}
             label="Plan"
             className="mb-4"
           />

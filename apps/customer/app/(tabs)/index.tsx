@@ -1,7 +1,6 @@
-import React from "react";
-import { View, Text, ScrollView, TouchableOpacity, Image } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
-import { CalendarPlus, ChevronRight } from "lucide-react-native";
+import { CalendarPlus, Building2 } from "lucide-react-native";
 import {
   Screen,
   Section,
@@ -17,7 +16,7 @@ import {
 import { useTimeoAuth, useTenantSwitcher } from "@timeo/auth";
 import { api } from "@timeo/api";
 import { useQuery } from "convex/react";
-import { useCart } from "../providers/cart";
+import { useCart } from "../../providers/cart";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -68,28 +67,62 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Tenant Branding Banner */}
-      <View
-        className="mt-4 overflow-hidden rounded-2xl p-5"
-        style={{ backgroundColor: theme.colors.primary }}
-      >
-        <Text className="text-lg font-bold text-white">{orgName}</Text>
-        <Text className="mt-1 text-sm text-white/80">
-          Book services and shop products all in one place.
-        </Text>
-        <View className="mt-4">
-          <Button
-            variant="outline"
-            onPress={() => router.push("/(tabs)/services")}
-            className="self-start border-white/30"
-          >
-            <View className="flex-row items-center">
-              <CalendarPlus size={16} color="#FFFFFF" />
-              <Text className="ml-2 font-semibold text-white">Book Now</Text>
+      {/* Tenant Branding Banner or Join Prompt */}
+      {!activeTenantId ? (
+        <View
+          className="mt-4 overflow-hidden rounded-2xl border p-5"
+          style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.surface }}
+        >
+          <View className="items-center">
+            <View
+              className="mb-3 rounded-2xl p-4"
+              style={{ backgroundColor: theme.colors.primary + "15" }}
+            >
+              <Building2 size={32} color={theme.colors.primary} />
             </View>
-          </Button>
+            <Text
+              className="text-lg font-bold text-center"
+              style={{ color: theme.colors.text }}
+            >
+              Join a Business
+            </Text>
+            <Text
+              className="mt-1 text-sm text-center"
+              style={{ color: theme.colors.textSecondary }}
+            >
+              Enter a business slug to browse their services and products.
+            </Text>
+          </View>
+          <View className="mt-4">
+            <Button onPress={() => router.push("/join" as any)}>
+              Find & Join Business
+            </Button>
+          </View>
         </View>
-      </View>
+      ) : (
+        <View
+          className="mt-4 overflow-hidden rounded-2xl p-5"
+          style={{ backgroundColor: theme.colors.primary }}
+        >
+          <Text className="text-lg font-bold" style={{ color: "#0B0B0F" }}>{orgName}</Text>
+          <Text className="mt-1 text-sm" style={{ color: "#0B0B0F99" }}>
+            Book services and shop products all in one place.
+          </Text>
+          <View className="mt-4">
+            <Button
+              variant="outline"
+              onPress={() => router.push("/(tabs)/services")}
+              className="self-start"
+              style={{ borderColor: "#0B0B0F30" }}
+            >
+              <View className="flex-row items-center">
+                <CalendarPlus size={16} color="#0B0B0F" />
+                <Text className="ml-2 font-semibold" style={{ color: "#0B0B0F" }}>Book Now</Text>
+              </View>
+            </Button>
+          </View>
+        </View>
+      )}
 
       {/* Featured Services */}
       <Section

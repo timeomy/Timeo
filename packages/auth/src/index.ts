@@ -15,6 +15,9 @@ export { AuthGuard, TenantGuard, RoleGuard } from "./guards";
 // Screens
 export { SignInScreen } from "./screens/SignInScreen";
 export { SignUpScreen } from "./screens/SignUpScreen";
+export { ForgotPasswordScreen } from "./screens/ForgotPasswordScreen";
+export { ResetPasswordScreen } from "./screens/ResetPasswordScreen";
+export { VerifyEmailScreen } from "./screens/VerifyEmailScreen";
 export { TenantSelectScreen } from "./screens/TenantSelectScreen";
 
 // Types

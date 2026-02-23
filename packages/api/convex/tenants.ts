@@ -1,6 +1,5 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { Id } from "./_generated/dataModel";
 import {
   authenticateUser,
   requireRole,
@@ -257,6 +256,43 @@ export const updateBranding = mutation({
       resource: "tenants",
       resourceId: args.tenantId,
     });
+  },
+});
+
+/** Returns tenants where the current user has an "invited" membership */
+export const getMyInvitations = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_authId", (q) => q.eq("authId", identity.subject))
+      .unique();
+    if (!user) return [];
+
+    const memberships = await ctx.db
+      .query("tenantMemberships")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .filter((q) => q.eq(q.field("status"), "invited"))
+      .collect();
+
+    const tenants = await Promise.all(
+      memberships.map(async (m) => {
+        const tenant = await ctx.db.get(m.tenantId);
+        if (!tenant) return null;
+        return {
+          _id: tenant._id,
+          name: tenant.name,
+          slug: tenant.slug,
+          role: m.role,
+          membershipId: m._id,
+        };
+      })
+    );
+
+    return tenants.filter(Boolean);
   },
 });
 

@@ -16,6 +16,7 @@ import {
   Package,
   Gift,
   Receipt,
+  UserPlus,
 } from "lucide-react-native";
 import {
   Screen,
@@ -30,7 +31,7 @@ import {
 import { useTimeoAuth, useTenantSwitcher } from "@timeo/auth";
 import { api } from "@timeo/api";
 import { useMutation } from "convex/react";
-import { useCart } from "../providers/cart";
+import { useCart } from "../../providers/cart";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -68,9 +69,7 @@ export default function ProfileScreen() {
     [user?.id, saveFile, updateEntityImage]
   );
 
-  const displayName = [user?.firstName, user?.lastName]
-    .filter(Boolean)
-    .join(" ") || "User";
+  const displayName = user?.name || "User";
 
   const handleSignOut = useCallback(() => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -297,7 +296,10 @@ export default function ProfileScreen() {
               className="mr-2 rounded-full px-2 py-0.5"
               style={{ backgroundColor: theme.colors.primary }}
             >
-              <Text className="text-xs font-bold text-white">
+              <Text
+                className="text-xs font-bold"
+                style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}
+              >
                 {totalItems}
               </Text>
             </View>
@@ -461,6 +463,25 @@ export default function ProfileScreen() {
             );
           })
         )}
+        <Separator />
+        <TouchableOpacity
+          onPress={() => router.push("/join" as any)}
+          className="flex-row items-center py-3"
+        >
+          <View
+            className="mr-3 rounded-lg p-2"
+            style={{ backgroundColor: theme.colors.primary + "15" }}
+          >
+            <UserPlus size={18} color={theme.colors.primary} />
+          </View>
+          <Text
+            className="flex-1 text-base font-medium"
+            style={{ color: theme.colors.primary }}
+          >
+            Join a Business
+          </Text>
+          <ChevronRight size={18} color={theme.colors.textSecondary} />
+        </TouchableOpacity>
       </Card>
 
       <Spacer size={16} />

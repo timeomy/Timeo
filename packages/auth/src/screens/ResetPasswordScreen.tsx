@@ -10,107 +10,127 @@ import {
   Platform,
   Animated,
 } from "react-native";
+import { CheckCircle } from "lucide-react-native";
 import { authClient } from "../auth-client";
 
-interface SignInScreenProps {
-  /** Navigate to sign-up screen */
-  onSignUp?: () => void;
-  /** Called after successful sign-in */
+interface ResetPasswordScreenProps {
+  token?: string;
   onSuccess?: () => void;
-  /** App display name shown in the header */
-  appName?: string;
-  /** Subtitle shown below the app name */
-  appSubtitle?: string;
-  /** Navigate to forgot-password screen */
-  onForgotPassword?: () => void;
+  onBackToSignIn?: () => void;
 }
 
-export function SignInScreen({
-  onSignUp,
+export function ResetPasswordScreen({
+  token,
   onSuccess,
-  appName = "Timeo",
-  appSubtitle = "Sign in to your account",
-  onForgotPassword,
-}: SignInScreenProps) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  onBackToSignIn,
+}: ResetPasswordScreenProps) {
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const logoAnim = useRef(new Animated.Value(0)).current;
-  const titleAnim = useRef(new Animated.Value(0)).current;
-  const titleSlide = useRef(new Animated.Value(20)).current;
-  const formAnim = useRef(new Animated.Value(0)).current;
-  const formSlide = useRef(new Animated.Value(20)).current;
-  const buttonAnim = useRef(new Animated.Value(0)).current;
+  const contentAnim = useRef(new Animated.Value(0)).current;
+  const contentSlide = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
     Animated.stagger(200, [
-      Animated.parallel([
-        Animated.timing(logoAnim, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.parallel([
-        Animated.timing(titleAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(titleSlide, {
-          toValue: 0,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.parallel([
-        Animated.timing(formAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(formSlide, {
-          toValue: 0,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.timing(buttonAnim, {
+      Animated.timing(logoAnim, {
         toValue: 1,
-        duration: 400,
+        duration: 600,
         useNativeDriver: true,
       }),
+      Animated.parallel([
+        Animated.timing(contentAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(contentSlide, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]),
     ]).start();
-  }, [logoAnim, titleAnim, titleSlide, formAnim, formSlide, buttonAnim]);
+  }, [logoAnim, contentAnim, contentSlide]);
 
-  const handleSignIn = useCallback(async () => {
+  const handleReset = useCallback(async () => {
     setError(null);
+
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    if (!token) {
+      setError("Invalid reset link");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const result = await authClient.signIn.email({
-        email: email.trim(),
-        password,
+      const result = await authClient.resetPassword({
+        newPassword,
+        token,
       });
 
       if (result.error) {
-        setError(result.error.message ?? "Invalid email or password");
+        const msg = result.error.message ?? "Failed to reset password";
+        if (msg.toLowerCase().includes("expired")) {
+          setError("Reset link has expired. Please request a new one.");
+        } else if (msg.toLowerCase().includes("invalid")) {
+          setError("Invalid reset link. Please request a new one.");
+        } else {
+          setError(msg);
+        }
         return;
       }
 
-      onSuccess?.();
+      setSuccess(true);
     } catch (err: unknown) {
       const message =
         err instanceof Error
           ? err.message
-          : "Sign-in failed. Please check your credentials.";
+          : "Something went wrong. Please try again.";
       setError(message);
     } finally {
       setLoading(false);
     }
-  }, [email, password, onSuccess]);
+  }, [newPassword, confirmPassword, token]);
+
+  if (success) {
+    return (
+      <View style={styles.container}>
+        <Animated.View style={[styles.content, { opacity: contentAnim }]}>
+          <View style={styles.iconContainer}>
+            <CheckCircle size={48} color="#FFB300" />
+          </View>
+          <Text style={styles.title}>Password reset!</Text>
+          <Text style={styles.subtitle}>
+            Your password has been successfully reset.
+          </Text>
+
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => {
+              onSuccess?.();
+              onBackToSignIn?.();
+            }}
+          >
+            <Text style={styles.buttonText}>Sign In</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -134,73 +154,55 @@ export function SignInScreen({
 
         <Animated.View
           style={{
-            opacity: titleAnim,
-            transform: [{ translateY: titleSlide }],
+            opacity: contentAnim,
+            transform: [{ translateY: contentSlide }],
           }}
         >
-          <Text style={styles.title}>{appName}</Text>
-          <Text style={styles.subtitle}>{appSubtitle}</Text>
-        </Animated.View>
+          <Text style={styles.title}>Reset password</Text>
+          <Text style={styles.subtitle}>Enter your new password</Text>
 
-        {error && <Text style={styles.error}>{error}</Text>}
-
-        <Animated.View
-          style={{
-            opacity: formAnim,
-            transform: [{ translateY: formSlide }],
-          }}
-        >
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="#555560"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            textContentType="emailAddress"
-            autoComplete="email"
-          />
+          {error && <Text style={styles.error}>{error}</Text>}
 
           <TextInput
             style={styles.input}
-            placeholder="Password"
+            placeholder="New password"
             placeholderTextColor="#555560"
-            value={password}
-            onChangeText={setPassword}
+            value={newPassword}
+            onChangeText={setNewPassword}
             secureTextEntry
-            textContentType="password"
-            autoComplete="password"
+            textContentType="newPassword"
+            autoComplete="new-password"
           />
 
-          {onForgotPassword && (
-            <TouchableOpacity
-              style={styles.forgotPassword}
-              onPress={onForgotPassword}
-            >
-              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-            </TouchableOpacity>
-          )}
-        </Animated.View>
+          <TextInput
+            style={styles.input}
+            placeholder="Confirm password"
+            placeholderTextColor="#555560"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry
+            textContentType="newPassword"
+            autoComplete="new-password"
+          />
 
-        <Animated.View style={{ opacity: buttonAnim }}>
+          <Text style={styles.hint}>Minimum 8 characters</Text>
+
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleSignIn}
-            disabled={loading || !email.trim() || !password}
+            onPress={handleReset}
+            disabled={loading || !newPassword || !confirmPassword}
           >
             {loading ? (
               <ActivityIndicator color="#0B0B0F" />
             ) : (
-              <Text style={styles.buttonText}>Sign In</Text>
+              <Text style={styles.buttonText}>Reset Password</Text>
             )}
           </TouchableOpacity>
 
-          {onSignUp && (
-            <TouchableOpacity style={styles.link} onPress={onSignUp}>
+          {onBackToSignIn && (
+            <TouchableOpacity style={styles.link} onPress={onBackToSignIn}>
               <Text style={styles.linkText}>
-                Don't have an account?{" "}
-                <Text style={styles.linkBold}>Sign up</Text>
+                Back to <Text style={styles.linkBold}>Sign In</Text>
               </Text>
             </TouchableOpacity>
           )}
@@ -240,6 +242,10 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#0B0B0F",
   },
+  iconContainer: {
+    alignItems: "center",
+    marginBottom: 24,
+  },
   title: {
     fontSize: 28,
     fontWeight: "700",
@@ -270,15 +276,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     backgroundColor: "#131318",
   },
-  forgotPassword: {
-    alignSelf: "flex-end",
+  hint: {
+    fontSize: 12,
+    color: "#555560",
     marginBottom: 8,
-    marginTop: -4,
-  },
-  forgotPasswordText: {
-    color: "#FFB300",
-    fontSize: 14,
-    fontWeight: "500",
   },
   button: {
     backgroundColor: "#FFB300",

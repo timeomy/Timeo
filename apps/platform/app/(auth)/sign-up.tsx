@@ -6,6 +6,8 @@ export default function SignUp() {
 
   return (
     <SignUpScreen
+      appName="Timeo Platform"
+      appSubtitle="Platform access"
       onSignIn={() => router.replace("/(auth)/sign-in")}
       onSuccess={() => router.replace("/(tabs)")}
     />

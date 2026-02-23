@@ -1,4 +1,4 @@
-import React from "react";
+import { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,10 @@ import {
   FlatList,
   ActivityIndicator,
   StyleSheet,
+  Alert,
 } from "react-native";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@timeo/api";
 import { useTenantSwitcher } from "../hooks";
 import type { TenantInfo } from "../types";
 
@@ -15,24 +18,59 @@ interface TenantSelectScreenProps {
   onSelect?: (tenant: TenantInfo) => void;
 }
 
+interface InvitedTenant {
+  _id: string;
+  name: string;
+  slug: string;
+  role: string;
+  membershipId: string;
+}
+
 export function TenantSelectScreen({ onSelect }: TenantSelectScreenProps) {
   const { tenants, activeTenant, switchTenant, isLoading } = useTenantSwitcher();
+  const invitations = useQuery(api.tenants.getMyInvitations);
+  const joinTenant = useMutation(api.tenantMemberships.join);
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
-  const handleSelect = async (tenant: TenantInfo) => {
-    await switchTenant(tenant.id);
+  const handleSelect = (tenant: TenantInfo) => {
+    switchTenant(tenant.id);
     onSelect?.(tenant);
   };
+
+  const handleAcceptInvitation = useCallback(
+    async (invitation: InvitedTenant) => {
+      setAcceptingId(invitation._id);
+      try {
+        await joinTenant({ tenantId: invitation._id as any });
+        Alert.alert(
+          "Joined!",
+          `You've joined ${invitation.name}. It will now appear in your organizations.`
+        );
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to accept invitation";
+        Alert.alert("Error", message);
+      } finally {
+        setAcceptingId(null);
+      }
+    },
+    [joinTenant]
+  );
 
   if (isLoading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#FFB300" />
         <Text style={styles.loadingText}>Loading your organizations...</Text>
       </View>
     );
   }
 
-  if (tenants.length === 0) {
+  const hasInvitations =
+    invitations && invitations.length > 0;
+  const hasNoContent = tenants.length === 0 && !hasInvitations;
+
+  if (hasNoContent) {
     return (
       <View style={styles.center}>
         <Text style={styles.emptyTitle}>No organizations</Text>
@@ -65,6 +103,35 @@ export function TenantSelectScreen({ onSelect }: TenantSelectScreenProps) {
     );
   };
 
+  const renderInvitation = ({ item }: { item: InvitedTenant }) => {
+    const isAccepting = acceptingId === item._id;
+
+    return (
+      <View style={styles.invitationCard}>
+        <View style={styles.invitationAvatar}>
+          <Text style={styles.avatarText}>
+            {item.name.charAt(0).toUpperCase()}
+          </Text>
+        </View>
+        <View style={styles.cardContent}>
+          <Text style={styles.cardTitle}>{item.name}</Text>
+          <Text style={styles.cardRole}>Invited as {item.role}</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.acceptButton}
+          onPress={() => handleAcceptInvitation(item)}
+          disabled={isAccepting}
+        >
+          {isAccepting ? (
+            <ActivityIndicator size="small" color="#0B0B0F" />
+          ) : (
+            <Text style={styles.acceptButtonText}>Accept</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Select Organization</Text>
@@ -72,12 +139,32 @@ export function TenantSelectScreen({ onSelect }: TenantSelectScreenProps) {
         Choose which organization to work with
       </Text>
 
-      <FlatList
-        data={tenants}
-        keyExtractor={(item) => item.id}
-        renderItem={renderTenant}
-        contentContainerStyle={styles.list}
-      />
+      {hasInvitations ? (
+        <>
+          <Text style={styles.sectionTitle}>Pending Invitations</Text>
+          <FlatList
+            data={invitations as InvitedTenant[]}
+            keyExtractor={(item) => item._id}
+            renderItem={renderInvitation}
+            contentContainerStyle={styles.list}
+            scrollEnabled={false}
+          />
+          {tenants.length > 0 && (
+            <Text style={[styles.sectionTitle, { marginTop: 16 }]}>
+              Your Organizations
+            </Text>
+          )}
+        </>
+      ) : null}
+
+      {tenants.length > 0 ? (
+        <FlatList
+          data={tenants}
+          keyExtractor={(item) => item.id}
+          renderItem={renderTenant}
+          contentContainerStyle={styles.list}
+        />
+      ) : null}
     </View>
   );
 }
@@ -85,7 +172,7 @@ export function TenantSelectScreen({ onSelect }: TenantSelectScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#0B0B0F",
     paddingTop: 60,
     paddingHorizontal: 24,
   },
@@ -94,46 +181,64 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 24,
+    backgroundColor: "#0B0B0F",
   },
   title: {
     fontSize: 28,
     fontWeight: "700",
-    color: "#111827",
+    color: "#EDECE8",
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
-    color: "#6b7280",
+    color: "#88878F",
     marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#88878F",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 12,
   },
   list: {
     gap: 12,
-    paddingBottom: 24,
+    paddingBottom: 12,
   },
   card: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: "#252530",
     borderRadius: 12,
     padding: 16,
-    backgroundColor: "#fff",
+    backgroundColor: "#131318",
   },
   cardActive: {
-    borderColor: "#111827",
-    backgroundColor: "#f9fafb",
+    borderColor: "#FFB300",
+    backgroundColor: "#1A1A22",
   },
   avatar: {
     width: 44,
     height: 44,
     borderRadius: 10,
-    backgroundColor: "#111827",
+    backgroundColor: "#FFB300",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  invitationAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: "#FFB30040",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
   },
   avatarText: {
-    color: "#fff",
+    color: "#0B0B0F",
     fontSize: 18,
     fontWeight: "700",
   },
@@ -143,38 +248,60 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#111827",
+    color: "#EDECE8",
   },
   cardRole: {
     fontSize: 13,
-    color: "#6b7280",
+    color: "#88878F",
     marginTop: 2,
     textTransform: "capitalize",
   },
   activeBadge: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#059669",
-    backgroundColor: "#d1fae5",
+    color: "#10B981",
+    backgroundColor: "#10B98120",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
     overflow: "hidden",
   },
+  invitationCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#FFB30040",
+    borderRadius: 12,
+    padding: 16,
+    backgroundColor: "#131318",
+  },
+  acceptButton: {
+    backgroundColor: "#FFB300",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 70,
+    alignItems: "center",
+  },
+  acceptButtonText: {
+    color: "#0B0B0F",
+    fontSize: 14,
+    fontWeight: "700",
+  },
   loadingText: {
     marginTop: 12,
-    color: "#6b7280",
+    color: "#88878F",
     fontSize: 14,
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#111827",
+    color: "#EDECE8",
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: "#6b7280",
+    color: "#88878F",
     textAlign: "center",
   },
 });

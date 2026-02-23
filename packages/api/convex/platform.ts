@@ -4,6 +4,7 @@ import { requirePlatformAdmin } from "./lib/middleware";
 import { insertAuditLog } from "./lib/helpers";
 import {
   tenantPlanValidator,
+  tenantStatusValidator,
   tenantSettingsValidator,
   tenantBrandingValidator,
 } from "./validators";
@@ -233,6 +234,166 @@ export const setFeatureFlag = mutation({
       resource: "featureFlags",
       resourceId: args.key,
       metadata: { enabled: args.enabled, tenantId: args.tenantId },
+    });
+  },
+});
+
+export const createTenantByEmail = mutation({
+  args: {
+    name: v.string(),
+    slug: v.string(),
+    ownerEmail: v.string(),
+    plan: tenantPlanValidator,
+    settings: v.optional(tenantSettingsValidator),
+    branding: v.optional(tenantBrandingValidator),
+  },
+  handler: async (ctx, args) => {
+    const admin = await requirePlatformAdmin(ctx);
+
+    const owner = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.ownerEmail.toLowerCase()))
+      .unique();
+    if (!owner) {
+      throw new Error(
+        "No user found with that email. They must sign up first."
+      );
+    }
+
+    const existing = await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .unique();
+    if (existing) throw new Error("Tenant slug already taken");
+
+    const tenantId = await ctx.db.insert("tenants", {
+      name: args.name,
+      slug: args.slug,
+      ownerId: owner._id,
+      plan: args.plan,
+      status: "active",
+      settings: args.settings ?? {
+        timezone: "Asia/Kuala_Lumpur",
+        autoConfirmBookings: false,
+      },
+      branding: args.branding ?? {},
+      createdAt: Date.now(),
+    });
+
+    await ctx.db.insert("tenantMemberships", {
+      userId: owner._id,
+      tenantId,
+      role: "admin",
+      status: "active",
+      joinedAt: Date.now(),
+    });
+
+    await insertAuditLog(ctx, {
+      tenantId,
+      actorId: admin._id,
+      action: "platform.tenant_created",
+      resource: "tenants",
+      resourceId: tenantId,
+      metadata: { ownerId: owner._id, plan: args.plan },
+    });
+
+    return tenantId;
+  },
+});
+
+export const updateTenant = mutation({
+  args: {
+    tenantId: v.id("tenants"),
+    name: v.optional(v.string()),
+    plan: v.optional(tenantPlanValidator),
+    status: v.optional(tenantStatusValidator),
+  },
+  handler: async (ctx, args) => {
+    const admin = await requirePlatformAdmin(ctx);
+    const tenant = await ctx.db.get(args.tenantId);
+    if (!tenant) throw new Error("Tenant not found");
+
+    const updates: Record<string, unknown> = {};
+    if (args.name !== undefined) updates.name = args.name;
+    if (args.plan !== undefined) updates.plan = args.plan;
+    if (args.status !== undefined) updates.status = args.status;
+
+    if (Object.keys(updates).length === 0) return;
+
+    await ctx.db.patch(args.tenantId, updates);
+
+    await insertAuditLog(ctx, {
+      tenantId: args.tenantId,
+      actorId: admin._id,
+      action: "platform.tenant_updated",
+      resource: "tenants",
+      resourceId: args.tenantId,
+      metadata: { fields: Object.keys(updates) },
+    });
+  },
+});
+
+export const getTenantById = query({
+  args: { tenantId: v.id("tenants") },
+  handler: async (ctx, args) => {
+    await requirePlatformAdmin(ctx);
+    const tenant = await ctx.db.get(args.tenantId);
+    if (!tenant) throw new Error("Tenant not found");
+
+    const owner = await ctx.db.get(tenant.ownerId);
+    const members = await ctx.db
+      .query("tenantMemberships")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
+      .collect();
+
+    const membersWithUser = await Promise.all(
+      members.map(async (m) => {
+        const user = await ctx.db.get(m.userId);
+        return {
+          _id: m._id,
+          role: m.role,
+          status: m.status,
+          joinedAt: m.joinedAt,
+          userName: user?.name ?? "Unknown",
+          userEmail: user?.email ?? "—",
+        };
+      })
+    );
+
+    return {
+      ...tenant,
+      ownerName: owner?.name ?? "Unknown",
+      ownerEmail: owner?.email ?? "—",
+      members: membersWithUser,
+    };
+  },
+});
+
+export const listConfig = query({
+  args: {},
+  handler: async (ctx) => {
+    await requirePlatformAdmin(ctx);
+    return await ctx.db.query("platformConfig").collect();
+  },
+});
+
+export const deleteConfig = mutation({
+  args: { key: v.string() },
+  handler: async (ctx, args) => {
+    const admin = await requirePlatformAdmin(ctx);
+    const existing = await ctx.db
+      .query("platformConfig")
+      .withIndex("by_key", (q) => q.eq("key", args.key))
+      .unique();
+    if (!existing) throw new Error("Config key not found");
+
+    await ctx.db.delete(existing._id);
+
+    await insertAuditLog(ctx, {
+      actorId: admin._id,
+      action: "platform.config_deleted",
+      resource: "platformConfig",
+      resourceId: args.key,
     });
   },
 });
