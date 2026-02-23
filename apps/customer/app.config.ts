@@ -32,6 +32,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: [
     "expo-router",
     "expo-secure-store",
+    [
+      "expo-dev-client",
+      {
+        launchMode: "launcher",
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,

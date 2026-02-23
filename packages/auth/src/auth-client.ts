@@ -11,7 +11,7 @@ export const authClient = createAuthClient({
   baseURL: process.env.EXPO_PUBLIC_CONVEX_SITE_URL,
   plugins: [
     expoClient({
-      scheme: "timeo",
+      scheme: process.env.EXPO_PUBLIC_APP_SCHEME || "timeo",
       storagePrefix: "timeo",
       storage: SecureStore,
     }),
