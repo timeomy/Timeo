@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTimeoWebAuthContext, useTimeoWebTenantContext, isRoleAtLeast } from "@timeo/auth/web";
@@ -172,20 +173,33 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             pathname === link.href ||
             (link.href !== "/dashboard" && pathname.startsWith(link.href + "/"));
           return (
-            <Link
+            <motion.div
               key={link.href}
-              href={link.href}
-              onClick={onNavigate}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
-                isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
-              )}
+              whileHover={{ x: 2 }}
+              whileTap={{ scale: 0.98 }}
+              className="relative"
             >
-              <link.icon className={cn("h-4 w-4", isActive && "text-primary")} />
-              {link.label}
-            </Link>
+              {isActive && (
+                <motion.div
+                  layoutId="activeNav"
+                  className="absolute inset-0 rounded-lg bg-primary/10"
+                  transition={{ type: "spring", duration: 0.2, bounce: 0.1 }}
+                />
+              )}
+              <Link
+                href={link.href}
+                onClick={onNavigate}
+                className={cn(
+                  "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  isActive
+                    ? "text-primary"
+                    : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
+                )}
+              >
+                <link.icon className={cn("h-4 w-4", isActive && "text-primary")} />
+                {link.label}
+              </Link>
+            </motion.div>
           );
         })}
       </nav>
@@ -234,6 +248,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn, activeRole } = useTimeoWebAuthContext();
   const { tenants, isLoading: tenantsLoading } = useTimeoWebTenantContext();
   useEnsureUser(!!isSignedIn);
+  const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // Loading state
@@ -310,9 +325,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-            {children}
-          </div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={pathname}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+            >
+              <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+                {children}
+              </div>
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
     </div>

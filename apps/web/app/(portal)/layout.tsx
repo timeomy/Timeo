@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
@@ -281,9 +282,19 @@ export default function PortalLayout({
 
       {/* Page Content */}
       <main className="flex-1">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          {children}
-        </div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={pathname}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
+            <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+              {children}
+            </div>
+          </motion.div>
+        </AnimatePresence>
       </main>
     </div>
   );

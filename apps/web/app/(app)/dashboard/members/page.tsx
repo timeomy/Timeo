@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@timeo/api";
 import { useTenantId } from "@/hooks/use-tenant-id";
@@ -96,19 +96,36 @@ export default function MembersPage() {
           .includes(search.toLowerCase()),
     ) ?? [];
 
+  const creditsByUser = useMemo(() => {
+    if (!allCredits) return {};
+    return allCredits.reduce((acc: Record<string, typeof allCredits>, credit: any) => {
+      const key = credit.userId as string;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(credit);
+      return acc;
+    }, {});
+  }, [allCredits]);
+
   function getUserCredits(userId: string) {
-    if (!allCredits) return { total: 0, used: 0, remaining: 0, items: [] };
-    const userCredits = allCredits.filter((c: any) => c.userId === userId);
+    const userCredits = creditsByUser[userId] ?? [];
+    if (userCredits.length === 0) return { total: 0, used: 0, remaining: 0, items: [] };
     const total = userCredits.reduce((s: number, c: any) => s + c.totalSessions, 0);
     const used = userCredits.reduce((s: number, c: any) => s + c.usedSessions, 0);
     return { total, used, remaining: total - used, items: userCredits };
   }
 
+  const checkInsByUser = useMemo(() => {
+    if (!checkIns) return {};
+    return checkIns.reduce((acc: Record<string, number>, ci: any) => {
+      const key = ci.userId as string;
+      const ts = ci.timestamp as number;
+      if (!acc[key] || ts > acc[key]) acc[key] = ts;
+      return acc;
+    }, {});
+  }, [checkIns]);
+
   function getLastCheckIn(userId: string) {
-    if (!checkIns) return null;
-    const userCheckIns = checkIns.filter((ci: any) => ci.userId === userId);
-    if (userCheckIns.length === 0) return null;
-    return userCheckIns[0]?.timestamp ?? null;
+    return checkInsByUser[userId] ?? null;
   }
 
   function formatDate(timestamp: number) {

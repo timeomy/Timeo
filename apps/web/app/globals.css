@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -67,11 +65,11 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-family: var(--font-plus-jakarta), 'Plus Jakarta Sans', sans-serif;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: var(--font-space-grotesk), 'Space Grotesk', sans-serif;
   }
 }
 
@@ -140,7 +138,7 @@
 
   .section-heading {
     @apply text-4xl md:text-5xl font-bold tracking-tight;
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: var(--font-space-grotesk), 'Space Grotesk', sans-serif;
   }
 
   .grid-pattern {

@@ -1,5 +1,7 @@
 "use client";
 
+import { motion, AnimatePresence } from "framer-motion";
+import { usePathname } from "next/navigation";
 import { NavHeader } from "../../components/nav-header";
 import { Zap } from "lucide-react";
 import Link from "next/link";
@@ -9,14 +11,26 @@ export default function StoreLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+
   return (
     <div className="flex min-h-screen flex-col">
       <NavHeader />
 
       <main className="flex-1">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          {children}
-        </div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={pathname}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
+            <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+              {children}
+            </div>
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       <footer className="border-t bg-muted/30">

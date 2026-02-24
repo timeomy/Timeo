@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@timeo/api";
@@ -40,34 +41,42 @@ function StatCard({
   icon: Icon,
   description,
   loading,
+  index = 0,
 }: {
   title: string;
   value: string | number;
   icon: React.ElementType;
   description?: string;
   loading?: boolean;
+  index?: number;
 }) {
   return (
-    <Card className="glass-card">
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">{title}</p>
-            {loading ? (
-              <Skeleton className="mt-1 h-8 w-24" />
-            ) : (
-              <p className="mt-1 text-3xl font-bold text-glow">{value}</p>
-            )}
-            {description && (
-              <p className="mt-1 text-xs text-muted-foreground">{description}</p>
-            )}
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: "easeOut", delay: index * 0.06 }}
+    >
+      <Card className="glass-card">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">{title}</p>
+              {loading ? (
+                <Skeleton className="mt-1 h-8 w-24" />
+              ) : (
+                <p className="mt-1 text-3xl font-bold text-glow">{value}</p>
+              )}
+              {description && (
+                <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+              )}
+            </div>
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+              <Icon className="h-6 w-6 text-primary" />
+            </div>
           </div>
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-            <Icon className="h-6 w-6 text-primary" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
 
@@ -99,6 +108,7 @@ function AdminDashboard({ tenantId }: { tenantId: any }) {
           icon={DollarSign}
           description="This month"
           loading={loading}
+          index={0}
         />
         <StatCard
           title="Bookings"
@@ -106,6 +116,7 @@ function AdminDashboard({ tenantId }: { tenantId: any }) {
           icon={Calendar}
           description={loading ? "" : `${bookings?.bookingsByStatus?.pending ?? 0} pending`}
           loading={loading}
+          index={1}
         />
         <StatCard
           title="Orders"
@@ -113,6 +124,7 @@ function AdminDashboard({ tenantId }: { tenantId: any }) {
           icon={Package}
           description={loading ? "" : `${orders?.ordersByStatus?.pending ?? 0} pending`}
           loading={loading}
+          index={2}
         />
         <StatCard
           title="Completion Rate"
@@ -120,6 +132,7 @@ function AdminDashboard({ tenantId }: { tenantId: any }) {
           icon={TrendingUp}
           description="Bookings completed"
           loading={loading}
+          index={3}
         />
       </div>
 
@@ -232,6 +245,7 @@ function StaffDashboard({ tenantId }: { tenantId: any }) {
           icon={ScanLine}
           description={`${checkInStats?.thisWeek ?? 0} this week`}
           loading={loading}
+          index={0}
         />
         <StatCard
           title="Bookings"
@@ -239,6 +253,7 @@ function StaffDashboard({ tenantId }: { tenantId: any }) {
           icon={Calendar}
           description={loading ? "" : `${bookings?.bookingsByStatus?.pending ?? 0} pending`}
           loading={loading}
+          index={1}
         />
         <StatCard
           title="Active Members"
@@ -246,6 +261,7 @@ function StaffDashboard({ tenantId }: { tenantId: any }) {
           icon={UserCheck}
           description="In your business"
           loading={members === undefined}
+          index={2}
         />
         <StatCard
           title="Check-in Methods"
@@ -253,6 +269,7 @@ function StaffDashboard({ tenantId }: { tenantId: any }) {
           icon={CreditCard}
           description={loading ? "" : `${checkInStats?.byMethod?.manual ?? 0} manual today`}
           loading={loading}
+          index={3}
         />
       </div>
 

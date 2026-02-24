@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@timeo/api";
 import type { GenericId } from "convex/values";
@@ -314,10 +315,12 @@ function GridView({
             {/* Image area */}
             <div className="relative flex h-40 items-center justify-center rounded-t-2xl bg-white/[0.02] border-b border-white/[0.06]">
               {product.imageUrl ? (
-                <img
+                <Image
                   src={product.imageUrl}
                   alt={product.name}
-                  className="h-full w-full rounded-t-2xl object-cover"
+                  fill
+                  className="rounded-t-2xl object-cover"
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 />
               ) : (
                 <ImageIcon className="h-10 w-10 text-white/10" />
@@ -429,12 +432,14 @@ function TableView({
               >
                 <TableCell>
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.03]">
+                    <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.03]">
                       {product.imageUrl ? (
-                        <img
+                        <Image
                           src={product.imageUrl}
                           alt={product.name}
-                          className="h-full w-full rounded-lg object-cover"
+                          fill
+                          className="rounded-lg object-cover"
+                          sizes="40px"
                         />
                       ) : (
                         <Package className="h-4 w-4 text-white/20" />

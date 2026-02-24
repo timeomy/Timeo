@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@timeo/api";
 import type { GenericId } from "convex/values";
@@ -73,18 +73,24 @@ export default function BookingsPage() {
 
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
-  const filteredBookings =
-    bookings?.filter((b) =>
-      activeTab === "all" ? true : b.status === activeTab,
-    ) ?? [];
+  const filteredBookings = useMemo(
+    () =>
+      bookings?.filter((b) =>
+        activeTab === "all" ? true : b.status === activeTab,
+      ) ?? [],
+    [bookings, activeTab],
+  );
 
-  const counts = {
-    all: bookings?.length ?? 0,
-    pending: bookings?.filter((b) => b.status === "pending").length ?? 0,
-    confirmed: bookings?.filter((b) => b.status === "confirmed").length ?? 0,
-    completed: bookings?.filter((b) => b.status === "completed").length ?? 0,
-    cancelled: bookings?.filter((b) => b.status === "cancelled").length ?? 0,
-  };
+  const counts = useMemo(
+    () => ({
+      all: bookings?.length ?? 0,
+      pending: bookings?.filter((b) => b.status === "pending").length ?? 0,
+      confirmed: bookings?.filter((b) => b.status === "confirmed").length ?? 0,
+      completed: bookings?.filter((b) => b.status === "completed").length ?? 0,
+      cancelled: bookings?.filter((b) => b.status === "cancelled").length ?? 0,
+    }),
+    [bookings],
+  );
 
   async function handleAction(
     action: "confirm" | "cancel" | "complete" | "no_show",

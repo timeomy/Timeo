@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useQuery } from "convex/react";
 import { api } from "@timeo/api";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
@@ -119,12 +120,14 @@ export default function ProductsPage() {
               className="group flex flex-col overflow-hidden transition-shadow hover:shadow-md"
             >
               {/* Image Placeholder */}
-              <div className="flex aspect-square items-center justify-center bg-muted/30">
+              <div className="relative flex aspect-square items-center justify-center bg-muted/30">
                 {product.imageUrl ? (
-                  <img
+                  <Image
                     src={product.imageUrl}
                     alt={product.name}
-                    className="h-full w-full object-cover"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                   />
                 ) : (
                   <ShoppingBag className="h-16 w-16 text-muted-foreground/20" />
