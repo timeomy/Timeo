@@ -510,3 +510,143 @@ export const createTenant = mutation({
     return tenantId;
   },
 });
+
+// ─── Client Management Queries ──────────────────────────────────────────────
+
+export const listAllUsers = query({
+  args: {
+    search: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    await requirePlatformAdmin(ctx);
+
+    const limit = args.limit ?? 200;
+    const allUsers = await ctx.db.query("users").take(limit);
+
+    const usersWithMemberships = await Promise.all(
+      allUsers.map(async (user) => {
+        const memberships = await ctx.db
+          .query("tenantMemberships")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .collect();
+
+        const activeMemberships = memberships.filter((m) => m.status === "active");
+
+        // Get unique tenant names
+        const tenantNames = await Promise.all(
+          activeMemberships.slice(0, 3).map(async (m) => {
+            const tenant = await ctx.db.get(m.tenantId);
+            return tenant?.name ?? "Unknown";
+          })
+        );
+
+        return {
+          _id: user._id,
+          name: user.name ?? "Unknown",
+          email: user.email,
+          createdAt: user._creationTime,
+          membershipCount: activeMemberships.length,
+          tenantNames,
+        };
+      })
+    );
+
+    // Filter by search if provided
+    if (args.search?.trim()) {
+      const q = args.search.toLowerCase();
+      return usersWithMemberships.filter(
+        (u) =>
+          u.name.toLowerCase().includes(q) ||
+          u.email?.toLowerCase().includes(q)
+      );
+    }
+
+    return usersWithMemberships;
+  },
+});
+
+export const getUserById = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    await requirePlatformAdmin(ctx);
+
+    const user = await ctx.db.get(args.userId);
+    if (!user) throw new Error("User not found");
+
+    const memberships = await ctx.db
+      .query("tenantMemberships")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+
+    const membershipsWithTenant = await Promise.all(
+      memberships.map(async (m) => {
+        const tenant = await ctx.db.get(m.tenantId);
+        return {
+          _id: m._id,
+          tenantId: m.tenantId,
+          tenantName: tenant?.name ?? "Unknown",
+          tenantSlug: tenant?.slug ?? "",
+          role: m.role,
+          status: m.status,
+          joinedAt: m.joinedAt,
+        };
+      })
+    );
+
+    const recentBookings = await ctx.db
+      .query("bookings")
+      .withIndex("by_customer", (q) => q.eq("customerId", args.userId))
+      .order("desc")
+      .take(10);
+
+    return {
+      _id: user._id,
+      name: user.name ?? "Unknown",
+      email: user.email,
+      createdAt: user._creationTime,
+      memberships: membershipsWithTenant,
+      recentBookingCount: recentBookings.length,
+    };
+  },
+});
+
+export const listAllMemberships = query({
+  args: {
+    tenantId: v.optional(v.id("tenants")),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    await requirePlatformAdmin(ctx);
+
+    const limit = args.limit ?? 200;
+
+    let memberships;
+    if (args.tenantId) {
+      memberships = await ctx.db
+        .query("tenantMemberships")
+        .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId!))
+        .take(limit);
+    } else {
+      memberships = await ctx.db.query("tenantMemberships").take(limit);
+    }
+
+    return await Promise.all(
+      memberships.map(async (m) => {
+        const user = await ctx.db.get(m.userId);
+        const tenant = await ctx.db.get(m.tenantId);
+        return {
+          _id: m._id,
+          userId: m.userId,
+          userName: user?.name ?? "Unknown",
+          userEmail: user?.email ?? "—",
+          tenantId: m.tenantId,
+          tenantName: tenant?.name ?? "Unknown",
+          role: m.role,
+          status: m.status,
+          joinedAt: m.joinedAt,
+        };
+      })
+    );
+  },
+});

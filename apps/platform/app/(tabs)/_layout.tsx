@@ -4,6 +4,7 @@ import { Tabs } from "expo-router";
 import {
   LayoutDashboard,
   Building2,
+  Users,
   Flag,
   ShieldAlert,
   LogOut,
@@ -100,6 +101,15 @@ export default function TabLayout() {
               title: "Tenants",
               tabBarIcon: ({ color, size }) => (
                 <Building2 size={size} color={color} />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="clients"
+            options={{
+              title: "Clients",
+              tabBarIcon: ({ color, size }) => (
+                <Users size={size} color={color} />
               ),
             }}
           />

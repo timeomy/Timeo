@@ -60,7 +60,7 @@ export function ForgotPasswordScreen({
     setLoading(true);
 
     try {
-      const result = await authClient.forgetPassword({
+      const result = await authClient.requestPasswordReset({
         email: email.trim(),
         redirectTo: "timeo://reset-password",
       });

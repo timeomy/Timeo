@@ -23,6 +23,7 @@ import {
   Menu,
   LogOut,
   Shield,
+  Users,
 } from "lucide-react";
 
 type SidebarLink = {
@@ -34,6 +35,7 @@ type SidebarLink = {
 const sidebarLinks: SidebarLink[] = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/tenants", label: "Tenants", icon: Building2 },
+  { href: "/admin/clients", label: "Clients", icon: Users },
   { href: "/admin/audit-logs", label: "Audit Logs", icon: ScrollText },
 ];
 
