@@ -300,7 +300,7 @@ export default function StaffScheduleScreen() {
                     <Text
                       className="text-xs font-bold"
                       style={{
-                        color: day.isToday ? "#FFFFFF" : theme.colors.text,
+                        color: day.isToday ? (theme.dark ? "#0B0B0F" : "#FFFFFF") : theme.colors.text,
                       }}
                     >
                       {day.dayNum}

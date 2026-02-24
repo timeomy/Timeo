@@ -119,7 +119,9 @@ export default function AdminDashboard() {
                 className="text-sm font-medium"
                 style={{
                   color:
-                    period === opt.value ? "#FFFFFF" : theme.colors.textSecondary,
+                    period === opt.value
+                      ? theme.dark ? "#0B0B0F" : "#FFFFFF"
+                      : theme.colors.textSecondary,
                 }}
               >
                 {opt.label}

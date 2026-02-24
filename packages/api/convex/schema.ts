@@ -28,6 +28,14 @@ export default defineSchema({
       ),
       bookingBuffer: v.optional(v.number()),
       autoConfirmBookings: v.optional(v.boolean()),
+      doorCamera: v.optional(
+        v.object({
+          ip: v.string(),
+          port: v.optional(v.number()),     // default 8000
+          gpioPort: v.optional(v.number()), // default 1
+          deviceSn: v.optional(v.string()), // device serial number for verification
+        })
+      ),
     }),
     branding: v.object({
       primaryColor: v.optional(v.string()),
@@ -74,7 +82,8 @@ export default defineSchema({
     .index("by_clerkOrgId", ["clerkOrgId"]),
 
   users: defineTable({
-    authId: v.string(),
+    authId: v.optional(v.string()), // optional for legacy Clerk users migrated before Better Auth
+    clerkId: v.optional(v.string()), // deprecated: kept for legacy Clerk user compat
     email: v.string(),
     name: v.string(),
     avatarUrl: v.optional(v.string()),

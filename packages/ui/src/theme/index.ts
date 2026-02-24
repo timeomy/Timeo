@@ -19,13 +19,13 @@ export interface TimeoTheme {
 
 export const defaultTheme: TimeoTheme = {
   colors: {
-    primary: "#1A56DB",
+    primary: "#D4970A",
     secondary: "#059669",
-    background: "#FFFFFF",
-    surface: "#F8FAFC",
-    text: "#1E293B",
+    background: "#FAFAF8",
+    surface: "#F0F0EC",
+    text: "#0B0B0F",
     textSecondary: "#64748B",
-    border: "#E2E8F0",
+    border: "#E0E0DC",
     error: "#DC2626",
     success: "#059669",
     warning: "#D97706",
@@ -36,13 +36,13 @@ export const defaultTheme: TimeoTheme = {
 
 export const darkTheme: TimeoTheme = {
   colors: {
-    primary: "#3B82F6",
+    primary: "#FFB300",
     secondary: "#10B981",
-    background: "#0F172A",
-    surface: "#1E293B",
-    text: "#F1F5F9",
-    textSecondary: "#94A3B8",
-    border: "#334155",
+    background: "#0B0B0F",
+    surface: "#131318",
+    text: "#EDECE8",
+    textSecondary: "#88878F",
+    border: "#252530",
     error: "#EF4444",
     success: "#10B981",
     warning: "#F59E0B",

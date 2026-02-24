@@ -1,32 +1,67 @@
 import React from "react";
-import { View, Text } from "react-native";
+import { View, Text, TouchableOpacity } from "react-native";
 import { Tabs } from "expo-router";
-import { LayoutDashboard, Building2, Flag, Settings } from "lucide-react-native";
-import { AuthGuard, RoleGuard } from "@timeo/auth";
+import {
+  LayoutDashboard,
+  Building2,
+  Flag,
+  ShieldAlert,
+  LogOut,
+} from "lucide-react-native";
+import { AuthGuard, useTimeoAuth } from "@timeo/auth";
 import { LoadingScreen, useTheme } from "@timeo/ui";
+import { useQuery } from "convex/react";
+import { api } from "@timeo/api";
 
-function AccessDenied() {
+function PlatformAdminGate({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
-
-  return (
-    <View
-      className="flex-1 items-center justify-center px-8"
-      style={{ backgroundColor: theme.colors.background }}
-    >
-      <Text
-        className="text-center text-lg font-bold"
-        style={{ color: theme.colors.text }}
-      >
-        Access Denied
-      </Text>
-      <Text
-        className="mt-2 text-center text-sm"
-        style={{ color: theme.colors.textSecondary }}
-      >
-        You must be a platform administrator to access this app.
-      </Text>
-    </View>
+  const { isSignedIn, signOut } = useTimeoAuth();
+  const isPlatformAdmin = useQuery(
+    api.platform.amIPlatformAdmin,
+    isSignedIn ? {} : "skip"
   );
+
+  // Still loading
+  if (isPlatformAdmin === undefined) {
+    return <LoadingScreen message="Verifying access..." />;
+  }
+
+  // Not a platform admin
+  if (!isPlatformAdmin) {
+    return (
+      <View
+        className="flex-1 items-center justify-center px-8"
+        style={{ backgroundColor: theme.colors.background }}
+      >
+        <ShieldAlert size={48} color={theme.colors.primary} />
+        <Text
+          className="mt-6 text-center text-xl font-bold"
+          style={{ color: theme.colors.text }}
+        >
+          Platform Admin Required
+        </Text>
+        <Text
+          className="mt-3 text-center text-sm leading-5"
+          style={{ color: theme.colors.textSecondary }}
+        >
+          This app is for the Timeo platform team only.{"\n"}
+          Contact your administrator to get platform admin access.
+        </Text>
+        <TouchableOpacity
+          onPress={() => signOut()}
+          className="mt-8 flex-row items-center gap-2 rounded-xl px-6 py-3"
+          style={{ backgroundColor: theme.colors.surface }}
+        >
+          <LogOut size={16} color={theme.colors.textSecondary} />
+          <Text style={{ color: theme.colors.textSecondary, fontSize: 14, fontWeight: "600" }}>
+            Sign Out
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return <>{children}</>;
 }
 
 export default function TabLayout() {
@@ -34,10 +69,7 @@ export default function TabLayout() {
 
   return (
     <AuthGuard loading={<LoadingScreen message="Authenticating..." />}>
-      <RoleGuard
-        allowedRoles={["platform_admin"]}
-        fallback={<AccessDenied />}
-      >
+      <PlatformAdminGate>
         <Tabs
           screenOptions={{
             headerShown: false,
@@ -80,17 +112,8 @@ export default function TabLayout() {
               ),
             }}
           />
-          <Tabs.Screen
-            name="config"
-            options={{
-              title: "Config",
-              tabBarIcon: ({ color, size }) => (
-                <Settings size={size} color={color} />
-              ),
-            }}
-          />
         </Tabs>
-      </RoleGuard>
+      </PlatformAdminGate>
     </AuthGuard>
   );
 }

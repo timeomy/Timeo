@@ -30,19 +30,25 @@ export default function SignUpPage() {
     setLoading(true);
     setError("");
 
-    const result = await authClient.signUp.email({
-      name: name.trim(),
-      email: email.trim(),
-      password,
-    });
+    try {
+      const result = await authClient.signUp.email({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+      });
 
-    if (result.error) {
-      setError(result.error.message ?? "Failed to create account");
+      if (result.error) {
+        setError(result.error.message ?? "Failed to create account");
+        setLoading(false);
+        return;
+      }
+
+      router.push("/onboarding");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to create account. Please try again.";
+      setError(message);
       setLoading(false);
-      return;
     }
-
-    router.push("/onboarding");
   };
 
   return (

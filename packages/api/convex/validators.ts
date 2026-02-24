@@ -121,6 +121,14 @@ export const tenantSettingsValidator = v.object({
   ),
   bookingBuffer: v.optional(v.number()),
   autoConfirmBookings: v.optional(v.boolean()),
+  doorCamera: v.optional(
+    v.object({
+      ip: v.string(),
+      port: v.optional(v.number()),
+      gpioPort: v.optional(v.number()),
+      deviceSn: v.optional(v.string()),
+    })
+  ),
 });
 
 export const tenantBrandingValidator = v.object({

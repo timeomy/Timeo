@@ -39,7 +39,7 @@ export const ensureUser = mutation({
         .withIndex("by_email", (q) => q.eq("email", identity.email!))
         .first();
 
-      if (legacyUser && legacyUser.authId.startsWith("legacy_")) {
+      if (legacyUser && (legacyUser.authId?.startsWith("legacy_") || legacyUser.authId?.startsWith("pending_"))) {
         await ctx.db.patch(legacyUser._id, {
           authId: identity.subject,
           name: identity.name ?? legacyUser.name,

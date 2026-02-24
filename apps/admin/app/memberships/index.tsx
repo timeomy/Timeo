@@ -158,7 +158,7 @@ export default function MembershipsScreen() {
             className="h-10 w-10 items-center justify-center rounded-full"
             style={{ backgroundColor: theme.colors.primary }}
           >
-            <Plus size={20} color="#FFFFFF" />
+            <Plus size={20} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
           </TouchableOpacity>
         }
       />

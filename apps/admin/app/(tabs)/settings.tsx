@@ -1019,8 +1019,8 @@ function StripeConnectSection({
                     loading={connecting}
                   >
                     <Row align="center" gap={8}>
-                      <ExternalLink size={16} color="#FFFFFF" />
-                      <Text className="text-sm font-semibold text-white">
+                      <ExternalLink size={16} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
+                      <Text className="text-sm font-semibold" style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}>
                         Complete Setup
                       </Text>
                     </Row>
@@ -1042,8 +1042,8 @@ function StripeConnectSection({
                   loading={connecting}
                 >
                   <Row align="center" gap={8}>
-                    <Banknote size={16} color="#FFFFFF" />
-                    <Text className="text-sm font-semibold text-white">
+                    <Banknote size={16} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
+                    <Text className="text-sm font-semibold" style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}>
                       Connect Stripe Account
                     </Text>
                   </Row>

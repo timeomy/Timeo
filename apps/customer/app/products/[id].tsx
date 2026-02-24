@@ -19,7 +19,7 @@ import { useTimeoAuth } from "@timeo/auth";
 import { useTrackEvent } from "@timeo/analytics";
 import { api } from "@timeo/api";
 import { useQuery } from "convex/react";
-import { useCart } from "../providers/cart";
+import { useCart } from "../../providers/cart";
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -237,8 +237,11 @@ export default function ProductDetailScreen() {
               className="min-w-[160px]"
             >
               <View className="flex-row items-center">
-                <ShoppingBag size={18} color="#FFFFFF" />
-                <Text className="ml-2 text-base font-semibold text-white">
+                <ShoppingBag size={18} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
+                <Text
+                  className="ml-2 text-base font-semibold"
+                  style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}
+                >
                   Add to Cart
                 </Text>
               </View>

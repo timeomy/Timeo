@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@timeo/api";
-import type { GenericId } from "convex/values";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import {
   Card,
@@ -36,6 +35,7 @@ import {
   AlertCircle,
   Users,
   TrendingUp,
+  Unlock,
 } from "lucide-react";
 
 export default function CheckInsPage() {
@@ -48,6 +48,8 @@ export default function CheckInsPage() {
   const [memberEmail, setMemberEmail] = useState("");
   const [lookupEmail, setLookupEmail] = useState<string | null>(null);
   const [checkingIn, setCheckingIn] = useState(false);
+  const [doorDialogOpen, setDoorDialogOpen] = useState(false);
+  const [openingDoor, setOpeningDoor] = useState(false);
 
   const dateMs = new Date(selectedDate).setHours(0, 0, 0, 0);
 
@@ -62,6 +64,9 @@ export default function CheckInsPage() {
   );
 
   const manualCheckIn = useMutation(api.checkIns.manualCheckIn);
+  const openDoor = useAction(
+    (api as any).actions.door.remoteOpenDoor,
+  );
 
   const lookedUpUser = useQuery(
     api.users.getByEmail,
@@ -85,6 +90,19 @@ export default function CheckInsPage() {
       console.error("Failed to check in:", err);
     } finally {
       setCheckingIn(false);
+    }
+  }
+
+  async function handleOpenDoor() {
+    if (!tenantId) return;
+    setOpeningDoor(true);
+    try {
+      await openDoor({ tenantId });
+      setDoorDialogOpen(false);
+    } catch (err) {
+      console.error("Failed to open door:", err);
+    } finally {
+      setOpeningDoor(false);
     }
   }
 
@@ -128,6 +146,14 @@ export default function CheckInsPage() {
             onChange={(e) => setSelectedDate(e.target.value)}
             className="w-auto"
           />
+          <Button
+            variant="outline"
+            className="gap-2 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+            onClick={() => setDoorDialogOpen(true)}
+          >
+            <Unlock className="h-4 w-4" />
+            Open Door
+          </Button>
           <Button className="gap-2" onClick={() => setManualDialogOpen(true)}>
             <UserPlus className="h-4 w-4" />
             Manual Check-in
@@ -334,6 +360,35 @@ export default function CheckInsPage() {
               disabled={checkingIn || !lookedUpUser}
             >
               {checkingIn ? "Checking in..." : "Check In"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Open Door Dialog */}
+      <Dialog open={doorDialogOpen} onOpenChange={setDoorDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Open Door</DialogTitle>
+            <DialogDescription>
+              Remotely trigger the door relay? This will unlock the door for a
+              few seconds.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDoorDialogOpen(false)}
+              disabled={openingDoor}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleOpenDoor}
+              disabled={openingDoor}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              {openingDoor ? "Opening..." : "Open"}
             </Button>
           </DialogFooter>
         </DialogContent>

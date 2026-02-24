@@ -4,8 +4,9 @@ import {
   CalendarDays,
   Package,
   ClipboardList,
+  Building2,
 } from "lucide-react-native";
-import { AuthGuard, RoleGuard } from "@timeo/auth";
+import { AuthGuard, RoleGuard, useTimeoAuth, useTenantSwitcher } from "@timeo/auth";
 import { LoadingScreen, useTheme } from "@timeo/ui";
 import { View, Text } from "react-native";
 
@@ -34,11 +35,58 @@ function AccessDenied() {
 
 function AuthFallback() {
   const router = useRouter();
-  // Redirect to sign-in when not authenticated
   if (router) {
     router.replace("/(auth)/sign-in");
   }
   return <LoadingScreen message="Redirecting to sign in..." />;
+}
+
+/**
+ * Waits for tenants to load before checking role.
+ * Without this, activeRole defaults to "customer" while loading,
+ * causing the RoleGuard to immediately show Access Denied.
+ */
+function TenantAndRoleGate({ children }: { children: React.ReactNode }) {
+  const theme = useTheme();
+  const { activeTenantId } = useTimeoAuth();
+  const { tenants, isLoading } = useTenantSwitcher();
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading your organization..." />;
+  }
+
+  if (tenants.length === 0) {
+    return (
+      <View
+        className="flex-1 items-center justify-center px-8"
+        style={{ backgroundColor: theme.colors.background }}
+      >
+        <Building2 size={32} color={theme.colors.primary} />
+        <Text
+          className="mt-4 text-xl font-bold text-center"
+          style={{ color: theme.colors.text }}
+        >
+          No Organization Yet
+        </Text>
+        <Text
+          className="mt-2 text-center text-sm"
+          style={{ color: theme.colors.textSecondary }}
+        >
+          Ask your business admin to add you as a staff member.
+        </Text>
+      </View>
+    );
+  }
+
+  if (!activeTenantId) {
+    return <LoadingScreen message="Setting up..." />;
+  }
+
+  return (
+    <RoleGuard minimumRole="staff" fallback={<AccessDenied />}>
+      {children}
+    </RoleGuard>
+  );
 }
 
 export default function TabLayout() {
@@ -49,7 +97,7 @@ export default function TabLayout() {
       loading={<LoadingScreen message="Loading..." />}
       fallback={<AuthFallback />}
     >
-      <RoleGuard minimumRole="staff" fallback={<AccessDenied />}>
+      <TenantAndRoleGate>
         <Tabs
           screenOptions={{
             headerShown: false,
@@ -102,7 +150,7 @@ export default function TabLayout() {
             }}
           />
         </Tabs>
-      </RoleGuard>
+      </TenantAndRoleGate>
     </AuthGuard>
   );
 }

@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import {
   authenticateUser,
@@ -8,6 +8,18 @@ import {
 import { insertAuditLog } from "./lib/helpers";
 import { checkInMethodValidator } from "./validators";
 import { internal } from "./_generated/api";
+
+// ─── Internal helpers ─────────────────────────────────────────────────────
+
+/** Returns door camera config for a tenant — callable from Node.js actions. */
+export const getTenantCameraConfig = internalQuery({
+  args: { tenantId: v.id("tenants") },
+  handler: async (ctx, args) => {
+    const tenant = await ctx.db.get(args.tenantId);
+    if (!tenant) return null;
+    return tenant.settings?.doorCamera ?? null;
+  },
+});
 
 // ─── Queries ──────────────────────────────────────────────────────────────
 
@@ -253,6 +265,95 @@ export const generateQrCode = mutation({
     });
 
     return { qrId, code };
+  },
+});
+
+/**
+ * Called by the Convex HTTP door webhook (no auth token required).
+ * Accepts a tenant slug (from the URL) so the HTTP handler doesn't need
+ * to do a separate tenant lookup.
+ *
+ * Validates the QR code, verifies membership, records the check-in,
+ * and returns whether the door should open.
+ */
+export const processQrDoorScanBySlug = internalMutation({
+  args: {
+    code: v.string(),
+    tenantSlug: v.string(),
+    deviceSn: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Look up tenant by slug
+    const tenant = await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q) => q.eq("slug", args.tenantSlug))
+      .unique();
+
+    if (!tenant) {
+      return { allowed: false, reason: "Tenant not found" };
+    }
+
+    // Optional: verify the push is coming from the configured camera
+    const cameraConfig = tenant.settings?.doorCamera;
+    if (cameraConfig?.deviceSn && args.deviceSn && cameraConfig.deviceSn !== args.deviceSn) {
+      return { allowed: false, reason: "Device serial number mismatch" };
+    }
+
+    const tenantId = tenant._id;
+
+    // Validate QR code
+    const qrCode = await ctx.db
+      .query("memberQrCodes")
+      .withIndex("by_code", (q) => q.eq("code", args.code))
+      .first();
+
+    if (!qrCode || !qrCode.isActive || qrCode.tenantId !== tenantId) {
+      return { allowed: false, reason: "Invalid or unrecognised QR code" };
+    }
+
+    if (qrCode.expiresAt && qrCode.expiresAt < Date.now()) {
+      return { allowed: false, reason: "QR code has expired" };
+    }
+
+    // Verify the member is still active in this tenant
+    const membership = await ctx.db
+      .query("tenantMemberships")
+      .withIndex("by_tenant_user", (q) =>
+        q.eq("tenantId", tenantId).eq("userId", qrCode.userId)
+      )
+      .unique();
+
+    if (!membership || membership.status !== "active") {
+      return { allowed: false, reason: "Membership not active" };
+    }
+
+    const member = await ctx.db.get(qrCode.userId);
+
+    // Record the check-in
+    await ctx.db.insert("checkIns", {
+      tenantId,
+      userId: qrCode.userId,
+      method: "qr",
+      timestamp: Date.now(),
+    });
+
+    // Notify the member
+    await ctx.db.insert("notifications", {
+      userId: qrCode.userId,
+      tenantId,
+      type: "check_in",
+      title: "Checked In",
+      body: "Welcome! Door access granted. Enjoy your workout.",
+      read: false,
+      createdAt: Date.now(),
+    });
+
+    return {
+      allowed: true,
+      memberId: qrCode.userId as string,
+      memberName: member?.name ?? "Member",
+      gpioPort: cameraConfig?.gpioPort,
+    };
   },
 });
 

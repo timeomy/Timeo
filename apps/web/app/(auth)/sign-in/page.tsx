@@ -27,18 +27,24 @@ export default function SignInPage() {
     setLoading(true);
     setError("");
 
-    const result = await authClient.signIn.email({
-      email: email.trim(),
-      password,
-    });
+    try {
+      const result = await authClient.signIn.email({
+        email: email.trim(),
+        password,
+      });
 
-    if (result.error) {
-      setError(result.error.message ?? "Invalid email or password");
+      if (result.error) {
+        setError(result.error.message ?? "Invalid email or password");
+        setLoading(false);
+        return;
+      }
+
+      router.push(redirect);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Invalid email or password";
+      setError(message);
       setLoading(false);
-      return;
     }
-
-    router.push(redirect);
   };
 
   return (

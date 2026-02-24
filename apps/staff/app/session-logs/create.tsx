@@ -521,8 +521,8 @@ export default function CreateSessionLogScreen() {
         {/* Submit */}
         <Button size="lg" onPress={handleSubmit} loading={isSubmitting}>
           <View className="flex-row items-center">
-            <Save size={18} color="#FFFFFF" />
-            <Text className="ml-2 text-base font-semibold text-white">
+            <Save size={18} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
+            <Text className="ml-2 text-base font-semibold" style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}>
               Save Session Log
             </Text>
           </View>

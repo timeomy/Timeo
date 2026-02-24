@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as actions_door from "../actions/door.js";
 import type * as actions_notifications from "../actions/notifications.js";
 import type * as actions_novuSync from "../actions/novuSync.js";
 import type * as analytics from "../analytics.js";
@@ -53,6 +54,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "actions/door": typeof actions_door;
   "actions/notifications": typeof actions_notifications;
   "actions/novuSync": typeof actions_novuSync;
   analytics: typeof analytics;

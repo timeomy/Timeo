@@ -78,8 +78,11 @@ export default function GiftCardsScreen() {
 
         <Button onPress={handleCheckBalance} disabled={!code.trim()}>
           <View className="flex-row items-center">
-            <Search size={16} color="#FFFFFF" />
-            <Text className="ml-2 font-semibold text-white">
+            <Search size={16} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
+            <Text
+              className="ml-2 font-semibold"
+              style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}
+            >
               Check Balance
             </Text>
           </View>

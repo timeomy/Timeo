@@ -96,7 +96,7 @@ export default function ServicesScreen() {
             className="rounded-full p-2"
             style={{ backgroundColor: theme.colors.primary }}
           >
-            <Plus size={20} color="#FFFFFF" />
+            <Plus size={20} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
           </TouchableOpacity>
         }
       />
@@ -197,7 +197,7 @@ export default function ServicesScreen() {
         className="absolute bottom-8 right-6 h-14 w-14 items-center justify-center rounded-full shadow-lg"
         style={{ backgroundColor: theme.colors.primary, elevation: 8 }}
       >
-        <Plus size={28} color="#FFFFFF" />
+        <Plus size={28} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
       </TouchableOpacity>
     </Screen>
   );

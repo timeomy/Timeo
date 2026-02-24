@@ -24,12 +24,14 @@
     "expo": "*",
     "react": "*",
     "react-native": "*",
-    "next": "*"
+    "next": "*",
+    "lucide-react-native": "*"
   },
   "peerDependenciesMeta": {
     "expo": { "optional": true },
     "react-native": { "optional": true },
-    "next": { "optional": true }
+    "next": { "optional": true },
+    "lucide-react-native": { "optional": true }
   },
   "devDependencies": {
     "@timeo/config-ts": "workspace:*",

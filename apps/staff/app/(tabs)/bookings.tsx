@@ -191,7 +191,7 @@ export default function BookingsScreen() {
                 <Text
                   className="text-sm font-medium"
                   style={{
-                    color: isActive ? "#FFFFFF" : theme.colors.textSecondary,
+                    color: isActive ? (theme.dark ? "#0B0B0F" : "#FFFFFF") : theme.colors.textSecondary,
                   }}
                 >
                   {item}

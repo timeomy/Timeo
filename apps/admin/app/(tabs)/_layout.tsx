@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Tabs, useRouter } from "expo-router";
 import {
   LayoutDashboard,
@@ -5,8 +6,9 @@ import {
   Briefcase,
   Package,
   Settings,
+  Building2,
 } from "lucide-react-native";
-import { AuthGuard, RoleGuard, useTimeoAuth } from "@timeo/auth";
+import { AuthGuard, RoleGuard, useTimeoAuth, useTenantSwitcher } from "@timeo/auth";
 import { LoadingScreen, useTheme } from "@timeo/ui";
 import { View, Text } from "react-native";
 
@@ -38,11 +40,71 @@ function AuthRedirect() {
   const { isLoaded } = useTimeoAuth();
 
   if (isLoaded) {
-    // Redirect to sign-in after render
     setTimeout(() => router.replace("/(auth)/sign-in"), 0);
   }
 
   return <LoadingScreen message="Redirecting..." />;
+}
+
+/**
+ * Redirects to onboarding when user has no tenant memberships.
+ * Shows loading while tenants are being fetched.
+ */
+function OnboardingRedirect() {
+  const router = useRouter();
+  const theme = useTheme();
+  const { tenants, isLoading } = useTenantSwitcher();
+
+  useEffect(() => {
+    if (!isLoading && tenants.length === 0) {
+      router.replace("/onboarding" as any);
+    }
+  }, [isLoading, tenants.length, router]);
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading your organization..." />;
+  }
+
+  // tenants.length > 0 but activeTenantId still null — waiting for auto-select
+  if (tenants.length > 0) {
+    return <LoadingScreen message="Setting up..." />;
+  }
+
+  // Redirect in progress
+  return (
+    <View
+      className="flex-1 items-center justify-center"
+      style={{ backgroundColor: theme.colors.background }}
+    >
+      <Building2 size={32} color={theme.colors.primary} />
+      <Text
+        className="mt-4 text-base"
+        style={{ color: theme.colors.textSecondary }}
+      >
+        Redirecting to setup...
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * Wraps children and handles:
+ * 1. No tenants → redirect to onboarding
+ * 2. Has tenant but not admin → show Access Denied
+ * 3. Has tenant + admin → show children
+ */
+function TenantAndRoleGate({ children }: { children: React.ReactNode }) {
+  const { activeTenantId } = useTimeoAuth();
+
+  if (!activeTenantId) {
+    return <OnboardingRedirect />;
+  }
+
+  return (
+    <RoleGuard minimumRole="admin" fallback={<AccessDenied />}>
+      {children}
+    </RoleGuard>
+  );
 }
 
 export default function TabLayout() {
@@ -53,7 +115,7 @@ export default function TabLayout() {
       loading={<LoadingScreen message="Loading..." />}
       fallback={<AuthRedirect />}
     >
-      <RoleGuard minimumRole="admin" fallback={<AccessDenied />}>
+      <TenantAndRoleGate>
         <Tabs
           screenOptions={{
             headerShown: false,
@@ -111,7 +173,7 @@ export default function TabLayout() {
             }}
           />
         </Tabs>
-      </RoleGuard>
+      </TenantAndRoleGate>
     </AuthGuard>
   );
 }

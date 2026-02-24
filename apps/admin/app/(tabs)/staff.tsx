@@ -144,7 +144,7 @@ export default function StaffScreen() {
             className="h-10 w-10 items-center justify-center rounded-full"
             style={{ backgroundColor: theme.colors.primary }}
           >
-            <UserPlus size={20} color="#FFFFFF" />
+            <UserPlus size={20} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
           </TouchableOpacity>
         }
       />

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { View, Text, ScrollView, Alert } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import {
@@ -7,6 +7,7 @@ import {
   Users,
   ShieldCheck,
   Globe,
+  Camera,
 } from "lucide-react-native";
 import {
   Screen,
@@ -14,21 +15,20 @@ import {
   Card,
   Badge,
   Button,
+  Input,
   Select,
+  Switch,
   Section,
   Separator,
   Spacer,
+  Modal,
   LoadingScreen,
   ErrorScreen,
   useTheme,
 } from "@timeo/ui";
 import { api } from "@timeo/api";
 import { useQuery, useMutation } from "convex/react";
-import {
-  formatDate,
-  TenantPlan,
-  TenantStatus,
-} from "@timeo/shared";
+import { formatDate } from "@timeo/shared";
 
 const PLAN_OPTIONS = [
   { label: "Free", value: "free" },
@@ -76,17 +76,158 @@ export default function TenantDetailScreen() {
   const [updatingPlan, setUpdatingPlan] = useState(false);
   const [togglingStatus, setTogglingStatus] = useState(false);
 
+  // Settings state
+  const [timezone, setTimezone] = useState("");
+  const [autoConfirmBookings, setAutoConfirmBookings] = useState(false);
+  const [bookingBuffer, setBookingBuffer] = useState("");
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsInitialized, setSettingsInitialized] = useState(false);
+
+  // Door camera state
+  const [doorIp, setDoorIp] = useState("");
+  const [doorPort, setDoorPort] = useState("");
+  const [doorGpioPort, setDoorGpioPort] = useState("");
+  const [doorDeviceSn, setDoorDeviceSn] = useState("");
+  const [savingDoor, setSavingDoor] = useState(false);
+
+  // Feature flags state
+  const [showAddFlagModal, setShowAddFlagModal] = useState(false);
+  const [newFlagKey, setNewFlagKey] = useState("");
+  const [newFlagEnabled, setNewFlagEnabled] = useState(true);
+  const [addingFlag, setAddingFlag] = useState(false);
+  const [, setTogglingFlagKey] = useState<string | null>(null);
+
   const tenant = useQuery(
     api.tenants.getById,
     id ? { tenantId: id as any } : "skip"
   );
 
   const updateTenant = useMutation(api.tenants.update);
+  const updateTenantSettings = useMutation(api.platform.updateTenantSettings);
+  const setFeatureFlag = useMutation(api.platform.setFeatureFlag);
 
   const memberships = useQuery(
     api.tenantMemberships.listByTenant,
     id ? { tenantId: id as any } : "skip"
   );
+
+  const tenantFlags = useQuery(
+    api.platform.listFeatureFlags,
+    id ? { tenantId: id as any } : "skip"
+  );
+
+  // Initialize settings from tenant data
+  useEffect(() => {
+    if (tenant && !settingsInitialized) {
+      setTimezone(tenant.settings?.timezone ?? "");
+      setAutoConfirmBookings(tenant.settings?.autoConfirmBookings ?? false);
+      setBookingBuffer(
+        tenant.settings?.bookingBuffer != null
+          ? String(tenant.settings.bookingBuffer)
+          : ""
+      );
+      const cam = tenant.settings?.doorCamera;
+      setDoorIp(cam?.ip ?? "");
+      setDoorPort(cam?.port != null ? String(cam.port) : "");
+      setDoorGpioPort(cam?.gpioPort != null ? String(cam.gpioPort) : "");
+      setDoorDeviceSn(cam?.deviceSn ?? "");
+      setSettingsInitialized(true);
+    }
+  }, [tenant, settingsInitialized]);
+
+  const handleSaveSettings = useCallback(async () => {
+    if (!id) return;
+    setSavingSettings(true);
+    try {
+      const bufferNum = bookingBuffer.trim() ? parseInt(bookingBuffer, 10) : undefined;
+      await updateTenantSettings({
+        tenantId: id as any,
+        settings: {
+          timezone: timezone.trim() || undefined,
+          autoConfirmBookings,
+          bookingBuffer: bufferNum !== undefined && !isNaN(bufferNum) ? bufferNum : undefined,
+        },
+      });
+      Alert.alert("Success", "Tenant settings have been updated.");
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        `Failed to update settings. ${error instanceof Error ? error.message : "Please try again."}`
+      );
+    } finally {
+      setSavingSettings(false);
+    }
+  }, [id, timezone, autoConfirmBookings, bookingBuffer, updateTenantSettings]);
+
+  const handleToggleFlag = useCallback(
+    async (key: string, enabled: boolean) => {
+      if (!id) return;
+      setTogglingFlagKey(key);
+      try {
+        await setFeatureFlag({ key, enabled, tenantId: id as any });
+      } catch (error) {
+        Alert.alert(
+          "Error",
+          `Failed to toggle flag. ${error instanceof Error ? error.message : "Please try again."}`
+        );
+      } finally {
+        setTogglingFlagKey(null);
+      }
+    },
+    [id, setFeatureFlag]
+  );
+
+  const handleAddFlag = useCallback(async () => {
+    if (!newFlagKey.trim() || !id) return;
+    setAddingFlag(true);
+    try {
+      await setFeatureFlag({
+        key: newFlagKey.trim(),
+        enabled: newFlagEnabled,
+        tenantId: id as any,
+      });
+      setNewFlagKey("");
+      setNewFlagEnabled(true);
+      setShowAddFlagModal(false);
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        `Failed to add flag. ${error instanceof Error ? error.message : "Please try again."}`
+      );
+    } finally {
+      setAddingFlag(false);
+    }
+  }, [newFlagKey, newFlagEnabled, id, setFeatureFlag]);
+
+  const handleSaveDoorCamera = useCallback(async () => {
+    if (!id) return;
+    setSavingDoor(true);
+    try {
+      const portNum = doorPort.trim() ? parseInt(doorPort, 10) : undefined;
+      const gpioNum = doorGpioPort.trim() ? parseInt(doorGpioPort, 10) : undefined;
+      await updateTenantSettings({
+        tenantId: id as any,
+        settings: {
+          doorCamera: doorIp.trim()
+            ? {
+                ip: doorIp.trim(),
+                port: portNum !== undefined && !isNaN(portNum) ? portNum : undefined,
+                gpioPort: gpioNum !== undefined && !isNaN(gpioNum) ? gpioNum : undefined,
+                deviceSn: doorDeviceSn.trim() || undefined,
+              }
+            : undefined,
+        },
+      });
+      Alert.alert("Success", "Door camera settings have been saved.");
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        `Failed to save door camera settings. ${error instanceof Error ? error.message : "Please try again."}`
+      );
+    } finally {
+      setSavingDoor(false);
+    }
+  }, [id, doorIp, doorPort, doorGpioPort, doorDeviceSn, updateTenantSettings]);
 
   const handleChangePlan = useCallback(async () => {
     if (!selectedPlan || !id) return;
@@ -375,8 +516,161 @@ export default function TenantDetailScreen() {
           </Section>
         ) : null}
 
+        {/* Tenant Settings */}
+        <Section title="Settings">
+          <Card>
+            <Input
+              label="Timezone"
+              value={timezone}
+              onChangeText={setTimezone}
+              placeholder="e.g. Asia/Kuala_Lumpur"
+              autoCapitalize="none"
+              className="mb-4"
+            />
+            <Input
+              label="Booking Buffer (minutes)"
+              value={bookingBuffer}
+              onChangeText={setBookingBuffer}
+              placeholder="e.g. 15"
+              keyboardType="numeric"
+              className="mb-4"
+            />
+            <Switch
+              label="Auto-confirm Bookings"
+              value={autoConfirmBookings}
+              onValueChange={setAutoConfirmBookings}
+              className="mb-4"
+            />
+            <Button loading={savingSettings} onPress={handleSaveSettings}>
+              Save Settings
+            </Button>
+          </Card>
+        </Section>
+
+        {/* Door Camera */}
+        <Section title="Door Camera">
+          <Card>
+            <Text
+              className="mb-3 text-xs"
+              style={{ color: theme.colors.textSecondary }}
+            >
+              Configure the HA SDK face-recognition camera that controls door access. The camera must be reachable from Convex servers.
+            </Text>
+            <Input
+              label="Camera IP Address"
+              value={doorIp}
+              onChangeText={setDoorIp}
+              placeholder="e.g. 192.168.1.100"
+              autoCapitalize="none"
+              keyboardType="decimal-pad"
+              className="mb-4"
+            />
+            <View className="flex-row" style={{ gap: 12 }}>
+              <View className="flex-1">
+                <Input
+                  label="HTTP Port"
+                  value={doorPort}
+                  onChangeText={setDoorPort}
+                  placeholder="8000"
+                  keyboardType="numeric"
+                />
+              </View>
+              <View className="flex-1">
+                <Input
+                  label="GPIO Port"
+                  value={doorGpioPort}
+                  onChangeText={setDoorGpioPort}
+                  placeholder="1"
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+            <Input
+              label="Device Serial (optional)"
+              value={doorDeviceSn}
+              onChangeText={setDoorDeviceSn}
+              placeholder="e.g. SN1234567890"
+              autoCapitalize="characters"
+              className="mb-4 mt-4"
+            />
+            <Button loading={savingDoor} onPress={handleSaveDoorCamera}>
+              Save Door Camera
+            </Button>
+          </Card>
+        </Section>
+
+        {/* Tenant Feature Flags */}
+        <Section
+          title="Feature Flags"
+          seeAll={{ label: "+ Add", onPress: () => setShowAddFlagModal(true) }}
+        >
+          <Card>
+            {tenantFlags && tenantFlags.length > 0 ? (
+              tenantFlags.map((flag, index) => (
+                <View key={flag._id}>
+                  <View className="flex-row items-center justify-between py-2">
+                    <Text
+                      className="flex-1 text-sm font-medium"
+                      style={{ color: theme.colors.text }}
+                    >
+                      {flag.key}
+                    </Text>
+                    <Switch
+                      value={flag.enabled}
+                      onValueChange={(enabled) =>
+                        handleToggleFlag(flag.key, enabled)
+                      }
+                    />
+                  </View>
+                  {index < tenantFlags.length - 1 ? <Separator /> : null}
+                </View>
+              ))
+            ) : (
+              <Text
+                className="py-2 text-center text-sm"
+                style={{ color: theme.colors.textSecondary }}
+              >
+                No tenant-specific flags configured.
+              </Text>
+            )}
+          </Card>
+        </Section>
+
         <Spacer size={24} />
       </ScrollView>
+
+      {/* Add Flag Modal */}
+      <Modal
+        visible={showAddFlagModal}
+        onClose={() => {
+          setShowAddFlagModal(false);
+          setNewFlagKey("");
+          setNewFlagEnabled(true);
+        }}
+        title="Add Feature Flag"
+      >
+        <Input
+          label="Flag Key"
+          value={newFlagKey}
+          onChangeText={setNewFlagKey}
+          placeholder="e.g. enable_pos"
+          autoCapitalize="none"
+          className="mb-4"
+        />
+        <Switch
+          label="Enabled"
+          value={newFlagEnabled}
+          onValueChange={setNewFlagEnabled}
+          className="mb-4"
+        />
+        <Button
+          loading={addingFlag}
+          onPress={handleAddFlag}
+          disabled={!newFlagKey.trim()}
+        >
+          Add Flag
+        </Button>
+      </Modal>
     </Screen>
   );
 }

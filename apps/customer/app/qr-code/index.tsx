@@ -53,7 +53,7 @@ export default function QrCodeScreen() {
   }, [tenantId, generateQrCode]);
 
   const displayName =
-    [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Member";
+    user?.name || "Member";
 
   if (!tenantId) {
     return (
@@ -176,8 +176,11 @@ export default function QrCodeScreen() {
             <Spacer size={20} />
             <Button onPress={handleGenerate} loading={isGenerating}>
               <View className="flex-row items-center">
-                <QrCode size={16} color="#FFFFFF" />
-                <Text className="ml-2 font-semibold text-white">
+                <QrCode size={16} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
+                <Text
+                  className="ml-2 font-semibold"
+                  style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}
+                >
                   Generate QR Code
                 </Text>
               </View>

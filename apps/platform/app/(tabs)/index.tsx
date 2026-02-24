@@ -80,7 +80,7 @@ export default function DashboardScreen() {
     );
   }
 
-  const displayName = user?.firstName ?? "Admin";
+  const displayName = user?.name ?? "Admin";
   const growth = platformOverview.growthMetrics;
 
   return (
@@ -387,8 +387,8 @@ export default function DashboardScreen() {
             <View className="flex-1">
               <Button onPress={() => router.push("/tenants/new")}>
                 <View className="flex-row items-center">
-                  <Plus size={16} color="#FFFFFF" />
-                  <Text className="ml-2 font-semibold text-white">
+                  <Plus size={16} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
+                  <Text className="ml-2 font-semibold" style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}>
                     New Tenant
                   </Text>
                 </View>

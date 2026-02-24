@@ -274,7 +274,7 @@ export default function POSScreen() {
         style={{ backgroundColor: theme.colors.primary, elevation: 5 }}
         activeOpacity={0.8}
       >
-        <Plus size={24} color="#FFFFFF" />
+        <Plus size={24} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
       </TouchableOpacity>
     </Screen>
   );

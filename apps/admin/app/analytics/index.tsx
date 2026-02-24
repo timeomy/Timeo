@@ -118,7 +118,7 @@ export default function AnalyticsScreen() {
                 style={{
                   color:
                     period === opt.value
-                      ? "#FFFFFF"
+                      ? theme.dark ? "#0B0B0F" : "#FFFFFF"
                       : theme.colors.textSecondary,
                 }}
               >

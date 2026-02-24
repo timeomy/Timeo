@@ -210,8 +210,8 @@ export default function RedeemGiftCardScreen() {
               disabled={!amount.trim() || redeeming}
             >
               <View className="flex-row items-center">
-                <CreditCard size={18} color="#FFFFFF" />
-                <Text className="ml-2 text-base font-semibold text-white">
+                <CreditCard size={18} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
+                <Text className="ml-2 text-base font-semibold" style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}>
                   Redeem Gift Card
                 </Text>
               </View>

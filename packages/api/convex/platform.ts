@@ -9,6 +9,39 @@ import {
   tenantBrandingValidator,
 } from "./validators";
 
+/**
+ * Check if the current user is a platform admin.
+ * Used by the Platform app to gate access without requiring tenant membership.
+ */
+export const amIPlatformAdmin = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return false;
+
+    let user = await ctx.db
+      .query("users")
+      .withIndex("by_authId", (q) => q.eq("authId", identity.subject))
+      .unique();
+    // Fallback: look up by email if authId hasn't been linked yet
+    if (!user && identity.email) {
+      user = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email!))
+        .first();
+    }
+    if (!user) return false;
+
+    const adminMembership = await ctx.db
+      .query("tenantMemberships")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .filter((q) => q.eq(q.field("role"), "platform_admin"))
+      .first();
+
+    return !!adminMembership;
+  },
+});
+
 export const getConfig = query({
   args: { key: v.string() },
   handler: async (ctx, args) => {
@@ -329,6 +362,30 @@ export const updateTenant = mutation({
       resource: "tenants",
       resourceId: args.tenantId,
       metadata: { fields: Object.keys(updates) },
+    });
+  },
+});
+
+export const updateTenantSettings = mutation({
+  args: {
+    tenantId: v.id("tenants"),
+    settings: tenantSettingsValidator,
+  },
+  handler: async (ctx, args) => {
+    const admin = await requirePlatformAdmin(ctx);
+    const tenant = await ctx.db.get(args.tenantId);
+    if (!tenant) throw new Error("Tenant not found");
+
+    const mergedSettings = { ...tenant.settings, ...args.settings };
+    await ctx.db.patch(args.tenantId, { settings: mergedSettings });
+
+    await insertAuditLog(ctx, {
+      tenantId: args.tenantId,
+      actorId: admin._id,
+      action: "platform.tenant_settings_updated",
+      resource: "tenants",
+      resourceId: args.tenantId,
+      metadata: { fields: Object.keys(args.settings) },
     });
   },
 });

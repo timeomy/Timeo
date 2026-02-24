@@ -16,8 +16,9 @@ import {
   Users,
   Search,
   X,
+  Unlock,
 } from "lucide-react-native";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@timeo/api";
 import { useTimeoAuth } from "@timeo/auth";
 import {
@@ -56,6 +57,7 @@ export default function CheckInsScreen() {
   const [showManualCheckIn, setShowManualCheckIn] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [openingDoor, setOpeningDoor] = useState(false);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -84,6 +86,7 @@ export default function CheckInsScreen() {
   );
 
   const manualCheckIn = useMutation(api.checkIns.manualCheckIn);
+  const remoteOpenDoor = useAction(api.actions.door.remoteOpenDoor);
 
   const filteredMembers = useMemo(() => {
     if (!members || !memberSearch.trim()) return [];
@@ -97,6 +100,34 @@ export default function CheckInsScreen() {
       )
       .slice(0, 10);
   }, [members, memberSearch]);
+
+  const handleOpenDoor = useCallback(async () => {
+    if (!tenantId) return;
+    Alert.alert(
+      "Open Door",
+      "Remotely trigger the door relay to open?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Open",
+          onPress: async () => {
+            setOpeningDoor(true);
+            try {
+              await remoteOpenDoor({ tenantId });
+              Alert.alert("Door Opened", "The door relay has been triggered.");
+            } catch (err) {
+              Alert.alert(
+                "Error",
+                err instanceof Error ? err.message : "Failed to open door"
+              );
+            } finally {
+              setOpeningDoor(false);
+            }
+          },
+        },
+      ]
+    );
+  }, [tenantId, remoteOpenDoor]);
 
   const handleManualCheckIn = useCallback(
     async (userId: string, userName: string) => {
@@ -190,30 +221,47 @@ export default function CheckInsScreen() {
       )}
 
       {/* Action Buttons */}
-      <View className="flex-row px-4 pb-3" style={{ gap: 10 }}>
+      <View className="px-4 pb-3" style={{ gap: 8 }}>
+        <View className="flex-row" style={{ gap: 10 }}>
+          <Button
+            variant="outline"
+            className="flex-1"
+            onPress={() => router.push("/check-ins/scan" as any)}
+          >
+            <View className="flex-row items-center">
+              <QrCode size={16} color={theme.colors.primary} />
+              <Text
+                className="ml-2 font-semibold"
+                style={{ color: theme.colors.primary }}
+              >
+                Scan QR
+              </Text>
+            </View>
+          </Button>
+          <Button
+            className="flex-1"
+            onPress={() => setShowManualCheckIn(true)}
+          >
+            <View className="flex-row items-center">
+              <UserPlus size={16} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
+              <Text className="ml-2 font-semibold" style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}>
+                Manual
+              </Text>
+            </View>
+          </Button>
+        </View>
         <Button
           variant="outline"
-          className="flex-1"
-          onPress={() => router.push("/check-ins/scan" as any)}
+          onPress={handleOpenDoor}
+          loading={openingDoor}
         >
-          <View className="flex-row items-center">
-            <QrCode size={16} color={theme.colors.primary} />
+          <View className="flex-row items-center justify-center">
+            <Unlock size={16} color={theme.colors.success} />
             <Text
               className="ml-2 font-semibold"
-              style={{ color: theme.colors.primary }}
+              style={{ color: theme.colors.success }}
             >
-              Scan QR
-            </Text>
-          </View>
-        </Button>
-        <Button
-          className="flex-1"
-          onPress={() => setShowManualCheckIn(true)}
-        >
-          <View className="flex-row items-center">
-            <UserPlus size={16} color="#FFFFFF" />
-            <Text className="ml-2 font-semibold text-white">
-              Manual Check-in
+              Open Door
             </Text>
           </View>
         </Button>

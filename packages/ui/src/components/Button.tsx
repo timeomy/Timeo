@@ -57,7 +57,7 @@ export function Button({
   };
 
   const textColors = {
-    default: "#FFFFFF",
+    default: theme.dark ? "#0B0B0F" : "#FFFFFF",
     outline: theme.colors.text,
     ghost: theme.colors.primary,
     destructive: "#FFFFFF",

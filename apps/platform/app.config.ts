@@ -13,7 +13,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   splash: {
     image: "./assets/splash.png",
     resizeMode: "contain",
-    backgroundColor: "#1A56DB",
+    backgroundColor: "#0B0B0F",
   },
   ios: {
     supportsTablet: true,
@@ -25,11 +25,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
-      backgroundColor: "#1A56DB",
+      backgroundColor: "#0B0B0F",
     },
     package: "my.timeo.platform",
   },
-  newArchEnabled: true,
   plugins: ["expo-router", "expo-secure-store", "expo-dev-client"],
   experiments: {
     typedRoutes: true,

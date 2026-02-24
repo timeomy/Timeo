@@ -28,7 +28,7 @@ import {
 import { useTimeoAuth } from "@timeo/auth";
 import { api } from "@timeo/api";
 import { useMutation } from "convex/react";
-import { useCart } from "./providers/cart";
+import { useCart } from "../providers/cart";
 
 export default function CartScreen() {
   const router = useRouter();
