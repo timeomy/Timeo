@@ -75,14 +75,17 @@ export const getSystemHealth = query({
   handler: async (ctx) => {
     await requirePlatformAdmin(ctx);
 
-    const tenants = await ctx.db.query("tenants").collect();
-    const users = await ctx.db.query("users").collect();
-    const allBookings = await ctx.db.query("bookings").collect();
+    const [tenants, users, allBookings, pendingOrders] = await Promise.all([
+      ctx.db.query("tenants").take(10_000),
+      ctx.db.query("users").take(10_000),
+      ctx.db.query("bookings").take(10_000),
+      ctx.db
+        .query("orders")
+        .filter((q) => q.eq(q.field("status"), "pending"))
+        .take(10_000),
+    ]);
+
     const pendingBookings = allBookings.filter((b) => b.status === "pending");
-    const orders = await ctx.db
-      .query("orders")
-      .filter((q) => q.eq(q.field("status"), "pending"))
-      .collect();
 
     return {
       totalTenants: tenants.length,
@@ -90,7 +93,7 @@ export const getSystemHealth = query({
       totalUsers: users.length,
       totalBookings: allBookings.length,
       pendingBookings: pendingBookings.length,
-      pendingOrders: orders.length,
+      pendingOrders: pendingOrders.length,
       timestamp: Date.now(),
     };
   },
@@ -608,6 +611,109 @@ export const getUserById = query({
       memberships: membershipsWithTenant,
       recentBookingCount: recentBookings.length,
     };
+  },
+});
+
+// ─── User Management Mutations ──────────────────────────────────────────────
+
+export const updateUserRole = mutation({
+  args: {
+    userId: v.id("users"),
+    tenantId: v.id("tenants"),
+    role: v.union(v.literal("admin"), v.literal("staff"), v.literal("customer")),
+  },
+  handler: async (ctx, args) => {
+    const admin = await requirePlatformAdmin(ctx);
+    const membership = await ctx.db
+      .query("tenantMemberships")
+      .withIndex("by_tenant_user", (q) =>
+        q.eq("tenantId", args.tenantId).eq("userId", args.userId)
+      )
+      .unique();
+    if (!membership) throw new Error("Membership not found");
+    await ctx.db.patch(membership._id, { role: args.role });
+    await insertAuditLog(ctx, {
+      actorId: admin._id,
+      tenantId: args.tenantId,
+      action: "platform.user_role_updated",
+      resource: "tenantMemberships",
+      resourceId: membership._id,
+      metadata: { userId: args.userId, newRole: args.role },
+    });
+  },
+});
+
+export const updateMembershipStatus = mutation({
+  args: {
+    userId: v.id("users"),
+    tenantId: v.id("tenants"),
+    status: v.union(v.literal("active"), v.literal("invited"), v.literal("suspended")),
+  },
+  handler: async (ctx, args) => {
+    const admin = await requirePlatformAdmin(ctx);
+    const membership = await ctx.db
+      .query("tenantMemberships")
+      .withIndex("by_tenant_user", (q) =>
+        q.eq("tenantId", args.tenantId).eq("userId", args.userId)
+      )
+      .unique();
+    if (!membership) throw new Error("Membership not found");
+    await ctx.db.patch(membership._id, { status: args.status });
+    await insertAuditLog(ctx, {
+      actorId: admin._id,
+      tenantId: args.tenantId,
+      action: "platform.membership_status_updated",
+      resource: "tenantMemberships",
+      resourceId: membership._id,
+      metadata: { userId: args.userId, newStatus: args.status },
+    });
+  },
+});
+
+export const deleteUser = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const admin = await requirePlatformAdmin(ctx);
+    if (args.userId === admin._id) {
+      throw new Error("You cannot delete your own account.");
+    }
+
+    const user = await ctx.db.get(args.userId);
+    if (!user) throw new Error("User not found");
+
+    // Prevent deleting other platform admins
+    const targetAdminMembership = await ctx.db
+      .query("tenantMemberships")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("role"), "platform_admin"),
+          q.eq(q.field("status"), "active")
+        )
+      )
+      .first();
+    if (targetAdminMembership) {
+      throw new Error("Cannot delete a platform admin account.");
+    }
+
+    // Remove all memberships
+    const memberships = await ctx.db
+      .query("tenantMemberships")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    for (const m of memberships) {
+      await ctx.db.delete(m._id);
+    }
+
+    await ctx.db.delete(args.userId);
+
+    await insertAuditLog(ctx, {
+      actorId: admin._id,
+      action: "platform.user_deleted",
+      resource: "users",
+      resourceId: args.userId,
+      metadata: { email: user.email },
+    });
   },
 });
 

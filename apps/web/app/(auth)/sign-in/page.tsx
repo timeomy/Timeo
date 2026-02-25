@@ -10,7 +10,11 @@ import { Loader2 } from "lucide-react";
 export default function SignInPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") || "/post-login";
+  const rawRedirect = searchParams.get("redirect") || "/post-login";
+  const redirect =
+    rawRedirect.startsWith("/") && !rawRedirect.startsWith("//")
+      ? rawRedirect
+      : "/post-login";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -77,9 +81,14 @@ export default function SignInPage() {
           </div>
 
           <div>
-            <label htmlFor="password" className="mb-1.5 block text-sm font-medium">
-              Password
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="password" className="mb-1.5 block text-sm font-medium">
+                Password
+              </label>
+              <Link href="/forgot-password" className="mb-1.5 text-xs text-primary hover:underline">
+                Forgot password?
+              </Link>
+            </div>
             <Input
               id="password"
               type="password"

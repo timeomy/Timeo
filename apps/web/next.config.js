@@ -16,7 +16,7 @@ const nextConfig = {
   },
   experimental: {
     outputFileTracingRoot: path.join(__dirname, "../../"),
-    optimizePackageImports: ["lucide-react", "framer-motion", "@timeo/ui"],
+    optimizePackageImports: ["lucide-react", "framer-motion", "@timeo/ui", "convex"],
   },
   transpilePackages: [
     "@timeo/ui",

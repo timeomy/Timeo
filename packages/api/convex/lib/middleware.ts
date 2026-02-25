@@ -76,7 +76,12 @@ export async function requirePlatformAdmin(ctx: QueryCtx | MutationCtx) {
   const adminMembership = await ctx.db
     .query("tenantMemberships")
     .withIndex("by_user", (q) => q.eq("userId", user._id))
-    .filter((q) => q.eq(q.field("role"), "platform_admin"))
+    .filter((q) =>
+      q.and(
+        q.eq(q.field("role"), "platform_admin"),
+        q.eq(q.field("status"), "active")
+      )
+    )
     .first();
 
   if (!adminMembership) {
