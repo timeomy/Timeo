@@ -44,6 +44,9 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
+# Public Convex URLs needed at runtime by the auth proxy API route
+ENV NEXT_PUBLIC_CONVEX_URL=https://mild-gnat-567.convex.cloud
+ENV NEXT_PUBLIC_CONVEX_SITE_URL=https://mild-gnat-567.convex.site
 
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
