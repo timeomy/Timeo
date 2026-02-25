@@ -25,14 +25,18 @@ COPY --from=deps /app/ ./
 COPY . .
 
 # Build args for NEXT_PUBLIC_* vars (baked into the client bundle at build time)
-ARG NEXT_PUBLIC_CONVEX_URL
-ARG NEXT_PUBLIC_CONVEX_SITE_URL
+# Defaults are set so the build works without Dokploy passing --build-arg.
+# Pass build args to override (e.g. for staging environments).
+ARG NEXT_PUBLIC_CONVEX_URL=https://mild-gnat-567.convex.cloud
+ARG NEXT_PUBLIC_CONVEX_SITE_URL=https://mild-gnat-567.convex.site
+ARG NEXT_PUBLIC_APP_URL=https://timeo.my
 ARG NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 ARG NEXT_PUBLIC_POSTHOG_KEY
 ARG NEXT_PUBLIC_POSTHOG_HOST
 
 ENV NEXT_PUBLIC_CONVEX_URL=$NEXT_PUBLIC_CONVEX_URL
 ENV NEXT_PUBLIC_CONVEX_SITE_URL=$NEXT_PUBLIC_CONVEX_SITE_URL
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 ENV NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
 ENV NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST
@@ -47,6 +51,7 @@ ENV PORT=3000
 # Public Convex URLs needed at runtime by the auth proxy API route
 ENV NEXT_PUBLIC_CONVEX_URL=https://mild-gnat-567.convex.cloud
 ENV NEXT_PUBLIC_CONVEX_SITE_URL=https://mild-gnat-567.convex.site
+ENV NEXT_PUBLIC_APP_URL=https://timeo.my
 
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
