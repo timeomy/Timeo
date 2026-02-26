@@ -43,7 +43,7 @@ export default function SignUpPage() {
         return;
       }
 
-      router.push("/onboarding");
+      router.push("/verify-email");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to create account. Please try again.";
       setError(message);

@@ -9,7 +9,6 @@ import type { TimeoRole } from "@timeo/auth/web";
 import { getInitials } from "@timeo/shared";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
 import {
-  Button,
   Avatar,
   AvatarImage,
   AvatarFallback,
@@ -28,7 +27,6 @@ import {
   Clock,
   Zap,
   Menu,
-  X,
   LogOut,
   ChevronDown,
   Building2,
@@ -273,9 +271,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  // No tenants — redirect to onboarding
+  // No tenants — redirect to portal
   if (tenants.length === 0) {
-    router.push("/onboarding");
+    router.push("/portal");
     return null;
   }
 

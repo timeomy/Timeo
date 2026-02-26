@@ -28,7 +28,45 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
     },
     emailAndPassword: {
       enabled: true,
-      requireEmailVerification: false,
+      requireEmailVerification: true,
+      sendVerificationEmail: async ({ user, url }: { user: { email: string; name?: string | null }; url: string }) => {
+        // Extract the token from the Better Auth verification URL
+        const token = new URL(url).searchParams.get("token") ?? url;
+        const customUrl = `${process.env.SITE_URL ?? "https://timeo.my"}/verify-email?token=${token}`;
+
+        console.log(
+          `[Auth] Verify email for ${user.email} — URL: ${customUrl}`
+        );
+
+        const emailApiUrl = process.env.EMAIL_API_URL;
+        if (emailApiUrl) {
+          try {
+            await fetch(emailApiUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                to: user.email,
+                subject: "Verify your Timeo email",
+                html: `
+                  <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+                    <h2 style="color: #0B0B0F;">Verify your email</h2>
+                    <p>Hi ${user.name || "there"},</p>
+                    <p>Thanks for signing up for Timeo! Please verify your email address to activate your account.</p>
+                    <a href="${customUrl}" style="display: inline-block; background: #FFB300; color: #0B0B0F; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+                      Verify Email
+                    </a>
+                    <p style="color: #666; font-size: 14px; margin-top: 16px;">
+                      If you didn't create a Timeo account, you can safely ignore this email.
+                    </p>
+                  </div>
+                `,
+              }),
+            });
+          } catch (err) {
+            console.error("[Auth] Failed to send verification email:", err);
+          }
+        }
+      },
       sendResetPassword: async ({ user, url }) => {
         // Log the reset email details for development.
         // In production, connect to Novu or another email provider.

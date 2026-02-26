@@ -21,9 +21,9 @@ export default function PostLoginPage() {
       return;
     }
 
-    // No tenant memberships — go to onboarding
+    // No tenant memberships — go to portal
     if (tenants.length === 0) {
-      router.replace("/onboarding");
+      router.replace("/portal");
       return;
     }
 
