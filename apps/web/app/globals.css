@@ -4,6 +4,8 @@
 
 @layer base {
   :root {
+    --font-plus-jakarta: "Plus Jakarta Sans Variable", sans-serif;
+    --font-space-grotesk: "Space Grotesk Variable", sans-serif;
     --background: 240 15% 5%;
     --foreground: 40 10% 92%;
 
