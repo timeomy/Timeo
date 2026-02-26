@@ -18,17 +18,17 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setError("");
     try {
-      const result = await authClient.requestPasswordReset({
+      // Always show the success state regardless of whether the email exists.
+      // This prevents email enumeration — an attacker must not be able to
+      // distinguish "email not found" from "reset email sent".
+      await authClient.requestPasswordReset({
         email: email.trim(),
         redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://timeo.my"}/reset-password`,
       });
-      if (result.error) {
-        setError(result.error.message ?? "Failed to send reset email");
-      } else {
-        setSent(true);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setSent(true);
+    } catch {
+      // Silently succeed — showing an error here would allow email enumeration.
+      setSent(true);
     } finally {
       setLoading(false);
     }

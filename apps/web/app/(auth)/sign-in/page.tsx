@@ -38,15 +38,17 @@ export default function SignInPage() {
       });
 
       if (result.error) {
-        setError(result.error.message ?? "Invalid email or password");
+        // Always use a generic message — never expose whether the email exists
+        // or the password was wrong, as that enables email enumeration attacks.
+        setError("Invalid email or password");
         setLoading(false);
         return;
       }
 
       router.push(redirect);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Invalid email or password";
-      setError(message);
+    } catch {
+      // Generic fallback — do not leak server error details to the client.
+      setError("Invalid email or password");
       setLoading(false);
     }
   };

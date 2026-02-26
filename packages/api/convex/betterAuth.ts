@@ -57,7 +57,32 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
       "https://www.timeo.my",
     ],
     advanced: {
+      // disableCSRFCheck is required for cross-domain and native mobile (Expo) clients.
+      // The crossDomain plugin handles the cross-origin session handoff via one-time tokens
+      // and the trustedOrigins list enforces origin validation on all callback/redirect URLs.
+      // Standard cookie-based CSRF tokens cannot be used when requests originate from native
+      // app contexts (no shared cookie jar). This is the documented trade-off for this
+      // architecture — see @convex-dev/better-auth crossDomain plugin docs.
       disableCSRFCheck: true,
+    },
+    // Rate limiting — applied per IP in production (memory storage).
+    // customRules override the global defaults for sensitive auth endpoints.
+    // window is in seconds; max is the request ceiling within that window.
+    rateLimit: {
+      enabled: true,
+      window: 60,    // 1-minute default window
+      max: 20,       // 20 requests/minute default (covers misc auth endpoints)
+      customRules: {
+        // Sign-in: 5 attempts per 5 minutes
+        "/sign-in/email": { window: 300, max: 5 },
+        // Sign-up: 3 registrations per 10 minutes
+        "/sign-up/email": { window: 600, max: 3 },
+        // Forgot / reset password: 3 requests per 10 minutes
+        "/forget-password": { window: 600, max: 3 },
+        "/reset-password": { window: 600, max: 3 },
+        // Email verification resend: 3 per 10 minutes
+        "/send-verification-email": { window: 600, max: 3 },
+      },
     },
     emailAndPassword: {
       enabled: true,
