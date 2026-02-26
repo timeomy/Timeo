@@ -44,6 +44,14 @@ const nextConfig = {
             value: "camera=(), microphone=(), geolocation=()",
           },
           { key: "X-XSS-Protection", value: "1; mode=block" },
+          ...(process.env.NODE_ENV === "production"
+            ? [
+                {
+                  key: "Strict-Transport-Security",
+                  value: "max-age=63072000; includeSubDomains; preload",
+                },
+              ]
+            : []),
         ],
       },
       {

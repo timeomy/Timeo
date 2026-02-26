@@ -38,7 +38,17 @@ export default function SignUpPage() {
       });
 
       if (result.error) {
-        setError(result.error.message ?? "Failed to create account");
+        // Sanitize server errors to prevent email enumeration.
+        // Better Auth may return "User already exists" which reveals
+        // whether an email is registered. Use a generic fallback.
+        const msg = result.error.message ?? "";
+        const isEnumeration =
+          /already exists|already registered|duplicate/i.test(msg);
+        setError(
+          isEnumeration
+            ? "Could not create account. Please try a different email or sign in."
+            : msg || "Failed to create account"
+        );
         setLoading(false);
         return;
       }

@@ -7,6 +7,16 @@ import authConfig from "./auth.config";
 
 export const authComponent = createClient<DataModel>((components as any).betterAuth);
 
+/** Escape user-supplied strings before embedding them in HTML email templates. */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 async function sendEmail({
   to,
   subject,
@@ -100,7 +110,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
                 <span style="font-size: 24px; font-weight: 700; color: #0B0B0F;">Timeo</span>
               </div>
               <h2 style="color: #0B0B0F; margin: 0 0 8px;">Verify your email</h2>
-              <p style="color: #444; margin: 0 0 24px;">Hi ${user.name || "there"},<br><br>Thanks for signing up! Click below to verify your email address and activate your account.</p>
+              <p style="color: #444; margin: 0 0 24px;">Hi ${escapeHtml(user.name || "there")},<br><br>Thanks for signing up! Click below to verify your email address and activate your account.</p>
               <a href="${verifyUrl}" style="display: inline-block; background: #FFB300; color: #0B0B0F; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px;">
                 Verify Email
               </a>
@@ -122,7 +132,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
                 <span style="font-size: 24px; font-weight: 700; color: #0B0B0F;">Timeo</span>
               </div>
               <h2 style="color: #0B0B0F; margin: 0 0 8px;">Reset your password</h2>
-              <p style="color: #444; margin: 0 0 24px;">Hi ${user.name || "there"},<br><br>We received a request to reset your Timeo password. Click below to choose a new one.</p>
+              <p style="color: #444; margin: 0 0 24px;">Hi ${escapeHtml(user.name || "there")},<br><br>We received a request to reset your Timeo password. Click below to choose a new one.</p>
               <a href="${url}" style="display: inline-block; background: #FFB300; color: #0B0B0F; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px;">
                 Reset Password
               </a>
