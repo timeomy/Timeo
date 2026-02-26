@@ -7,6 +7,39 @@ import authConfig from "./auth.config";
 
 export const authComponent = createClient<DataModel>((components as any).betterAuth);
 
+async function sendEmail({
+  to,
+  subject,
+  html,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+}) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn("[Auth] RESEND_API_KEY not set — email not sent to:", to);
+    return;
+  }
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      from: "Timeo <noreply@timeo.my>",
+      to: [to],
+      subject,
+      html,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    console.error("[Auth] Resend error:", res.status, body);
+  }
+}
+
 export const createAuth = (ctx: GenericCtx<DataModel>) => {
   // Env vars are only available during function execution, but registerRoutes
   // calls createAuth({}) at module load time to read basePath. Use fallbacks
@@ -30,79 +63,50 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
       enabled: true,
       requireEmailVerification: true,
       sendVerificationEmail: async ({ user, url }: { user: { email: string; name?: string | null }; url: string }) => {
-        // Extract the token from the Better Auth verification URL
         const token = new URL(url).searchParams.get("token") ?? url;
-        const customUrl = `${process.env.SITE_URL ?? "https://timeo.my"}/verify-email?token=${token}`;
-
-        console.log(
-          `[Auth] Verify email for ${user.email} — URL: ${customUrl}`
-        );
-
-        const emailApiUrl = process.env.EMAIL_API_URL;
-        if (emailApiUrl) {
-          try {
-            await fetch(emailApiUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                to: user.email,
-                subject: "Verify your Timeo email",
-                html: `
-                  <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-                    <h2 style="color: #0B0B0F;">Verify your email</h2>
-                    <p>Hi ${user.name || "there"},</p>
-                    <p>Thanks for signing up for Timeo! Please verify your email address to activate your account.</p>
-                    <a href="${customUrl}" style="display: inline-block; background: #FFB300; color: #0B0B0F; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-                      Verify Email
-                    </a>
-                    <p style="color: #666; font-size: 14px; margin-top: 16px;">
-                      If you didn't create a Timeo account, you can safely ignore this email.
-                    </p>
-                  </div>
-                `,
-              }),
-            });
-          } catch (err) {
-            console.error("[Auth] Failed to send verification email:", err);
-          }
-        }
+        const verifyUrl = `${process.env.SITE_URL ?? "https://timeo.my"}/verify-email?token=${token}`;
+        console.log(`[Auth] Sending verification email to ${user.email} — ${verifyUrl}`);
+        await sendEmail({
+          to: user.email,
+          subject: "Verify your Timeo email",
+          html: `
+            <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
+              <div style="margin-bottom: 24px;">
+                <span style="font-size: 24px; font-weight: 700; color: #0B0B0F;">Timeo</span>
+              </div>
+              <h2 style="color: #0B0B0F; margin: 0 0 8px;">Verify your email</h2>
+              <p style="color: #444; margin: 0 0 24px;">Hi ${user.name || "there"},<br><br>Thanks for signing up! Click below to verify your email address and activate your account.</p>
+              <a href="${verifyUrl}" style="display: inline-block; background: #FFB300; color: #0B0B0F; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px;">
+                Verify Email
+              </a>
+              <p style="color: #888; font-size: 13px; margin-top: 24px;">
+                This link expires in 24 hours. If you didn't create a Timeo account, you can safely ignore this email.
+              </p>
+            </div>
+          `,
+        });
       },
-      sendResetPassword: async ({ user, url }) => {
-        // Log the reset email details for development.
-        // In production, connect to Novu or another email provider.
-        console.log(
-          `[Auth] Password reset requested for ${user.email} — URL: ${url}`
-        );
-
-        // Send via HTTP if EMAIL_API_URL is configured
-        const emailApiUrl = process.env.EMAIL_API_URL;
-        if (emailApiUrl) {
-          try {
-            await fetch(emailApiUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                to: user.email,
-                subject: "Reset your Timeo password",
-                html: `
-                  <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-                    <h2 style="color: #0B0B0F;">Reset your password</h2>
-                    <p>Hi ${user.name || "there"},</p>
-                    <p>We received a request to reset your Timeo account password.</p>
-                    <a href="${url}" style="display: inline-block; background: #FFB300; color: #0B0B0F; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-                      Reset Password
-                    </a>
-                    <p style="color: #666; font-size: 14px; margin-top: 16px;">
-                      If you didn't request this, you can safely ignore this email.
-                    </p>
-                  </div>
-                `,
-              }),
-            });
-          } catch (err) {
-            console.error("[Auth] Failed to send reset email:", err);
-          }
-        }
+      sendResetPassword: async ({ user, url }: { user: { email: string; name?: string | null }; url: string }) => {
+        console.log(`[Auth] Sending password reset email to ${user.email}`);
+        await sendEmail({
+          to: user.email,
+          subject: "Reset your Timeo password",
+          html: `
+            <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
+              <div style="margin-bottom: 24px;">
+                <span style="font-size: 24px; font-weight: 700; color: #0B0B0F;">Timeo</span>
+              </div>
+              <h2 style="color: #0B0B0F; margin: 0 0 8px;">Reset your password</h2>
+              <p style="color: #444; margin: 0 0 24px;">Hi ${user.name || "there"},<br><br>We received a request to reset your Timeo password. Click below to choose a new one.</p>
+              <a href="${url}" style="display: inline-block; background: #FFB300; color: #0B0B0F; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px;">
+                Reset Password
+              </a>
+              <p style="color: #888; font-size: 13px; margin-top: 24px;">
+                This link expires in 1 hour. If you didn't request this, you can safely ignore this email.
+              </p>
+            </div>
+          `,
+        });
       },
     },
     plugins: [
@@ -123,4 +127,3 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
     ],
   });
 };
-
