@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v4
         with:
           version: 9
 
@@ -24,19 +24,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright (Chromium only)
-        run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
 
-      - name: Run E2E auth tests
+      - run: npx playwright test e2e/auth.spec.ts --reporter=list
         working-directory: apps/web
         env:
           PLAYWRIGHT_BASE_URL: https://timeo.my
-        run: npx playwright test e2e/auth.spec.ts
 
-      - name: Upload test report
+      - uses: actions/upload-artifact@v4
         if: failure()
-        uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: apps/web/test-results/
-          retention-days: 14
+          path: apps/web/playwright-report/
