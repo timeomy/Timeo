@@ -119,4 +119,52 @@ test.describe("Auth Flow", () => {
     // Middleware should redirect unauthenticated users to sign-in
     await expect(page).toHaveURL(/\/sign-in/, { timeout: 8000 });
   });
+
+  test("reset-password with no token shows invalid link", async ({ page }) => {
+    await page.goto("/reset-password");
+    // No token → renders "Invalid Link" h1
+    await expect(page.locator("h1")).toContainText(/invalid link/i);
+    // Should have a link back to forgot-password
+    await expect(
+      page.locator('a[href="/forgot-password"]')
+    ).toBeVisible();
+  });
+
+  test("reset-password with invalid token shows form then error on submit", async ({
+    page,
+  }) => {
+    await page.goto("/reset-password?token=invalid-token-xyz");
+    // Token is present → shows the "Set new password" form
+    await expect(page.locator("h1")).toContainText(/set new password/i);
+    // Fill matching passwords (valid length) and submit
+    await page.fill('input[placeholder="New password"]', "NewPass123!");
+    await page.fill('input[placeholder="Confirm password"]', "NewPass123!");
+    await page.click('button[type="submit"]');
+    // Should show an error from the server (invalid token)
+    await expect(page.locator(".text-destructive")).toBeVisible({
+      timeout: 10000,
+    });
+  });
+
+  test("sign-up client-side validation shows field errors", async ({
+    page,
+  }) => {
+    await page.goto("/sign-up");
+    await expect(page.locator("h1")).toContainText(/create your account/i);
+
+    // Submit with all fields empty → "All fields are required"
+    await page.click('button[type="submit"]');
+    await expect(page.locator(".text-destructive")).toContainText(
+      /all fields are required/i
+    );
+
+    // Fill name and email but short password → "at least 8 characters"
+    await page.fill("#name", "Test User");
+    await page.fill("#email", "test@example.com");
+    await page.fill("#password", "1234");
+    await page.click('button[type="submit"]');
+    await expect(page.locator(".text-destructive")).toContainText(
+      /at least 8 characters/i
+    );
+  });
 });
