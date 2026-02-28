@@ -21,7 +21,6 @@ const nextConfig = {
     "@timeo/ui",
     "@timeo/shared",
     "@timeo/auth",
-    "@timeo/api",
     "@timeo/api-client",
     "@timeo/payments",
     "@timeo/analytics",

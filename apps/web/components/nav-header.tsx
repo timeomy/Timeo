@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useTimeoWebAuthContext } from "@timeo/auth/web";
+import { useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
 import {
   Button,
   Avatar,
@@ -28,8 +28,6 @@ import {
   Bell,
   LayoutDashboard,
 } from "lucide-react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
 
 const navLinks = [
   { href: "/services", label: "Services", icon: Calendar },
@@ -39,14 +37,23 @@ const navLinks = [
 ];
 
 function NotificationBellWidget() {
-  const unreadCount = useQuery(api.notifications.getUnreadCount) ?? 0;
-  const result = useQuery(api.notifications.listByUser, { limit: 5 });
-  const markAsRead = useMutation(api.notifications.markAsRead);
+  const { tenants } = useTimeoWebTenantContext();
+  const activeTenantId = tenants[0]?.id ?? null;
 
-  const notifications = result?.notifications ?? [];
+  // Notifications widget renders as a static bell when no active tenant
+  if (!activeTenantId) {
+    return (
+      <NotificationBell unreadCount={0}>
+        <div className="flex flex-col items-center py-8 text-center">
+          <Bell className="mb-2 h-6 w-6 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">No notifications</p>
+        </div>
+      </NotificationBell>
+    );
+  }
 
   return (
-    <NotificationBell unreadCount={unreadCount}>
+    <NotificationBell unreadCount={0}>
       <div className="max-h-96 overflow-y-auto">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <span className="text-sm font-semibold">Notifications</span>
@@ -57,40 +64,10 @@ function NotificationBellWidget() {
             View all
           </Link>
         </div>
-        {notifications.length === 0 ? (
-          <div className="flex flex-col items-center py-8 text-center">
-            <Bell className="mb-2 h-6 w-6 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">No notifications</p>
-          </div>
-        ) : (
-          <div className="divide-y">
-            {notifications.map((n: any) => (
-              <button
-                key={n._id}
-                onClick={() => {
-                  if (!n.read) markAsRead({ notificationId: n._id });
-                }}
-                className={`flex w-full items-start gap-2 px-4 py-3 text-left transition-colors hover:bg-accent/50 ${
-                  !n.read ? "bg-accent/30" : ""
-                }`}
-              >
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={`text-sm ${n.read ? "font-normal" : "font-semibold"}`}
-                  >
-                    {n.title}
-                  </p>
-                  <p className="text-xs text-muted-foreground line-clamp-1">
-                    {n.body}
-                  </p>
-                </div>
-                {!n.read && (
-                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                )}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex flex-col items-center py-8 text-center">
+          <Bell className="mb-2 h-6 w-6 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">No notifications</p>
+        </div>
       </div>
     </NotificationBell>
   );

@@ -1,4 +1,3 @@
-import { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,10 +5,7 @@ import {
   FlatList,
   ActivityIndicator,
   StyleSheet,
-  Alert,
 } from "react-native";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
 import { useTenantSwitcher } from "../hooks";
 import type { TenantInfo } from "../types";
 
@@ -18,44 +14,13 @@ interface TenantSelectScreenProps {
   onSelect?: (tenant: TenantInfo) => void;
 }
 
-interface InvitedTenant {
-  _id: string;
-  name: string;
-  slug: string;
-  role: string;
-  membershipId: string;
-}
-
 export function TenantSelectScreen({ onSelect }: TenantSelectScreenProps) {
   const { tenants, activeTenant, switchTenant, isLoading } = useTenantSwitcher();
-  const invitations = useQuery(api.tenants.getMyInvitations);
-  const joinTenant = useMutation(api.tenantMemberships.join);
-  const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
   const handleSelect = (tenant: TenantInfo) => {
     switchTenant(tenant.id);
     onSelect?.(tenant);
   };
-
-  const handleAcceptInvitation = useCallback(
-    async (invitation: InvitedTenant) => {
-      setAcceptingId(invitation._id);
-      try {
-        await joinTenant({ tenantId: invitation._id as any });
-        Alert.alert(
-          "Joined!",
-          `You've joined ${invitation.name}. It will now appear in your organizations.`
-        );
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Failed to accept invitation";
-        Alert.alert("Error", message);
-      } finally {
-        setAcceptingId(null);
-      }
-    },
-    [joinTenant]
-  );
 
   if (isLoading) {
     return (
@@ -66,11 +31,7 @@ export function TenantSelectScreen({ onSelect }: TenantSelectScreenProps) {
     );
   }
 
-  const hasInvitations =
-    invitations && invitations.length > 0;
-  const hasNoContent = tenants.length === 0 && !hasInvitations;
-
-  if (hasNoContent) {
+  if (tenants.length === 0) {
     return (
       <View style={styles.center}>
         <Text style={styles.emptyTitle}>No organizations</Text>
@@ -103,35 +64,6 @@ export function TenantSelectScreen({ onSelect }: TenantSelectScreenProps) {
     );
   };
 
-  const renderInvitation = ({ item }: { item: InvitedTenant }) => {
-    const isAccepting = acceptingId === item._id;
-
-    return (
-      <View style={styles.invitationCard}>
-        <View style={styles.invitationAvatar}>
-          <Text style={styles.avatarText}>
-            {item.name.charAt(0).toUpperCase()}
-          </Text>
-        </View>
-        <View style={styles.cardContent}>
-          <Text style={styles.cardTitle}>{item.name}</Text>
-          <Text style={styles.cardRole}>Invited as {item.role}</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.acceptButton}
-          onPress={() => handleAcceptInvitation(item)}
-          disabled={isAccepting}
-        >
-          {isAccepting ? (
-            <ActivityIndicator size="small" color="#0B0B0F" />
-          ) : (
-            <Text style={styles.acceptButtonText}>Accept</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Select Organization</Text>
@@ -139,32 +71,12 @@ export function TenantSelectScreen({ onSelect }: TenantSelectScreenProps) {
         Choose which organization to work with
       </Text>
 
-      {hasInvitations ? (
-        <>
-          <Text style={styles.sectionTitle}>Pending Invitations</Text>
-          <FlatList
-            data={invitations as InvitedTenant[]}
-            keyExtractor={(item) => item._id}
-            renderItem={renderInvitation}
-            contentContainerStyle={styles.list}
-            scrollEnabled={false}
-          />
-          {tenants.length > 0 && (
-            <Text style={[styles.sectionTitle, { marginTop: 16 }]}>
-              Your Organizations
-            </Text>
-          )}
-        </>
-      ) : null}
-
-      {tenants.length > 0 ? (
-        <FlatList
-          data={tenants}
-          keyExtractor={(item) => item.id}
-          renderItem={renderTenant}
-          contentContainerStyle={styles.list}
-        />
-      ) : null}
+      <FlatList
+        data={tenants}
+        keyExtractor={(item) => item.id}
+        renderItem={renderTenant}
+        contentContainerStyle={styles.list}
+      />
     </View>
   );
 }

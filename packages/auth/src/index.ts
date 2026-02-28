@@ -40,7 +40,3 @@ export type { Resource } from "./permissions";
 
 // Server auth types (re-exported for convenience)
 export type { Session, User } from "./server";
-
-// Deprecated Convex auth helpers — will be removed after migration
-export { getAuthInfo, requireAuthInfo, requireTenantAuthInfo } from "./convex";
-export type { ConvexAuthInfo } from "./convex";

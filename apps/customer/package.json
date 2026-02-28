@@ -18,7 +18,6 @@
     "@timeo/auth": "workspace:*",
     "@timeo/shared": "workspace:*",
     "@timeo/ui": "workspace:*",
-    "convex": "^1.17.0",
     "expo": "~55.0.0-preview.12",
     "expo-build-properties": "~55.0.8",
     "expo-constants": "~55.0.6",
