@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { useOrders } from "@timeo/api-client";
 import { QRCodeSVG } from "qrcode.react";
 import QRCode from "qrcode";
 import { useTenantId } from "@/hooks/use-tenant-id";
@@ -74,12 +73,9 @@ export default function TransactionHistoryPage() {
   const { tenantId, tenant } = useTenantId();
   const [selectedTx, setSelectedTx] = useState<any | null>(null);
 
-  const transactions = useQuery(
-    api.pos.listByCustomer,
-    tenantId ? { tenantId } : "skip",
-  );
+  const { data: transactions, isLoading } = useOrders(tenantId);
 
-  function formatDate(timestamp: number) {
+  function formatDate(timestamp: string | number) {
     return new Date(timestamp).toLocaleDateString("en-MY", {
       day: "numeric",
       month: "short",
@@ -236,7 +232,6 @@ export default function TransactionHistoryPage() {
     Record<string, typeof transactions>
   >((acc, tx) => {
     const date = new Date(tx.createdAt);
-    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
     const label = date.toLocaleDateString("en-MY", {
       month: "long",
       year: "numeric",
@@ -248,7 +243,7 @@ export default function TransactionHistoryPage() {
 
   const totalSpent = (transactions ?? [])
     .filter((t) => t.status === "completed")
-    .reduce((sum, t) => sum + t.total, 0);
+    .reduce((sum, t) => sum + (t.total ?? 0), 0);
 
   return (
     <div className="space-y-6">
@@ -261,13 +256,13 @@ export default function TransactionHistoryPage() {
         </p>
       </div>
 
-      {transactions === undefined ? (
+      {isLoading ? (
         <div className="space-y-4">
           {Array.from({ length: 5 }).map((_, i) => (
             <Skeleton key={i} className="h-20 w-full rounded-xl bg-white/[0.06]" />
           ))}
         </div>
-      ) : transactions.length === 0 ? (
+      ) : !transactions || transactions.length === 0 ? (
         <Card className="glass-card">
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <FileText className="h-8 w-8 text-white/20 mb-3" />
@@ -316,7 +311,7 @@ export default function TransactionHistoryPage() {
 
                   return (
                     <Card
-                      key={tx._id}
+                      key={tx.id}
                       className="glass-card cursor-pointer transition-colors hover:bg-white/[0.04]"
                       onClick={() => setSelectedTx(tx)}
                     >
@@ -351,7 +346,7 @@ export default function TransactionHistoryPage() {
                               {statusConfig?.label ?? tx.status}
                             </Badge>
                             <p className="text-sm font-bold">
-                              {formatPrice(tx.total, tx.currency)}
+                              {formatPrice(tx.total ?? 0, tx.currency)}
                             </p>
                           </div>
                         </div>

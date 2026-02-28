@@ -2,10 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "convex/react";
-import { api } from "@timeo/api";
+import { api } from "@timeo/api-client";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
-import { useEnsureUser } from "@/hooks/use-ensure-user";
 import {
   Button,
   Card,
@@ -18,9 +16,7 @@ import { Zap, UserPlus, ArrowRight, Loader2, Check, Building2 } from "lucide-rea
 
 export default function JoinBusinessPage() {
   const router = useRouter();
-  const { isLoaded, isSignedIn, user } = useTimeoWebAuthContext();
-  useEnsureUser(!!isSignedIn);
-  const joinAsCustomer = useMutation(api.tenants.joinAsCustomer);
+  const { isLoaded, isSignedIn } = useTimeoWebAuthContext();
 
   const [slug, setSlug] = useState("");
   const [joining, setJoining] = useState(false);
@@ -50,15 +46,10 @@ export default function JoinBusinessPage() {
     setError("");
 
     try {
-      const result = await joinAsCustomer({ tenantSlug: slug.trim().toLowerCase() });
+      await api.post("/api/tenants/join", { slug: slug.trim().toLowerCase() });
 
-      if (result.alreadyMember) {
-        setSuccess(true);
-        setTimeout(() => router.push("/portal"), 1500);
-      } else {
-        setSuccess(true);
-        setTimeout(() => router.push("/portal"), 1500);
-      }
+      setSuccess(true);
+      setTimeout(() => router.push("/portal"), 1500);
     } catch (err: any) {
       const msg = err?.message || "Failed to join business. Check the code and try again.";
       setError(msg);

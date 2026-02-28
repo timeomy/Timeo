@@ -1,3 +1,7 @@
+/**
+ * @deprecated This file is Convex-specific and will be deleted after the Convex → PostgreSQL migration.
+ * Auth is now handled by the Hono API server at packages/api/src/middleware/auth.ts.
+ */
 import { convexBetterAuthNextJs } from "@convex-dev/better-auth/nextjs";
 
 let _cached: ReturnType<typeof convexBetterAuthNextJs> | null = null;

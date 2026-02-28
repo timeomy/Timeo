@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { usePlatformTenants } from "@timeo/api-client";
 import {
   Card,
   CardContent,
@@ -21,11 +20,16 @@ import { Users, Search } from "lucide-react";
 export default function ClientsPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const clients = useQuery(
-    api.platform.listAllUsers,
-    search.trim() ? { search } : {}
-  );
-  const loading = clients === undefined;
+  const { data: clients, isLoading } = usePlatformTenants();
+
+  const filtered = clients?.filter((client) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      client.name.toLowerCase().includes(q) ||
+      client.slug.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-8">
@@ -34,9 +38,9 @@ export default function ClientsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
           <p className="mt-1 text-muted-foreground">
-            {loading
+            {isLoading
               ? "Loading clients..."
-              : `${clients.length} user${clients.length !== 1 ? "s" : ""} registered`}
+              : `${clients?.length ?? 0} user${(clients?.length ?? 0) !== 1 ? "s" : ""} registered`}
           </p>
         </div>
       </div>
@@ -45,7 +49,7 @@ export default function ClientsPage() {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Search by name or email..."
+          placeholder="Search by name or slug..."
           value={search}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
             setSearch(e.target.value)
@@ -57,7 +61,7 @@ export default function ClientsPage() {
       {/* Table */}
       <Card className="glass border-white/[0.08]">
         <CardContent className="p-0">
-          {loading ? (
+          {isLoading ? (
             <div className="space-y-4 p-6">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-4">
@@ -71,7 +75,7 @@ export default function ClientsPage() {
                 </div>
               ))}
             </div>
-          ) : !clients || clients.length === 0 ? (
+          ) : !filtered || filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
                 <Users className="h-8 w-8 text-primary" />
@@ -90,29 +94,25 @@ export default function ClientsPage() {
               <TableHeader>
                 <TableRow className="border-white/[0.06]">
                   <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Memberships</TableHead>
-                  <TableHead>Businesses</TableHead>
-                  <TableHead>Joined</TableHead>
+                  <TableHead>Slug</TableHead>
+                  <TableHead>Members</TableHead>
+                  <TableHead>Revenue</TableHead>
+                  <TableHead>Created</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {clients.map((client) => (
+                {filtered.map((client) => (
                   <TableRow
-                    key={client._id}
+                    key={client.id}
                     className="cursor-pointer border-white/[0.06] transition-colors hover:bg-white/[0.03]"
                     onClick={() =>
-                      router.push(`/admin/clients/${client._id}`)
+                      router.push(`/admin/clients/${client.id}`)
                     }
                   >
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                          {(
-                            client.name?.[0] ??
-                            client.email?.[0] ??
-                            "?"
-                          ).toUpperCase()}
+                          {(client.name?.[0] ?? "?").toUpperCase()}
                         </div>
                         <p className="text-sm font-medium">
                           {client.name || "\u2014"}
@@ -120,22 +120,18 @@ export default function ClientsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {client.email ?? "\u2014"}
+                      @{client.slug}
                     </TableCell>
                     <TableCell className="text-sm">
                       <span className="font-medium">
-                        {client.membershipCount}
+                        {client.memberCount}
                       </span>
                       <span className="text-muted-foreground"> active</span>
                     </TableCell>
                     <TableCell>
                       <p className="text-xs text-muted-foreground">
-                        {client.tenantNames.length > 0
-                          ? client.tenantNames.join(", ") +
-                            (client.membershipCount >
-                            client.tenantNames.length
-                              ? ` +${client.membershipCount - client.tenantNames.length}`
-                              : "")
+                        {client.revenue > 0
+                          ? `RM ${(client.revenue / 100).toFixed(2)}`
                           : "\u2014"}
                       </p>
                     </TableCell>

@@ -16,6 +16,7 @@
     "@fontsource-variable/space-grotesk": "^5.2.10",
     "@stripe/stripe-js": "^5.5.0",
     "@timeo/api": "workspace:*",
+    "@timeo/api-client": "workspace:*",
     "@timeo/auth": "workspace:*",
     "@timeo/cms": "workspace:*",
     "@timeo/payments": "workspace:*",

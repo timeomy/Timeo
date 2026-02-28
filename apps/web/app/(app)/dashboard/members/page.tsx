@@ -1,8 +1,15 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
+import {
+  useStaffMembers,
+  useSessionCredits,
+  useCheckIns,
+  useSessionPackages,
+  useUpdateStaffRole,
+  useAssignSessionPackage,
+  useAdjustSessionCredits,
+} from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import {
   Card,
@@ -34,12 +41,9 @@ import {
   ScanLine,
   Settings2,
   Plus,
-  Minus,
   Package,
   Pencil,
   Loader2,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 
 const ROLE_BADGE: Record<string, string> = {
@@ -65,25 +69,10 @@ export default function MembersPage() {
   const [assignPackageOpen, setAssignPackageOpen] = useState(false);
   const [adjustCreditId, setAdjustCreditId] = useState<string | null>(null);
 
-  const members = useQuery(
-    api.tenantMemberships.listByTenant,
-    tenantId ? { tenantId } : "skip",
-  );
-
-  const allCredits = useQuery(
-    api.sessionCredits.listByTenant,
-    tenantId ? { tenantId } : "skip",
-  );
-
-  const checkIns = useQuery(
-    api.checkIns.listByTenant,
-    tenantId ? { tenantId } : "skip",
-  );
-
-  const packages = useQuery(
-    api.sessionPackages.listByTenant,
-    tenantId ? { tenantId } : "skip",
-  );
+  const { data: members, isLoading } = useStaffMembers(tenantId ?? "");
+  const { data: allCredits } = useSessionCredits(tenantId ?? "");
+  const { data: checkIns } = useCheckIns(tenantId ?? "");
+  const { data: packages } = useSessionPackages(tenantId ?? "");
 
   const filtered =
     members?.filter(
@@ -116,9 +105,9 @@ export default function MembersPage() {
 
   const checkInsByUser = useMemo(() => {
     if (!checkIns) return {};
-    return checkIns.reduce((acc: Record<string, number>, ci: any) => {
+    return checkIns.reduce((acc: Record<string, string>, ci: any) => {
       const key = ci.userId as string;
-      const ts = ci.timestamp as number;
+      const ts = ci.checkedInAt as string;
       if (!acc[key] || ts > acc[key]) acc[key] = ts;
       return acc;
     }, {});
@@ -128,22 +117,22 @@ export default function MembersPage() {
     return checkInsByUser[userId] ?? null;
   }
 
-  function formatDate(timestamp: number) {
-    return new Date(timestamp).toLocaleDateString("en-MY", {
+  function formatDate(isoString: string) {
+    return new Date(isoString).toLocaleDateString("en-MY", {
       day: "numeric",
       month: "short",
       year: "numeric",
     });
   }
 
-  function formatRelative(timestamp: number) {
-    const diff = Date.now() - timestamp;
+  function formatRelative(isoString: string) {
+    const diff = Date.now() - new Date(isoString).getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     if (days === 0) return "Today";
     if (days === 1) return "Yesterday";
     if (days < 7) return `${days} days ago`;
     if (days < 30) return `${Math.floor(days / 7)} week${Math.floor(days / 7) !== 1 ? "s" : ""} ago`;
-    return formatDate(timestamp);
+    return formatDate(isoString);
   }
 
   return (
@@ -155,9 +144,9 @@ export default function MembersPage() {
             Members
           </h1>
           <p className="text-sm text-white/50">
-            {members === undefined
+            {isLoading
               ? "Loading..."
-              : `${members.length} member${members.length !== 1 ? "s" : ""}`}
+              : `${members?.length ?? 0} member${(members?.length ?? 0) !== 1 ? "s" : ""}`}
           </p>
         </div>
       </div>
@@ -176,7 +165,7 @@ export default function MembersPage() {
       {/* Table */}
       <Card className="glass-card">
         <CardContent className="p-0">
-          {members === undefined ? (
+          {isLoading ? (
             <LoadingSkeleton />
           ) : filtered.length === 0 ? (
             <EmptyState hasMembers={(members?.length ?? 0) > 0} />
@@ -199,18 +188,18 @@ export default function MembersPage() {
                 {filtered.map((member: any) => {
                   const userCred = getUserCredits(member.userId);
                   const lastCheckIn = getLastCheckIn(member.userId);
-                  const isExpanded = expandedId === member._id;
+                  const isExpanded = expandedId === member.id;
 
                   return (
                     <>
                       <TableRow
-                        key={member._id}
+                        key={member.id}
                         className={cn(
                           "border-white/[0.06] hover:bg-white/[0.02] cursor-pointer",
                           isExpanded && "bg-white/[0.02]",
                         )}
                         onClick={() =>
-                          setExpandedId(isExpanded ? null : member._id)
+                          setExpandedId(isExpanded ? null : member.id)
                         }
                       >
                         <TableCell>
@@ -304,7 +293,7 @@ export default function MembersPage() {
                       {/* Expanded Detail Row */}
                       {isExpanded && (
                         <TableRow
-                          key={`${member._id}-detail`}
+                          key={`${member.id}-detail`}
                           className="border-white/[0.06] bg-white/[0.01]"
                         >
                           <TableCell colSpan={7}>
@@ -362,7 +351,7 @@ export default function MembersPage() {
                                 </p>
                                 {userCred.items.map((credit: any) => (
                                   <div
-                                    key={credit._id}
+                                    key={credit.id}
                                     className="flex items-center justify-between rounded-md border border-white/[0.06] bg-white/[0.02] px-3 py-2"
                                   >
                                     <div className="flex items-center gap-2">
@@ -382,7 +371,7 @@ export default function MembersPage() {
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           setManageMember(member);
-                                          setAdjustCreditId(credit._id);
+                                          setAdjustCreditId(credit.id);
                                         }}
                                       >
                                         <Pencil className="h-3 w-3" />
@@ -435,7 +424,7 @@ export default function MembersPage() {
 
       {/* Manage Member Dialog — always re-derive from live query data */}
       {manageMember && tenantId && (() => {
-        const liveMember = members?.find((m: any) => m._id === manageMember._id) ?? manageMember;
+        const liveMember = members?.find((m: any) => m.id === manageMember.id) ?? manageMember;
         return (
           <ManageMemberDialog
             member={liveMember}
@@ -468,16 +457,16 @@ function ManageMemberDialog({
   onClose,
 }: {
   member: any;
-  tenantId: any;
+  tenantId: string;
   credits: any[];
   packages: any[];
   initialAssignOpen: boolean;
   initialAdjustCreditId: string | null;
   onClose: () => void;
 }) {
-  const updateRole = useMutation(api.tenantMemberships.updateRole);
-  const purchaseCredits = useMutation(api.sessionCredits.purchase);
-  const adjustCredits = useMutation(api.sessionCredits.adjustCredits);
+  const { mutateAsync: updateRole } = useUpdateStaffRole(tenantId);
+  const { mutateAsync: assignPackage } = useAssignSessionPackage(tenantId);
+  const { mutateAsync: adjustCredits } = useAdjustSessionCredits(tenantId);
 
   const [view, setView] = useState<"main" | "assign" | "adjust">(
     initialAssignOpen ? "assign" : initialAdjustCreditId ? "adjust" : "main"
@@ -498,11 +487,7 @@ function ManageMemberDialog({
     setSaving(true);
     setError("");
     try {
-      await updateRole({
-        tenantId,
-        membershipId: member._id,
-        role: newRole as any,
-      });
+      await updateRole({ userId: member.userId ?? member.id, role: newRole as any });
       setRoleValue(newRole);
       setSuccess("Role updated");
       setTimeout(() => setSuccess(""), 2000);
@@ -518,10 +503,9 @@ function ManageMemberDialog({
     setSaving(true);
     setError("");
     try {
-      await purchaseCredits({
-        tenantId,
-        userId: member.userId,
-        packageId: selectedPackageId as any,
+      await assignPackage({
+        userId: member.userId ?? member.id,
+        packageId: selectedPackageId,
       });
       setSuccess("Package assigned");
       setSelectedPackageId("");
@@ -541,13 +525,11 @@ function ManageMemberDialog({
     setSaving(true);
     setError("");
     try {
-      const updates: { creditId: any; totalSessions?: number; usedSessions?: number } = {
-        creditId: editCreditId as any,
-      };
-      if (editTotal !== "") updates.totalSessions = parseInt(editTotal, 10);
-      if (editUsed !== "") updates.usedSessions = parseInt(editUsed, 10);
-
-      await adjustCredits(updates);
+      await adjustCredits({
+        creditId: editCreditId,
+        totalSessions: editTotal !== "" ? parseInt(editTotal, 10) : undefined,
+        usedSessions: editUsed !== "" ? parseInt(editUsed, 10) : undefined,
+      });
       setSuccess("Credits adjusted");
       setTimeout(() => {
         setSuccess("");
@@ -562,7 +544,7 @@ function ManageMemberDialog({
   }
 
   function startAdjust(credit: any) {
-    setEditCreditId(credit._id);
+    setEditCreditId(credit.id);
     setEditTotal(String(credit.totalSessions));
     setEditUsed(String(credit.usedSessions));
     setError("");
@@ -649,7 +631,7 @@ function ManageMemberDialog({
                       : 0;
                     return (
                       <div
-                        key={credit._id}
+                        key={credit.id}
                         className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3"
                       >
                         <div className="flex items-center justify-between mb-2">
@@ -724,11 +706,11 @@ function ManageMemberDialog({
               <div className="space-y-2">
                 {activePackages.map((pkg: any) => (
                   <button
-                    key={pkg._id}
-                    onClick={() => setSelectedPackageId(pkg._id)}
+                    key={pkg.id}
+                    onClick={() => setSelectedPackageId(pkg.id)}
                     className={cn(
                       "flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors",
-                      selectedPackageId === pkg._id
+                      selectedPackageId === pkg.id
                         ? "border-primary bg-primary/5"
                         : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]"
                     )}

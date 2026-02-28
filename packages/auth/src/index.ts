@@ -9,6 +9,9 @@ export { authClient } from "./auth-client";
 // Hooks
 export { useTimeoAuth, useRequireAuth, useTenantSwitcher, useRole, usePermission } from "./hooks";
 
+// Context accessors
+export { useTimeoAuthContext, useTenantSwitcherContext } from "./provider";
+
 // Guards
 export { AuthGuard, TenantGuard, RoleGuard } from "./guards";
 
@@ -35,6 +38,9 @@ export { ROLES, isRoleAtLeast } from "./types";
 export { hasPermission, PERMISSIONS } from "./permissions";
 export type { Resource } from "./permissions";
 
-// Convex auth helper
+// Server auth types (re-exported for convenience)
+export type { Session, User } from "./server";
+
+// Deprecated Convex auth helpers — will be removed after migration
 export { getAuthInfo, requireAuthInfo, requireTenantAuthInfo } from "./convex";
 export type { ConvexAuthInfo } from "./convex";

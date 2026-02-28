@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
+import { useTenant, useUpdateTenantSettings, useUpdateTenantBranding } from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import {
   Card,
@@ -46,13 +45,10 @@ const STATUS_BADGE_VARIANTS: Record<string, string> = {
 export default function SettingsPage() {
   const { tenantId } = useTenantId();
 
-  const tenant = useQuery(
-    api.tenants.getById,
-    tenantId ? { tenantId: tenantId } : "skip"
-  );
+  const { data: tenant, isLoading } = useTenant(tenantId ?? "");
 
-  const updateTenant = useMutation(api.tenants.update);
-  const updateBranding = useMutation(api.tenants.updateBranding);
+  const { mutateAsync: updateTenant } = useUpdateTenantSettings(tenantId ?? "");
+  const { mutateAsync: updateBranding } = useUpdateTenantBranding(tenantId ?? "");
 
   // General form state
   const [businessName, setBusinessName] = useState("");
@@ -80,7 +76,6 @@ export default function SettingsPage() {
     setGeneralSuccess(false);
     try {
       await updateTenant({
-        tenantId: tenantId,
         name: businessName,
       });
       setGeneralSuccess(true);
@@ -98,7 +93,6 @@ export default function SettingsPage() {
     setBrandingSuccess(false);
     try {
       await updateBranding({
-        tenantId: tenantId,
         branding: {
           primaryColor: primaryColor || undefined,
           logoUrl: logoUrl || undefined,
@@ -113,7 +107,7 @@ export default function SettingsPage() {
     }
   }
 
-  const loading = tenant === undefined;
+  const loading = isLoading;
 
   return (
     <div className="space-y-8">

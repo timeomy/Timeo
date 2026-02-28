@@ -1,0 +1,28 @@
+{
+  "name": "@timeo/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./hooks": "./src/hooks/index.ts",
+    "./socket": "./src/socket/socket-client.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.0.0",
+    "socket.io-client": "^4.8.0",
+    "zod": "^3.23.0"
+  },
+  "peerDependencies": {
+    "react": "*"
+  },
+  "devDependencies": {
+    "@timeo/config-ts": "workspace:*",
+    "@types/react": "~19.1.0",
+    "typescript": "^5.3.3"
+  }
+}

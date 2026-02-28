@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
+import { useService, useCreateBooking } from "@timeo/api-client";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
 import { formatPrice } from "@timeo/shared";
 import {
@@ -36,11 +35,9 @@ export default function ServiceDetailPage() {
 
   const { activeTenantId, isSignedIn } = useTimeoWebAuthContext();
 
-  const service = useQuery(api.services.getById, {
-    serviceId: serviceId as any,
-  });
+  const { data: service, isLoading } = useService(activeTenantId ?? "", serviceId);
 
-  const createBooking = useMutation(api.bookings.create);
+  const { mutateAsync: createBooking } = useCreateBooking(activeTenantId ?? "");
 
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
@@ -48,8 +45,6 @@ export default function ServiceDetailPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const isLoading = service === undefined;
 
   const handleBooking = async () => {
     if (!selectedDate || !selectedTime) {
@@ -66,23 +61,23 @@ export default function ServiceDetailPage() {
 
     try {
       const dateTimeStr = `${selectedDate}T${selectedTime}:00`;
-      const startTime = new Date(dateTimeStr).getTime();
+      const startTimeMs = new Date(dateTimeStr).getTime();
+      const startTime = new Date(dateTimeStr).toISOString();
 
-      if (isNaN(startTime)) {
+      if (isNaN(startTimeMs)) {
         setError("Invalid date or time selected.");
         setIsSubmitting(false);
         return;
       }
 
-      if (startTime < Date.now()) {
+      if (startTimeMs < Date.now()) {
         setError("Please select a future date and time.");
         setIsSubmitting(false);
         return;
       }
 
       await createBooking({
-        tenantId: activeTenantId as any,
-        serviceId: serviceId as any,
+        serviceId,
         startTime,
         notes: notes.trim() || undefined,
       });

@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
-import type { GenericId } from "convex/values";
+import {
+  useSessionLogs,
+  useCreateSessionLog,
+  useDeleteSessionLog,
+} from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import {
   Card,
@@ -126,20 +128,10 @@ export default function SessionLogsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<SessionForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [lookupEmail, setLookupEmail] = useState<string | null>(null);
 
-  const logs = useQuery(
-    api.sessionLogs.listByTenant,
-    tenantId ? { tenantId } : "skip",
-  );
-
-  const createLog = useMutation(api.sessionLogs.create);
-  const deleteLog = useMutation(api.sessionLogs.remove);
-
-  const lookedUpUser = useQuery(
-    api.users.getByEmail,
-    lookupEmail ? { email: lookupEmail } : "skip",
-  );
+  const { data: logs, isLoading } = useSessionLogs(tenantId ?? "");
+  const { mutateAsync: createLog } = useCreateSessionLog(tenantId ?? "");
+  const { mutateAsync: deleteLog } = useDeleteSessionLog(tenantId ?? "");
 
   const filteredLogs =
     logs?.filter((l) =>
@@ -160,13 +152,7 @@ export default function SessionLogsPage() {
 
   function openCreate() {
     setForm(EMPTY_FORM);
-    setLookupEmail(null);
     setDialogOpen(true);
-  }
-
-  function handleLookup() {
-    if (!form.clientEmail.trim()) return;
-    setLookupEmail(form.clientEmail.trim());
   }
 
   function addExercise() {
@@ -190,7 +176,7 @@ export default function SessionLogsPage() {
   }
 
   async function handleSave() {
-    if (!tenantId || !lookedUpUser) return;
+    if (!tenantId || !form.clientEmail.trim()) return;
     setSaving(true);
     try {
       const metrics =
@@ -219,8 +205,7 @@ export default function SessionLogsPage() {
         }));
 
       await createLog({
-        tenantId,
-        clientId: lookedUpUser._id,
+        clientEmail: form.clientEmail.trim(),
         sessionType: form.sessionType,
         notes: form.notes || undefined,
         exercises,
@@ -229,7 +214,6 @@ export default function SessionLogsPage() {
 
       setDialogOpen(false);
       setForm(EMPTY_FORM);
-      setLookupEmail(null);
     } catch (err) {
       console.error("Failed to create session log:", err);
     } finally {
@@ -237,16 +221,17 @@ export default function SessionLogsPage() {
     }
   }
 
-  async function handleDelete(sessionLogId: GenericId<"sessionLogs">) {
+  async function handleDelete(sessionLogId: string) {
+    if (!tenantId) return;
     try {
-      await deleteLog({ sessionLogId });
+      await deleteLog(sessionLogId);
     } catch (err) {
       console.error("Failed to delete session log:", err);
     }
   }
 
-  function formatDate(timestamp: number) {
-    return new Date(timestamp).toLocaleDateString("en-MY", {
+  function formatDate(isoString: string) {
+    return new Date(isoString).toLocaleDateString("en-MY", {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -262,9 +247,9 @@ export default function SessionLogsPage() {
             Session Logs
           </h1>
           <p className="text-sm text-white/50">
-            {logs === undefined
+            {isLoading
               ? "Loading..."
-              : `${logs.length} session${logs.length !== 1 ? "s" : ""} logged`}
+              : `${logs?.length ?? 0} session${(logs?.length ?? 0) !== 1 ? "s" : ""} logged`}
           </p>
         </div>
         <Button className="gap-2" onClick={openCreate}>
@@ -295,7 +280,7 @@ export default function SessionLogsPage() {
         <TabsContent value={activeTab} className="mt-4">
           <Card className="glass-card">
             <CardContent className="p-0">
-              {logs === undefined ? (
+              {isLoading ? (
                 <LoadingSkeleton />
               ) : filteredLogs.length === 0 ? (
                 <EmptyState tab={activeTab} onAdd={openCreate} />
@@ -318,7 +303,7 @@ export default function SessionLogsPage() {
                   <TableBody>
                     {filteredLogs.map((log) => (
                       <TableRow
-                        key={log._id}
+                        key={log.id}
                         className="border-white/[0.06] hover:bg-white/[0.02]"
                       >
                         <TableCell>
@@ -366,7 +351,7 @@ export default function SessionLogsPage() {
                             size="sm"
                             variant="ghost"
                             className="h-7 gap-1 text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                            onClick={() => handleDelete(log._id)}
+                            onClick={() => handleDelete(log.id)}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                             Delete
@@ -393,50 +378,17 @@ export default function SessionLogsPage() {
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Client Lookup */}
+            {/* Client Email */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Client Email</label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="client@example.com"
-                  value={form.clientEmail}
-                  onChange={(e) => {
-                    setForm({ ...form, clientEmail: e.target.value });
-                    setLookupEmail(null);
-                  }}
-                  type="email"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleLookup}
-                  disabled={!form.clientEmail.trim()}
-                  className="shrink-0"
-                >
-                  <Search className="h-4 w-4" />
-                </Button>
-              </div>
-              {lookupEmail && lookedUpUser === undefined && (
-                <p className="text-sm text-white/50">Searching...</p>
-              )}
-              {lookupEmail && lookedUpUser === null && (
-                <p className="text-sm text-yellow-400">
-                  No user found with that email.
-                </p>
-              )}
-              {lookedUpUser && (
-                <div className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.03] p-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
-                    {(lookedUpUser.name?.[0] ?? "?").toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{lookedUpUser.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {lookedUpUser.email}
-                    </p>
-                  </div>
-                </div>
-              )}
+              <Input
+                placeholder="client@example.com"
+                value={form.clientEmail}
+                onChange={(e) =>
+                  setForm({ ...form, clientEmail: e.target.value })
+                }
+                type="email"
+              />
             </div>
 
             <Select
@@ -605,7 +557,7 @@ export default function SessionLogsPage() {
             </Button>
             <Button
               onClick={handleSave}
-              disabled={saving || !lookedUpUser}
+              disabled={saving || !form.clientEmail.trim()}
             >
               {saving ? "Saving..." : "Log Session"}
             </Button>

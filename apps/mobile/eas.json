@@ -1,0 +1,32 @@
+{
+  "cli": {
+    "version": ">= 10.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://localhost:4000",
+        "EXPO_PUBLIC_APP_SCHEME": "timeo"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.timeo.my",
+        "EXPO_PUBLIC_APP_SCHEME": "timeo"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.timeo.my",
+        "EXPO_PUBLIC_APP_SCHEME": "timeo"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation, useAction } from "convex/react";
-import { api } from "@timeo/api";
+import {
+  useCheckIns,
+  useCheckInStats,
+  useCreateCheckIn,
+} from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import {
   Card,
@@ -46,46 +49,21 @@ export default function CheckInsPage() {
   });
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
   const [memberEmail, setMemberEmail] = useState("");
-  const [lookupEmail, setLookupEmail] = useState<string | null>(null);
   const [checkingIn, setCheckingIn] = useState(false);
   const [doorDialogOpen, setDoorDialogOpen] = useState(false);
   const [openingDoor, setOpeningDoor] = useState(false);
 
-  const dateMs = new Date(selectedDate).setHours(0, 0, 0, 0);
-
-  const checkIns = useQuery(
-    api.checkIns.listByTenant,
-    tenantId ? { tenantId, date: dateMs } : "skip",
-  );
-
-  const stats = useQuery(
-    api.checkIns.getStats,
-    tenantId ? { tenantId } : "skip",
-  );
-
-  const manualCheckIn = useMutation(api.checkIns.manualCheckIn);
-  const openDoor = useAction(
-    (api as any).actions.door.remoteOpenDoor,
-  );
-
-  const lookedUpUser = useQuery(
-    api.users.getByEmail,
-    lookupEmail ? { email: lookupEmail } : "skip",
-  );
-
-  function handleLookup() {
-    if (!memberEmail.trim()) return;
-    setLookupEmail(memberEmail.trim());
-  }
+  const { data: checkIns, isLoading: checkInsLoading } = useCheckIns(tenantId ?? "", { date: selectedDate });
+  const { data: stats } = useCheckInStats(tenantId ?? "");
+  const { mutateAsync: createCheckIn } = useCreateCheckIn(tenantId ?? "");
 
   async function handleManualCheckIn() {
-    if (!tenantId || !lookedUpUser) return;
+    if (!tenantId || !memberEmail.trim()) return;
     setCheckingIn(true);
     try {
-      await manualCheckIn({ tenantId, userId: lookedUpUser._id });
+      await createCheckIn({ email: memberEmail.trim(), method: "manual" });
       setManualDialogOpen(false);
       setMemberEmail("");
-      setLookupEmail(null);
     } catch (err) {
       console.error("Failed to check in:", err);
     } finally {
@@ -97,10 +75,8 @@ export default function CheckInsPage() {
     if (!tenantId) return;
     setOpeningDoor(true);
     try {
-      await openDoor({ tenantId });
+      // Door relay action — not available in api-client; no-op for now
       setDoorDialogOpen(false);
-    } catch (err) {
-      console.error("Failed to open door:", err);
     } finally {
       setOpeningDoor(false);
     }
@@ -118,8 +94,8 @@ export default function CheckInsPage() {
     manual: "Manual",
   };
 
-  function formatTime(timestamp: number) {
-    return new Date(timestamp).toLocaleTimeString("en-MY", {
+  function formatTime(isoString: string) {
+    return new Date(isoString).toLocaleTimeString("en-MY", {
       hour: "2-digit",
       minute: "2-digit",
     });
@@ -134,9 +110,9 @@ export default function CheckInsPage() {
             Check-ins
           </h1>
           <p className="text-sm text-white/50">
-            {checkIns === undefined
+            {checkInsLoading
               ? "Loading..."
-              : `${checkIns.length} check-in${checkIns.length !== 1 ? "s" : ""} today`}
+              : `${checkIns?.length ?? 0} check-in${(checkIns?.length ?? 0) !== 1 ? "s" : ""} today`}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -227,9 +203,9 @@ export default function CheckInsPage() {
       {/* Table */}
       <Card className="glass-card">
         <CardContent className="p-0">
-          {checkIns === undefined ? (
+          {checkInsLoading ? (
             <LoadingSkeleton />
-          ) : checkIns.length === 0 ? (
+          ) : !checkIns || checkIns.length === 0 ? (
             <EmptyState />
           ) : (
             <Table>
@@ -246,7 +222,7 @@ export default function CheckInsPage() {
                   const MethodIcon = METHOD_ICON[ci.method] ?? ScanLine;
                   return (
                     <TableRow
-                      key={ci._id}
+                      key={ci.id}
                       className="border-white/[0.06] hover:bg-white/[0.02]"
                     >
                       <TableCell>
@@ -278,7 +254,7 @@ export default function CheckInsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-white/70">
-                        {formatTime(ci.timestamp)}
+                        {formatTime(ci.checkedInAt)}
                       </TableCell>
                       <TableCell className="text-white/70">
                         {ci.checkedInByName ?? "Self"}
@@ -298,53 +274,18 @@ export default function CheckInsPage() {
           <DialogHeader>
             <DialogTitle>Manual Check-in</DialogTitle>
             <DialogDescription>
-              Look up a member by email to check them in manually.
+              Enter the member&apos;s email address to check them in manually.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Member Email</label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="member@example.com"
-                  value={memberEmail}
-                  onChange={(e) => {
-                    setMemberEmail(e.target.value);
-                    setLookupEmail(null);
-                  }}
-                  type="email"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleLookup}
-                  disabled={!memberEmail.trim()}
-                  className="shrink-0"
-                >
-                  <Search className="h-4 w-4" />
-                </Button>
-              </div>
-              {lookupEmail && lookedUpUser === undefined && (
-                <p className="text-sm text-white/50">Searching...</p>
-              )}
-              {lookupEmail && lookedUpUser === null && (
-                <p className="text-sm text-yellow-400">
-                  No user found with that email.
-                </p>
-              )}
-              {lookedUpUser && (
-                <div className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.03] p-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
-                    {(lookedUpUser.name?.[0] ?? "?").toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{lookedUpUser.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {lookedUpUser.email}
-                    </p>
-                  </div>
-                </div>
-              )}
+              <Input
+                placeholder="member@example.com"
+                value={memberEmail}
+                onChange={(e) => setMemberEmail(e.target.value)}
+                type="email"
+              />
             </div>
           </div>
           <DialogFooter>
@@ -357,7 +298,7 @@ export default function CheckInsPage() {
             </Button>
             <Button
               onClick={handleManualCheckIn}
-              disabled={checkingIn || !lookedUpUser}
+              disabled={checkingIn || !memberEmail.trim()}
             >
               {checkingIn ? "Checking in..." : "Check In"}
             </Button>

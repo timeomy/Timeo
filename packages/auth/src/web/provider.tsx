@@ -1,10 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useMemo, useState } from "react";
-import { ConvexReactClient, useQuery } from "convex/react";
-import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
 import { authClient } from "./auth-client";
-import { api } from "@timeo/api";
 import type { TimeoAuthContext, TenantSwitcherContext, TenantInfo, TimeoRole } from "../types";
 
 // ─── Contexts ───────────────────────────────────────────────────────
@@ -12,15 +9,22 @@ const TimeoWebAuthCtx = createContext<TimeoAuthContext | null>(null);
 const TimeoWebTenantCtx = createContext<TenantSwitcherContext | null>(null);
 
 // ─── Inner Provider ─────────────────────────────────────────────────
-function TimeoWebAuthInner({ children }: { children: React.ReactNode }) {
+function TimeoWebAuthInner({
+  children,
+  tenants: externalTenants,
+  tenantsLoading,
+}: {
+  children: React.ReactNode;
+  tenants?: TenantInfo[];
+  tenantsLoading?: boolean;
+}) {
   const session = authClient.useSession();
   const [activeTenantId, setActiveTenantId] = useState<string | null>(null);
 
   const isSignedIn = !!session.data?.user;
   const isLoaded = !session.isPending;
 
-  // Query Convex for user's tenants
-  const convexTenants = useQuery(api.tenants.getMyTenants, isSignedIn ? {} : "skip");
+  const tenants = externalTenants ?? [];
 
   const authContext = useMemo<TimeoAuthContext>(() => {
     const user = session.data?.user;
@@ -33,10 +37,8 @@ function TimeoWebAuthInner({ children }: { children: React.ReactNode }) {
         }
       : null;
 
-    const activeTenant = convexTenants?.find(
-      (t) => t && t._id === activeTenantId
-    );
-    const activeRole: TimeoRole = (activeTenant?.role as TimeoRole) ?? "customer";
+    const activeTenant = tenants.find((t) => t.id === activeTenantId);
+    const activeRole: TimeoRole = activeTenant?.role ?? "customer";
 
     return {
       user: timeoUser,
@@ -49,35 +51,26 @@ function TimeoWebAuthInner({ children }: { children: React.ReactNode }) {
       activeRole,
       setActiveTenant: setActiveTenantId,
     };
-  }, [session.data, isLoaded, isSignedIn, activeTenantId, convexTenants]);
+  }, [session.data, isLoaded, isSignedIn, activeTenantId, tenants]);
 
   const tenantSwitcher = useMemo<TenantSwitcherContext>(() => {
-    const tenants: TenantInfo[] = (convexTenants ?? [])
-      .filter((t): t is NonNullable<typeof t> => t != null)
-      .map((t) => ({
-        id: t._id,
-        name: t.name,
-        slug: t.slug,
-        role: (t.role as TimeoRole) ?? "customer",
-      }));
-
     const activeTenant = tenants.find((t) => t.id === activeTenantId) ?? null;
 
     return {
       tenants,
       activeTenant,
       switchTenant: setActiveTenantId,
-      isLoading: convexTenants === undefined,
+      isLoading: tenantsLoading ?? false,
     };
-  }, [convexTenants, activeTenantId]);
+  }, [tenants, activeTenantId, tenantsLoading]);
 
   // Auto-select first tenant if none selected
   React.useEffect(() => {
-    if (!activeTenantId && convexTenants && convexTenants.length > 0) {
-      const first = convexTenants[0];
-      if (first) setActiveTenantId(first._id);
+    if (!activeTenantId && tenants.length > 0) {
+      const first = tenants[0];
+      if (first) setActiveTenantId(first.id);
     }
-  }, [activeTenantId, convexTenants]);
+  }, [activeTenantId, tenants]);
 
   return (
     <TimeoWebAuthCtx.Provider value={authContext}>
@@ -91,16 +84,21 @@ function TimeoWebAuthInner({ children }: { children: React.ReactNode }) {
 // ─── Main Web Provider ──────────────────────────────────────────────
 interface TimeoWebAuthProviderProps {
   children: React.ReactNode;
-  convexUrl: string;
+  /** Tenant list from external data source (e.g., TanStack Query) */
+  tenants?: TenantInfo[];
+  /** Whether tenant data is still loading */
+  tenantsLoading?: boolean;
 }
 
-export function TimeoWebAuthProvider({ children, convexUrl }: TimeoWebAuthProviderProps) {
-  const convex = useMemo(() => new ConvexReactClient(convexUrl), [convexUrl]);
-
+export function TimeoWebAuthProvider({
+  children,
+  tenants,
+  tenantsLoading,
+}: TimeoWebAuthProviderProps) {
   return (
-    <ConvexBetterAuthProvider client={convex} authClient={authClient}>
-      <TimeoWebAuthInner>{children}</TimeoWebAuthInner>
-    </ConvexBetterAuthProvider>
+    <TimeoWebAuthInner tenants={tenants} tenantsLoading={tenantsLoading}>
+      {children}
+    </TimeoWebAuthInner>
   );
 }
 

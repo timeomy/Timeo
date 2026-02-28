@@ -1,9 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
-import type { GenericId } from "convex/values";
+import {
+  useBookings,
+  useConfirmBooking,
+  useCancelBooking,
+  useCompleteBooking,
+  useMarkNoShow,
+} from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import {
   Card,
@@ -61,15 +65,12 @@ export default function BookingsPage() {
   const { tenantId } = useTenantId();
   const [activeTab, setActiveTab] = useState("all");
 
-  const bookings = useQuery(
-    api.bookings.listByTenant,
-    tenantId ? { tenantId: tenantId } : "skip",
-  );
+  const { data: bookings, isLoading } = useBookings(tenantId ?? "");
 
-  const confirmBooking = useMutation(api.bookings.confirm);
-  const cancelBooking = useMutation(api.bookings.cancel);
-  const completeBooking = useMutation(api.bookings.complete);
-  const markNoShow = useMutation(api.bookings.markNoShow);
+  const { mutateAsync: confirmBooking } = useConfirmBooking(tenantId ?? "");
+  const { mutateAsync: cancelBooking } = useCancelBooking(tenantId ?? "");
+  const { mutateAsync: completeBooking } = useCompleteBooking(tenantId ?? "");
+  const { mutateAsync: markNoShow } = useMarkNoShow(tenantId ?? "");
 
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
@@ -94,23 +95,24 @@ export default function BookingsPage() {
 
   async function handleAction(
     action: "confirm" | "cancel" | "complete" | "no_show",
-    bookingId: GenericId<"bookings">,
+    bookingId: string,
   ) {
+    if (!tenantId) return;
     const key = `${action}-${bookingId}`;
     setLoadingAction(key);
     try {
       switch (action) {
         case "confirm":
-          await confirmBooking({ bookingId });
+          await confirmBooking(bookingId);
           break;
         case "cancel":
           await cancelBooking({ bookingId });
           break;
         case "complete":
-          await completeBooking({ bookingId });
+          await completeBooking(bookingId);
           break;
         case "no_show":
-          await markNoShow({ bookingId });
+          await markNoShow(bookingId);
           break;
       }
     } catch (err) {
@@ -120,20 +122,20 @@ export default function BookingsPage() {
     }
   }
 
-  function isLoading(action: string, id: string) {
+  function isActionLoading(action: string, id: string) {
     return loadingAction === `${action}-${id}`;
   }
 
-  function formatDate(timestamp: number) {
-    return new Date(timestamp).toLocaleDateString("en-MY", {
+  function formatDate(isoString: string) {
+    return new Date(isoString).toLocaleDateString("en-MY", {
       day: "numeric",
       month: "short",
       year: "numeric",
     });
   }
 
-  function formatTime(timestamp: number) {
-    return new Date(timestamp).toLocaleTimeString("en-MY", {
+  function formatTime(isoString: string) {
+    return new Date(isoString).toLocaleTimeString("en-MY", {
       hour: "2-digit",
       minute: "2-digit",
     });
@@ -148,9 +150,9 @@ export default function BookingsPage() {
             Bookings
           </h1>
           <p className="text-sm text-white/50">
-            {bookings === undefined
+            {isLoading
               ? "Loading..."
-              : `${bookings.length} total bookings`}
+              : `${bookings?.length ?? 0} total bookings`}
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
@@ -183,7 +185,7 @@ export default function BookingsPage() {
         <TabsContent value={activeTab} className="mt-4">
           <Card className="glass-card">
             <CardContent className="p-0">
-              {bookings === undefined ? (
+              {isLoading ? (
                 <LoadingSkeleton />
               ) : filteredBookings.length === 0 ? (
                 <EmptyState tab={activeTab} />
@@ -204,7 +206,7 @@ export default function BookingsPage() {
                   <TableBody>
                     {filteredBookings.map((booking) => (
                       <TableRow
-                        key={booking._id}
+                        key={booking.id}
                         className="border-white/[0.06] hover:bg-white/[0.02]"
                       >
                         <TableCell className="font-medium text-white">
@@ -236,9 +238,9 @@ export default function BookingsPage() {
                                   size="sm"
                                   variant="ghost"
                                   className="h-7 gap-1 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
-                                  disabled={isLoading("confirm", booking._id)}
+                                  disabled={isActionLoading("confirm", booking.id)}
                                   onClick={() =>
-                                    handleAction("confirm", booking._id)
+                                    handleAction("confirm", booking.id)
                                   }
                                 >
                                   <CheckCircle2 className="h-3.5 w-3.5" />
@@ -248,9 +250,9 @@ export default function BookingsPage() {
                                   size="sm"
                                   variant="ghost"
                                   className="h-7 gap-1 text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                                  disabled={isLoading("cancel", booking._id)}
+                                  disabled={isActionLoading("cancel", booking.id)}
                                   onClick={() =>
-                                    handleAction("cancel", booking._id)
+                                    handleAction("cancel", booking.id)
                                   }
                                 >
                                   <XCircle className="h-3.5 w-3.5" />
@@ -264,9 +266,9 @@ export default function BookingsPage() {
                                   size="sm"
                                   variant="ghost"
                                   className="h-7 gap-1 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
-                                  disabled={isLoading("complete", booking._id)}
+                                  disabled={isActionLoading("complete", booking.id)}
                                   onClick={() =>
-                                    handleAction("complete", booking._id)
+                                    handleAction("complete", booking.id)
                                   }
                                 >
                                   <CheckCircle2 className="h-3.5 w-3.5" />
@@ -276,9 +278,9 @@ export default function BookingsPage() {
                                   size="sm"
                                   variant="ghost"
                                   className="h-7 gap-1 text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                                  disabled={isLoading("cancel", booking._id)}
+                                  disabled={isActionLoading("cancel", booking.id)}
                                   onClick={() =>
-                                    handleAction("cancel", booking._id)
+                                    handleAction("cancel", booking.id)
                                   }
                                 >
                                   <XCircle className="h-3.5 w-3.5" />
@@ -288,9 +290,9 @@ export default function BookingsPage() {
                                   size="sm"
                                   variant="ghost"
                                   className="h-7 gap-1 text-gray-400 hover:bg-gray-500/10 hover:text-gray-300"
-                                  disabled={isLoading("no_show", booking._id)}
+                                  disabled={isActionLoading("no_show", booking.id)}
                                   onClick={() =>
-                                    handleAction("no_show", booking._id)
+                                    handleAction("no_show", booking.id)
                                   }
                                 >
                                   <UserX className="h-3.5 w-3.5" />

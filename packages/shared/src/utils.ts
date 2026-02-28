@@ -10,21 +10,22 @@ export function formatPrice(
   return `${symbol} ${amount}`;
 }
 
-/** Format unix ms timestamp to locale date string */
-export function formatDate(timestampMs: number): string {
-  return new Date(timestampMs).toLocaleDateString();
+/** Format unix ms timestamp or ISO string to locale date string */
+export function formatDate(timestamp: number | string): string {
+  return new Date(timestamp).toLocaleDateString();
 }
 
-/** Format unix ms timestamp to locale time string */
-export function formatTime(timestampMs: number): string {
-  return new Date(timestampMs).toLocaleTimeString([], {
+/** Format unix ms timestamp or ISO string to locale time string */
+export function formatTime(timestamp: number | string): string {
+  return new Date(timestamp).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   });
 }
 
-/** Format unix ms timestamp to relative time (e.g. "2 hours ago") */
-export function formatRelativeTime(timestampMs: number): string {
+/** Format unix ms timestamp or ISO string to relative time (e.g. "2 hours ago") */
+export function formatRelativeTime(timestamp: number | string): string {
+  const timestampMs = typeof timestamp === "string" ? new Date(timestamp).getTime() : timestamp;
   const seconds = Math.floor((Date.now() - timestampMs) / 1000);
   if (seconds < 60) return "just now";
   const minutes = Math.floor(seconds / 60);

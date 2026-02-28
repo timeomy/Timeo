@@ -1,12 +1,15 @@
 "use client";
 
 import { createAuthClient } from "better-auth/react";
-import { convexClient } from "@convex-dev/better-auth/client/plugins";
 
 /**
  * Web (Next.js) auth client.
  * Auth requests are proxied through Next.js API routes (/api/auth/[...all]).
+ * No baseURL needed — uses same-origin cookies.
  */
 export const authClient = createAuthClient({
-  plugins: [convexClient()],
+  baseURL:
+    typeof window !== "undefined"
+      ? window.location.origin
+      : process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
 });

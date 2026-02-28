@@ -1,8 +1,26 @@
 "use client";
 
 import { ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TimeoWebAuthProvider } from "@timeo/auth/web";
 import { TimeoWebAnalyticsProvider } from "@timeo/analytics/web";
+import { useMyTenants } from "@timeo/api-client";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 30_000, retry: 1 },
+  },
+});
+
+/** Loads tenant list and wires it into the auth provider. Must be inside QueryClientProvider. */
+function TenantsLoader({ children }: { children: ReactNode }) {
+  const { data: tenants, isLoading } = useMyTenants();
+  return (
+    <TimeoWebAuthProvider tenants={tenants ?? []} tenantsLoading={isLoading}>
+      {children}
+    </TimeoWebAuthProvider>
+  );
+}
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
@@ -10,11 +28,9 @@ export function Providers({ children }: { children: ReactNode }) {
       apiKey={process.env.NEXT_PUBLIC_POSTHOG_KEY ?? ""}
       host={process.env.NEXT_PUBLIC_POSTHOG_HOST}
     >
-      <TimeoWebAuthProvider
-        convexUrl={process.env.NEXT_PUBLIC_CONVEX_URL as string}
-      >
-        {children}
-      </TimeoWebAuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <TenantsLoader>{children}</TenantsLoader>
+      </QueryClientProvider>
     </TimeoWebAnalyticsProvider>
   );
 }

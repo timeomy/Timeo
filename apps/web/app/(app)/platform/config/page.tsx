@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
+import { usePlatformConfig, useUpdatePlatformConfig } from "@timeo/api-client";
 import {
   Card,
   CardContent,
@@ -32,9 +31,8 @@ import {
 } from "lucide-react";
 
 export default function PlatformConfigPage() {
-  const configs = useQuery(api.platform.listConfig);
-  const setConfig = useMutation(api.platform.setConfig);
-  const deleteConfig = useMutation(api.platform.deleteConfig);
+  const { data: configData, isLoading } = usePlatformConfig();
+  const { mutateAsync: updateConfig } = useUpdatePlatformConfig();
 
   const [addOpen, setAddOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState<string | null>(null);
@@ -46,6 +44,11 @@ export default function PlatformConfigPage() {
   const [newValue, setNewValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  // Derive a stable key-value list from the config object for rendering
+  const configs = configData
+    ? Object.entries(configData).map(([key, value]) => ({ key, value, updatedAt: null as null }))
+    : [];
 
   const handleAdd = async () => {
     if (!newKey.trim()) {
@@ -68,7 +71,7 @@ export default function PlatformConfigPage() {
         // Keep as string
       }
 
-      await setConfig({ key: newKey.trim(), value: parsedValue });
+      await updateConfig({ [newKey.trim()]: parsedValue } as any);
       setAddOpen(false);
       setNewKey("");
       setNewValue("");
@@ -93,7 +96,7 @@ export default function PlatformConfigPage() {
         // Keep as string
       }
 
-      await setConfig({ key, value: parsedValue });
+      await updateConfig({ [key]: parsedValue } as any);
       setEditingKey(null);
       setEditValue("");
     } catch (err: any) {
@@ -106,7 +109,7 @@ export default function PlatformConfigPage() {
   const handleDelete = async (key: string) => {
     setSubmitting(true);
     try {
-      await deleteConfig({ key });
+      await updateConfig({ [key]: undefined } as any);
       setDeleteOpen(null);
     } catch (err: any) {
       setError(err?.message || "Failed to delete config.");
@@ -140,7 +143,7 @@ export default function PlatformConfigPage() {
       {/* Config Table */}
       <Card className="glass-card">
         <CardContent className="p-0">
-          {configs === undefined ? (
+          {isLoading ? (
             <div className="space-y-2 p-6">
               {Array.from({ length: 3 }).map((_, i) => (
                 <Skeleton key={i} className="h-14 w-full" />
@@ -173,7 +176,7 @@ export default function PlatformConfigPage() {
               </TableHeader>
               <TableBody>
                 {configs.map((config) => (
-                  <TableRow key={config._id} className="border-white/[0.06]">
+                  <TableRow key={config.key} className="border-white/[0.06]">
                     <TableCell>
                       <Badge variant="outline" className="font-mono text-xs">
                         {config.key}

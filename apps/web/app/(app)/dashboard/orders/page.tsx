@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
-import type { GenericId } from "convex/values";
+import { useOrders, useUpdateOrderStatus } from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import { formatPrice } from "@timeo/shared";
 import {
@@ -92,12 +90,8 @@ export default function OrdersPage() {
   const { tenantId } = useTenantId();
   const [activeTab, setActiveTab] = useState("all");
 
-  const orders = useQuery(
-    api.orders.listByTenant,
-    tenantId ? { tenantId: tenantId } : "skip",
-  );
-
-  const updateStatus = useMutation(api.orders.updateStatus);
+  const { data: orders, isLoading } = useOrders(tenantId ?? "");
+  const { mutateAsync: updateStatus } = useUpdateOrderStatus(tenantId ?? "");
 
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
@@ -115,7 +109,8 @@ export default function OrdersPage() {
     cancelled: orders?.filter((o) => o.status === "cancelled").length ?? 0,
   };
 
-  async function handleUpdateStatus(orderId: GenericId<"orders">, status: OrderStatus) {
+  async function handleUpdateStatus(orderId: string, status: OrderStatus) {
+    if (!tenantId) return;
     const key = `${status}-${orderId}`;
     setLoadingAction(key);
     try {
@@ -127,16 +122,15 @@ export default function OrdersPage() {
     }
   }
 
-  function isLoading(status: string, id: string) {
+  function isActionLoading(status: string, id: string) {
     return loadingAction === `${status}-${id}`;
   }
 
   function shortId(id: string) {
-    // Convex IDs look like "k57abc123..." — show last 6 chars
     return `#${id.slice(-6).toUpperCase()}`;
   }
 
-  function formatDate(timestamp: number) {
+  function formatDate(timestamp: string | number) {
     return new Date(timestamp).toLocaleDateString("en-MY", {
       day: "numeric",
       month: "short",
@@ -153,9 +147,9 @@ export default function OrdersPage() {
             Orders
           </h1>
           <p className="text-sm text-white/50">
-            {orders === undefined
+            {isLoading
               ? "Loading..."
-              : `${orders.length} total orders`}
+              : `${orders?.length ?? 0} total orders`}
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
@@ -188,7 +182,7 @@ export default function OrdersPage() {
         <TabsContent value={activeTab} className="mt-4">
           <Card className="glass-card">
             <CardContent className="p-0">
-              {orders === undefined ? (
+              {isLoading ? (
                 <LoadingSkeleton />
               ) : filteredOrders.length === 0 ? (
                 <EmptyState tab={activeTab} />
@@ -212,13 +206,13 @@ export default function OrdersPage() {
                         STATUS_TRANSITIONS[order.status as OrderStatus] ?? [];
                       return (
                         <TableRow
-                          key={order._id}
+                          key={order.id}
                           className="border-white/[0.06] hover:bg-white/[0.02]"
                         >
                           <TableCell>
                             <div className="flex flex-col">
                               <span className="font-mono text-sm font-medium text-white">
-                                {shortId(order._id)}
+                                {shortId(order.id)}
                               </span>
                               <span className="text-xs text-white/30">
                                 {formatDate(order.createdAt)}
@@ -229,7 +223,7 @@ export default function OrdersPage() {
                             {order.customerName ?? "Guest"}
                           </TableCell>
                           <TableCell className="text-white/70">
-                            {order.itemCount > 0 ? (
+                            {(order.itemCount ?? 0) > 0 ? (
                               <span className="text-sm">
                                 {order.itemCount} item{order.itemCount !== 1 ? "s" : ""}
                               </span>
@@ -251,9 +245,9 @@ export default function OrdersPage() {
                                   size="sm"
                                   variant="ghost"
                                   className={cn("h-7 gap-1", t.color)}
-                                  disabled={isLoading(t.status, order._id)}
+                                  disabled={isActionLoading(t.status, order.id)}
                                   onClick={() =>
-                                    handleUpdateStatus(order._id, t.status)
+                                    handleUpdateStatus(order.id, t.status)
                                   }
                                 >
                                   <t.icon className="h-3.5 w-3.5" />

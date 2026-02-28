@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { usePlatformLogs } from "@timeo/api-client";
 import {
   Card,
   CardContent,
@@ -52,29 +51,28 @@ function getActionVariant(action: string): string {
 }
 
 export default function AuditLogsPage() {
-  const logs = useQuery(api.platform.listAuditLogs, { limit: 200 });
+  const { data: logsData, isLoading } = usePlatformLogs();
+  const logs = logsData ?? [];
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState("");
 
-  const loading = logs === undefined;
-
   // Derive unique action types for filter dropdown
   const actionOptions = useMemo(() => {
-    if (!logs) return [];
-    const unique = [...new Set(logs.map((l) => l.action))].sort();
+    if (!logsData) return [];
+    const unique = [...new Set(logsData.map((l) => l.action))].sort();
     return [
       { label: "All Actions", value: "" },
       ...unique.map((a) => ({ label: a, value: a })),
     ];
-  }, [logs]);
+  }, [logsData]);
 
-  const filtered = logs?.filter((log) => {
+  const filtered = logsData?.filter((log) => {
     const matchesSearch =
       !search ||
-      log.actorName.toLowerCase().includes(search.toLowerCase()) ||
+      (log as any).actorName?.toLowerCase().includes(search.toLowerCase()) ||
       log.action.toLowerCase().includes(search.toLowerCase()) ||
-      log.resource.toLowerCase().includes(search.toLowerCase()) ||
-      (log.tenantName ?? "").toLowerCase().includes(search.toLowerCase());
+      JSON.stringify(log.details).toLowerCase().includes(search.toLowerCase()) ||
+      (log as any).tenantId?.toLowerCase().includes(search.toLowerCase());
 
     const matchesAction = !actionFilter || log.action === actionFilter;
 
@@ -87,7 +85,7 @@ export default function AuditLogsPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Audit Logs</h1>
         <p className="mt-1 text-muted-foreground">
-          {loading
+          {isLoading
             ? "Loading audit logs..."
             : `${logs.length} log entr${logs.length !== 1 ? "ies" : "y"}`}
         </p>
@@ -120,7 +118,7 @@ export default function AuditLogsPage() {
       {/* Table */}
       <Card className="glass border-white/[0.08]">
         <CardContent className="p-0">
-          {loading ? (
+          {isLoading ? (
             <div className="space-y-4 p-6">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-4">
@@ -161,21 +159,18 @@ export default function AuditLogsPage() {
               </TableHeader>
               <TableBody>
                 {filtered.map((log) => (
-                  <TableRow key={log._id} className="border-white/[0.06]">
+                  <TableRow key={log.id} className="border-white/[0.06]">
                     <TableCell>
                       <span
                         className="text-sm text-muted-foreground"
-                        title={new Date(log.timestamp).toLocaleString()}
+                        title={new Date(log.createdAt).toLocaleString()}
                       >
-                        {timeAgo(log.timestamp)}
+                        {timeAgo(new Date(log.createdAt).getTime())}
                       </span>
                     </TableCell>
                     <TableCell>
                       <div>
-                        <p className="text-sm font-medium">{log.actorName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {log.actorEmail}
-                        </p>
+                        <p className="text-sm font-medium">{log.userId}</p>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -187,11 +182,13 @@ export default function AuditLogsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm">{log.resource}</span>
+                      <span className="text-sm font-mono text-xs text-muted-foreground">
+                        {JSON.stringify(log.details)}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-muted-foreground">
-                        {log.tenantName ?? "Platform"}
+                        {log.tenantId ?? "Platform"}
                       </span>
                     </TableCell>
                   </TableRow>

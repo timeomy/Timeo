@@ -1,7 +1,7 @@
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
+import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from "@timeo/api-client";
+import { useTimeoWebAuthContext } from "@timeo/auth/web";
 import { useCallback } from "react";
 import {
   Card,
@@ -46,23 +46,24 @@ function formatTimeAgo(timestamp: number): string {
 }
 
 export default function NotificationsPage() {
-  const result = useQuery(api.notifications.listByUser, { limit: 50 });
-  const unreadCount = useQuery(api.notifications.getUnreadCount);
-  const markAsRead = useMutation(api.notifications.markAsRead);
-  const markAllAsRead = useMutation(api.notifications.markAllAsRead);
+  const { activeTenantId } = useTimeoWebAuthContext();
+
+  const { data: notifications, isLoading } = useNotifications(activeTenantId ?? "");
+  const { mutateAsync: markAsRead } = useMarkNotificationRead(activeTenantId ?? "");
+  const { mutateAsync: markAllAsRead } = useMarkAllNotificationsRead(activeTenantId ?? "");
+
+  const unreadCount = notifications?.filter((n: any) => !n.read).length ?? 0;
 
   const handleMarkAsRead = useCallback(
     (notificationId: string) => {
-      markAsRead({ notificationId: notificationId as any });
+      markAsRead(notificationId);
     },
     [markAsRead]
   );
 
   const handleMarkAllAsRead = useCallback(() => {
-    markAllAsRead({});
+    markAllAsRead(undefined);
   }, [markAllAsRead]);
-
-  const notifications = result?.notifications;
 
   return (
     <div className="space-y-6">
@@ -70,12 +71,12 @@ export default function NotificationsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
           <p className="text-sm text-muted-foreground">
-            {unreadCount !== undefined && unreadCount > 0
+            {!isLoading && unreadCount > 0
               ? `${unreadCount} unread notification${unreadCount !== 1 ? "s" : ""}`
               : "You're all caught up"}
           </p>
         </div>
-        {unreadCount !== undefined && unreadCount > 0 && (
+        {!isLoading && unreadCount > 0 && (
           <Button
             variant="outline"
             size="sm"
@@ -90,11 +91,11 @@ export default function NotificationsPage() {
 
       <Card>
         <CardContent className="p-0">
-          {notifications === undefined ? (
+          {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             </div>
-          ) : notifications.length === 0 ? (
+          ) : !notifications || notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
                 <Bell className="h-8 w-8 text-muted-foreground" />
@@ -113,10 +114,10 @@ export default function NotificationsPage() {
 
                 return (
                   <button
-                    key={notification._id}
+                    key={notification.id}
                     onClick={() => {
                       if (!notification.read) {
-                        handleMarkAsRead(notification._id);
+                        handleMarkAsRead(notification.id);
                       }
                     }}
                     className={`flex w-full items-start gap-3 p-4 text-left transition-colors hover:bg-accent/50 ${

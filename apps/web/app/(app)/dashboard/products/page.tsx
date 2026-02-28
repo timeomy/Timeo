@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
-import type { GenericId } from "convex/values";
+import {
+  useProducts,
+  useCreateProduct,
+  useUpdateProduct,
+  useDeleteProduct,
+} from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import { formatPrice } from "@timeo/shared";
 import {
@@ -68,19 +71,16 @@ export default function ProductsPage() {
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("grid");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingId, setEditingId] = useState<GenericId<"products"> | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ProductForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [togglingId, setTogglingId] = useState<GenericId<"products"> | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  const products = useQuery(
-    api.products.list,
-    tenantId ? { tenantId: tenantId } : "skip",
-  );
+  const { data: products, isLoading } = useProducts(tenantId ?? "");
 
-  const createProduct = useMutation(api.products.create);
-  const updateProduct = useMutation(api.products.update);
-  const toggleActive = useMutation(api.products.toggleActive);
+  const { mutateAsync: createProduct } = useCreateProduct(tenantId ?? "");
+  const { mutateAsync: updateProduct } = useUpdateProduct(tenantId ?? "");
+  const { mutateAsync: deleteProduct } = useDeleteProduct(tenantId ?? "");
 
   const filtered =
     products?.filter((p) =>
@@ -94,7 +94,7 @@ export default function ProductsPage() {
   }
 
   function openEdit(product: NonNullable<typeof products>[number]) {
-    setEditingId(product._id);
+    setEditingId(product.id);
     setForm({
       name: product.name,
       description: product.description ?? "",
@@ -116,9 +116,9 @@ export default function ProductsPage() {
         currency: form.currency,
       };
       if (editingId) {
-        await updateProduct({ productId: editingId, ...data });
+        await updateProduct({ id: editingId, ...data });
       } else {
-        await createProduct({ tenantId: tenantId!, ...data });
+        await createProduct(data);
       }
       setDialogOpen(false);
       setForm(EMPTY_FORM);
@@ -130,10 +130,11 @@ export default function ProductsPage() {
     }
   }
 
-  async function handleToggle(productId: GenericId<"products">) {
+  async function handleToggle(productId: string) {
+    if (!tenantId) return;
     setTogglingId(productId);
     try {
-      await toggleActive({ productId });
+      await deleteProduct(productId);
     } catch (err) {
       console.error("Failed to toggle product:", err);
     } finally {
@@ -150,9 +151,9 @@ export default function ProductsPage() {
             Products
           </h1>
           <p className="text-sm text-white/50">
-            {products === undefined
+            {isLoading
               ? "Loading..."
-              : `${products.length} product${products.length !== 1 ? "s" : ""}`}
+              : `${products?.length ?? 0} product${(products?.length ?? 0) !== 1 ? "s" : ""}`}
           </p>
         </div>
         <Button className="gap-2" onClick={openCreate}>
@@ -199,7 +200,7 @@ export default function ProductsPage() {
       </div>
 
       {/* Content */}
-      {products === undefined ? (
+      {isLoading ? (
         <LoadingSkeleton view={view} />
       ) : filtered.length === 0 ? (
         <EmptyState hasProducts={(products?.length ?? 0) > 0} onAdd={openCreate} />
@@ -302,15 +303,15 @@ function GridView({
   onToggle,
   togglingId,
 }: {
-  products: Array<{ _id: GenericId<"products">; name: string; description?: string; price: number; currency?: string; isActive: boolean; imageUrl?: string; createdAt?: number }>;
+  products: Array<{ id: string; name: string; description?: string; price: number; currency?: string; isActive: boolean; imageUrl?: string; createdAt?: string | number }>;
   onEdit: (p: any) => void;
-  onToggle: (id: GenericId<"products">) => void;
-  togglingId: GenericId<"products"> | null;
+  onToggle: (id: string) => void;
+  togglingId: string | null;
 }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {products.map((product) => (
-        <Card key={product._id} className="glass-card group">
+        <Card key={product.id} className="glass-card group">
           <CardContent className="p-0">
             {/* Image area */}
             <div className="relative flex h-40 items-center justify-center rounded-t-2xl bg-white/[0.02] border-b border-white/[0.06]">
@@ -373,8 +374,8 @@ function GridView({
                       ? "text-yellow-400 hover:bg-yellow-500/10 hover:text-yellow-300"
                       : "text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300",
                   )}
-                  disabled={togglingId === product._id}
-                  onClick={() => onToggle(product._id)}
+                  disabled={togglingId === product.id}
+                  onClick={() => onToggle(product.id)}
                 >
                   {product.isActive ? (
                     <>
@@ -405,10 +406,10 @@ function TableView({
   onToggle,
   togglingId,
 }: {
-  products: Array<{ _id: GenericId<"products">; name: string; description?: string; price: number; currency?: string; isActive: boolean; imageUrl?: string; createdAt?: number }>;
+  products: Array<{ id: string; name: string; description?: string; price: number; currency?: string; isActive: boolean; imageUrl?: string; createdAt?: string | number }>;
   onEdit: (p: any) => void;
-  onToggle: (id: GenericId<"products">) => void;
-  togglingId: GenericId<"products"> | null;
+  onToggle: (id: string) => void;
+  togglingId: string | null;
 }) {
   return (
     <Card className="glass-card">
@@ -427,7 +428,7 @@ function TableView({
           <TableBody>
             {products.map((product) => (
               <TableRow
-                key={product._id}
+                key={product.id}
                 className="border-white/[0.06] hover:bg-white/[0.02]"
               >
                 <TableCell>
@@ -491,8 +492,8 @@ function TableView({
                           ? "text-yellow-400 hover:bg-yellow-500/10 hover:text-yellow-300"
                           : "text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300",
                       )}
-                      disabled={togglingId === product._id}
-                      onClick={() => onToggle(product._id)}
+                      disabled={togglingId === product.id}
+                      onClick={() => onToggle(product.id)}
                     >
                       {product.isActive ? (
                         <>

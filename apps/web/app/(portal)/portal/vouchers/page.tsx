@@ -1,7 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { useVouchers } from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import {
   Card,
@@ -14,13 +13,7 @@ import { Ticket, AlertCircle } from "lucide-react";
 export default function MyVouchersPage() {
   const { tenantId } = useTenantId();
 
-  const access = useQuery(api.auth.checkAccess, tenantId ? { tenantId } : "skip");
-  const ready = tenantId && access?.ready;
-
-  const vouchers = useQuery(
-    api.vouchers.getMyVouchers,
-    ready ? { tenantId } : "skip"
-  );
+  const { data: vouchers, isLoading } = useVouchers(tenantId);
 
   return (
     <div className="space-y-6">
@@ -35,9 +28,9 @@ export default function MyVouchersPage() {
       </div>
 
       {/* Content */}
-      {vouchers === undefined ? (
+      {isLoading ? (
         <LoadingSkeleton />
-      ) : vouchers.length === 0 ? (
+      ) : !vouchers || vouchers.length === 0 ? (
         <EmptyState />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -60,7 +53,7 @@ export default function MyVouchersPage() {
 
             return (
               <Card
-                key={redemption._id}
+                key={redemption.id}
                 className="glass border-white/[0.08]"
               >
                 <CardContent className="p-5">

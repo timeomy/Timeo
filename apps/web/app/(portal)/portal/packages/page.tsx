@@ -1,7 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { useSessionCredits } from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import {
   Card,
@@ -14,13 +13,7 @@ import { CreditCard, AlertCircle } from "lucide-react";
 export default function MyPackagesPage() {
   const { tenantId } = useTenantId();
 
-  const access = useQuery(api.auth.checkAccess, tenantId ? { tenantId } : "skip");
-  const ready = tenantId && access?.ready;
-
-  const credits = useQuery(
-    api.sessionCredits.getByUser,
-    ready ? { tenantId } : "skip"
-  );
+  const { data: credits, isLoading } = useSessionCredits(tenantId);
 
   return (
     <div className="space-y-6">
@@ -35,9 +28,9 @@ export default function MyPackagesPage() {
       </div>
 
       {/* Content */}
-      {credits === undefined ? (
+      {isLoading ? (
         <LoadingSkeleton />
-      ) : credits.length === 0 ? (
+      ) : !credits || credits.length === 0 ? (
         <EmptyState />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -50,12 +43,12 @@ export default function MyPackagesPage() {
             const isExpired =
               credit.expiresAt !== undefined &&
               credit.expiresAt !== null &&
-              credit.expiresAt < Date.now();
+              new Date(credit.expiresAt).getTime() < Date.now();
             const isFullyUsed = remaining <= 0;
 
             return (
               <Card
-                key={credit._id}
+                key={credit.id}
                 className={cn(
                   "glass border-white/[0.08]",
                   (isExpired || isFullyUsed) && "opacity-60"

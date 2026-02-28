@@ -3,8 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { useProducts } from "@timeo/api-client";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
 import { formatPrice } from "@timeo/shared";
 import {
@@ -24,17 +23,12 @@ export default function ProductsPage() {
   const { activeTenantId } = useTimeoWebAuthContext();
   const [searchQuery, setSearchQuery] = useState("");
 
-  const products = useQuery(
-    api.products.list,
-    activeTenantId ? { tenantId: activeTenantId as any } : "skip"
-  );
-
-  const isLoading = products === undefined;
+  const { data: products, isLoading } = useProducts(activeTenantId ?? "");
 
   const filteredProducts = products?.filter(
     (product) =>
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.description.toLowerCase().includes(searchQuery.toLowerCase())
+      (product.description ?? "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -116,7 +110,7 @@ export default function ProductsPage() {
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredProducts.map((product) => (
             <Card
-              key={product._id}
+              key={product.id}
               className="group flex flex-col overflow-hidden transition-shadow hover:shadow-md"
             >
               {/* Image Placeholder */}
@@ -148,7 +142,7 @@ export default function ProductsPage() {
                 </p>
               </CardContent>
               <CardFooter>
-                <Link href={`/products/${product._id}`} className="w-full">
+                <Link href={`/products/${product.id}`} className="w-full">
                   <Button
                     variant="outline"
                     className="w-full gap-2 transition-all group-hover:gap-3"

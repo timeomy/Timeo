@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
+import { useBusinessHours, useUpdateBusinessHours } from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import {
   Card,
@@ -52,12 +51,9 @@ const DEFAULT_HOURS: DayHours[] = Array.from({ length: 7 }, (_, i) => ({
 export default function SchedulingPage() {
   const { tenantId } = useTenantId();
 
-  const businessHours = useQuery(
-    api.scheduling.getBusinessHours,
-    tenantId ? { tenantId: tenantId } : "skip"
-  );
+  const { data: businessHours, isLoading } = useBusinessHours(tenantId ?? "");
 
-  const setBusinessHoursMut = useMutation(api.scheduling.setBusinessHours);
+  const { mutateAsync: setBusinessHoursMut } = useUpdateBusinessHours(tenantId ?? "");
 
   const [hours, setHours] = useState<DayHours[]>(DEFAULT_HOURS);
   const [saving, setSaving] = useState(false);
@@ -76,8 +72,8 @@ export default function SchedulingPage() {
           return found
             ? {
                 dayOfWeek: found.dayOfWeek,
-                openTime: found.openTime,
-                closeTime: found.closeTime,
+                openTime: found.openTime ?? def.openTime,
+                closeTime: found.closeTime ?? def.closeTime,
                 isOpen: found.isOpen,
               }
             : def;
@@ -106,7 +102,6 @@ export default function SchedulingPage() {
     setSuccess(false);
     try {
       await setBusinessHoursMut({
-        tenantId: tenantId,
         hours: hours.map((h) => ({
           dayOfWeek: h.dayOfWeek,
           openTime: h.openTime,
@@ -123,7 +118,7 @@ export default function SchedulingPage() {
     }
   }
 
-  const loading = businessHours === undefined;
+  const loading = isLoading;
 
   return (
     <div className="space-y-8">

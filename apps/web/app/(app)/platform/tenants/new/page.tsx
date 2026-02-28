@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "convex/react";
-import { api } from "@timeo/api";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@timeo/api-client";
 import {
   Card,
   CardContent,
@@ -41,7 +41,19 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function CreateTenantPage() {
   const router = useRouter();
-  const createTenant = useMutation(api.platform.createTenantByEmail);
+  const queryClient = useQueryClient();
+
+  const { mutateAsync: createTenant } = useMutation({
+    mutationFn: (data: {
+      name: string;
+      slug: string;
+      plan: string;
+      ownerEmail: string;
+    }) => api.post("/api/platform/tenants", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["platform", "tenants"] });
+    },
+  });
 
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -92,7 +104,7 @@ export default function CreateTenantPage() {
       await createTenant({
         name: name.trim(),
         slug: slug.trim(),
-        plan: plan as "free" | "starter" | "pro" | "enterprise",
+        plan,
         ownerEmail: ownerEmail.trim().toLowerCase(),
       });
       setSuccess(true);

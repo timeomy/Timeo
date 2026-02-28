@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { usePlatformTenants } from "@timeo/api-client";
 import {
   Card,
   CardContent,
@@ -58,8 +57,11 @@ function StatCard({
 }
 
 export default function PlatformOverviewPage() {
-  const health = useQuery(api.platform.getSystemHealth);
-  const loading = health === undefined;
+  const { data: tenants, isLoading } = usePlatformTenants();
+
+  const totalTenants = tenants?.length ?? 0;
+  const activeTenants = tenants?.filter((t) => t.isActive).length ?? 0;
+  const totalMembers = tenants?.reduce((sum, t) => sum + t.memberCount, 0) ?? 0;
 
   return (
     <div className="space-y-8">
@@ -75,35 +77,35 @@ export default function PlatformOverviewPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Tenants"
-          value={loading ? "" : health.totalTenants}
+          value={isLoading ? "" : totalTenants}
           icon={Building2}
           description="All registered businesses"
-          loading={loading}
+          loading={isLoading}
         />
         <StatCard
           title="Active Tenants"
-          value={loading ? "" : health.activeTenants}
+          value={isLoading ? "" : activeTenants}
           icon={Activity}
           description="Currently active"
-          loading={loading}
+          loading={isLoading}
         />
         <StatCard
-          title="Total Users"
-          value={loading ? "" : health.totalUsers}
+          title="Total Members"
+          value={isLoading ? "" : totalMembers}
           icon={Users}
-          description="All platform users"
-          loading={loading}
+          description="All platform members"
+          loading={isLoading}
         />
         <StatCard
-          title="Total Bookings"
-          value={loading ? "" : health.totalBookings}
-          icon={Calendar}
-          description={
-            loading
+          title="Total Revenue"
+          value={
+            isLoading
               ? ""
-              : `${health.pendingBookings} pending`
+              : `RM ${((tenants?.reduce((sum, t) => sum + t.revenue, 0) ?? 0) / 100).toFixed(0)}`
           }
-          loading={loading}
+          icon={Calendar}
+          description="Across all tenants"
+          loading={isLoading}
         />
       </div>
 
@@ -164,7 +166,7 @@ export default function PlatformOverviewPage() {
       </Card>
 
       {/* System Info */}
-      {!loading && (
+      {!isLoading && (
         <Card className="glass border-white/[0.08]">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">System Status</CardTitle>
@@ -175,15 +177,15 @@ export default function PlatformOverviewPage() {
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-lg border border-white/[0.06] p-4">
-                <p className="text-sm text-muted-foreground">Pending Bookings</p>
+                <p className="text-sm text-muted-foreground">Active Tenants</p>
                 <p className="mt-1 text-2xl font-bold">
-                  {health.pendingBookings}
+                  {activeTenants}
                 </p>
               </div>
               <div className="rounded-lg border border-white/[0.06] p-4">
-                <p className="text-sm text-muted-foreground">Pending Orders</p>
+                <p className="text-sm text-muted-foreground">Total Members</p>
                 <p className="mt-1 text-2xl font-bold">
-                  {health.pendingOrders}
+                  {totalMembers}
                 </p>
               </div>
             </div>

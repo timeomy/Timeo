@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { useMyBookings } from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import {
   Card,
@@ -22,13 +21,7 @@ export default function MyBookingsPage() {
   const { tenantId } = useTenantId();
   const [activeTab, setActiveTab] = useState<BookingStatus>("all");
 
-  const access = useQuery(api.auth.checkAccess, tenantId ? { tenantId } : "skip");
-  const ready = tenantId && access?.ready;
-
-  const bookings = useQuery(
-    api.bookings.listByCustomer,
-    ready ? { tenantId } : "skip"
-  );
+  const { data: bookings, isLoading } = useMyBookings(tenantId);
 
   const now = Date.now();
 
@@ -37,7 +30,7 @@ export default function MyBookingsPage() {
       case "upcoming":
         return (
           (b.status === "pending" || b.status === "confirmed") &&
-          b.startTime > now
+          new Date(b.startTime).getTime() > now
         );
       case "completed":
         return b.status === "completed";
@@ -73,7 +66,7 @@ export default function MyBookingsPage() {
         </TabsList>
 
         <TabsContent value={activeTab}>
-          {bookings === undefined ? (
+          {isLoading ? (
             <LoadingSkeleton />
           ) : filteredBookings && filteredBookings.length === 0 ? (
             <EmptyState tab={activeTab} />
@@ -81,7 +74,7 @@ export default function MyBookingsPage() {
             <div className="space-y-3">
               {filteredBookings?.map((booking) => (
                 <Card
-                  key={booking._id}
+                  key={booking.id}
                   className="glass border-white/[0.08]"
                 >
                   <CardContent className="p-4">

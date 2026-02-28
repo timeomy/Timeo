@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
-import type { GenericId } from "convex/values";
+import {
+  useSessionPackages,
+  useCreateSessionPackage,
+  useUpdateSessionPackage,
+  useDeleteSessionPackage,
+} from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import { formatPrice } from "@timeo/shared";
 import {
@@ -64,19 +67,16 @@ export default function PackagesPage() {
   const { tenantId } = useTenantId();
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingId, setEditingId] = useState<GenericId<"sessionPackages"> | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<PackageForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [togglingId, setTogglingId] = useState<GenericId<"sessionPackages"> | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  const packages = useQuery(
-    api.sessionPackages.listByTenant,
-    tenantId ? { tenantId } : "skip",
-  );
+  const { data: packages, isLoading } = useSessionPackages(tenantId ?? "");
 
-  const createPackage = useMutation(api.sessionPackages.create);
-  const updatePackage = useMutation(api.sessionPackages.update);
-  const toggleActive = useMutation(api.sessionPackages.toggleActive);
+  const { mutateAsync: createPackage } = useCreateSessionPackage(tenantId ?? "");
+  const { mutateAsync: updatePackage } = useUpdateSessionPackage(tenantId ?? "");
+  const { mutateAsync: deletePackage } = useDeleteSessionPackage(tenantId ?? "");
 
   const filtered =
     packages?.filter((p) =>
@@ -90,7 +90,7 @@ export default function PackagesPage() {
   }
 
   function openEdit(pkg: NonNullable<typeof packages>[number]) {
-    setEditingId(pkg._id);
+    setEditingId(pkg.id);
     setForm({
       name: pkg.name,
       description: pkg.description ?? "",
@@ -108,7 +108,7 @@ export default function PackagesPage() {
     try {
       if (editingId) {
         await updatePackage({
-          packageId: editingId,
+          id: editingId,
           name: form.name.trim(),
           description: form.description.trim() || undefined,
           sessionCount: Number(form.sessionCount),
@@ -117,7 +117,6 @@ export default function PackagesPage() {
         });
       } else {
         await createPackage({
-          tenantId: tenantId!,
           name: form.name.trim(),
           description: form.description.trim() || undefined,
           sessionCount: Number(form.sessionCount),
@@ -135,10 +134,11 @@ export default function PackagesPage() {
     }
   }
 
-  async function handleToggle(packageId: GenericId<"sessionPackages">) {
+  async function handleToggle(packageId: string) {
+    if (!tenantId) return;
     setTogglingId(packageId);
     try {
-      await toggleActive({ packageId });
+      await deletePackage(packageId);
     } catch (err) {
       console.error("Failed to toggle package:", err);
     } finally {
@@ -155,9 +155,9 @@ export default function PackagesPage() {
             Packages
           </h1>
           <p className="text-sm text-white/50">
-            {packages === undefined
+            {isLoading
               ? "Loading..."
-              : `${packages.length} package${packages.length !== 1 ? "s" : ""}`}
+              : `${packages?.length ?? 0} package${(packages?.length ?? 0) !== 1 ? "s" : ""}`}
           </p>
         </div>
         <Button className="gap-2" onClick={openCreate}>
@@ -180,7 +180,7 @@ export default function PackagesPage() {
       {/* Table */}
       <Card className="glass-card">
         <CardContent className="p-0">
-          {packages === undefined ? (
+          {isLoading ? (
             <LoadingSkeleton />
           ) : filtered.length === 0 ? (
             <EmptyState
@@ -203,7 +203,7 @@ export default function PackagesPage() {
               <TableBody>
                 {filtered.map((pkg) => (
                   <TableRow
-                    key={pkg._id}
+                    key={pkg.id}
                     className="border-white/[0.06] hover:bg-white/[0.02]"
                   >
                     <TableCell>
@@ -259,8 +259,8 @@ export default function PackagesPage() {
                               ? "text-yellow-400 hover:bg-yellow-500/10 hover:text-yellow-300"
                               : "text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300",
                           )}
-                          disabled={togglingId === pkg._id}
-                          onClick={() => handleToggle(pkg._id)}
+                          disabled={togglingId === pkg.id}
+                          onClick={() => handleToggle(pkg.id)}
                         >
                           {pkg.isActive ? (
                             <>

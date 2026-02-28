@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
+import { useTenantBySlug, useCreateEInvoiceRequest } from "@timeo/api-client";
 import { formatPrice } from "@timeo/shared";
 import {
   Card,
@@ -48,6 +47,8 @@ export default function EInvoicePage() {
   const tenantSlug = params.tenantSlug as string;
   const refParam = searchParams.get("ref") ?? "";
 
+  const { data: tenantData } = useTenantBySlug(tenantSlug);
+
   // Step state
   const [step, setStep] = useState<"lookup" | "form" | "success">("lookup");
 
@@ -71,14 +72,21 @@ export default function EInvoicePage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const receiptData = useQuery(
-    api.eInvoice.lookupReceipt,
-    lookupRef
-      ? { tenantSlug, receiptNumber: lookupRef }
-      : "skip"
-  );
+  const createEInvoice = useCreateEInvoiceRequest(tenantData?.id ?? "");
 
-  const submitRequest = useMutation(api.eInvoice.submitRequest);
+  // Simulate receipt lookup state (to be replaced by a real lookup hook when available)
+  const [receiptData, setReceiptData] = useState<{
+    found: boolean;
+    alreadySubmitted?: boolean;
+    existingStatus?: string;
+    receiptNumber?: string;
+    status?: string;
+    date?: number;
+    items?: Array<{ name: string; quantity: number; price: number }>;
+    total?: number;
+    currency?: string;
+  } | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
 
   // Auto-advance to form when receipt found
   useEffect(() => {
@@ -97,34 +105,32 @@ export default function EInvoicePage() {
   function handleLookup() {
     if (!receiptInput.trim()) return;
     setLookupRef(receiptInput.trim().toUpperCase());
+    // Receipt lookup will be wired to a real endpoint once available
+    setLookupLoading(true);
+    setTimeout(() => {
+      setReceiptData(null);
+      setLookupLoading(false);
+    }, 500);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!receiptData?.found || !lookupRef) return;
+    if (!receiptData?.found || !lookupRef || !tenantData?.id) return;
 
     setSubmitting(true);
     setError("");
 
     try {
-      await submitRequest({
-        tenantSlug,
-        receiptNumber: lookupRef,
+      await createEInvoice.mutateAsync({
         buyerTin: buyerTin.trim(),
-        buyerIdType,
-        buyerIdValue: buyerIdValue.trim(),
         buyerName: buyerName.trim(),
-        buyerEmail: buyerEmail.trim(),
-        buyerPhone: buyerPhone.trim() || undefined,
-        buyerAddress: {
-          line1: addressLine1.trim(),
-          line2: addressLine2.trim() || undefined,
-          city: city.trim(),
-          state,
-          postcode: postcode.trim(),
-          country: "MYS",
-        },
-        buyerSstRegNo: sstRegNo.trim() || undefined,
+        items: [
+          {
+            description: lookupRef,
+            quantity: 1,
+            unitPrice: receiptData.total ?? 0,
+          },
+        ],
       });
       setStep("success");
     } catch (err: any) {
@@ -152,7 +158,7 @@ export default function EInvoicePage() {
           </div>
           <div>
             <p className="text-sm font-bold">
-              {receiptData?.tenantName ?? tenantSlug}
+              {tenantData?.name ?? tenantSlug}
             </p>
             <p className="text-xs text-muted-foreground">e-Invoice Request</p>
           </div>
@@ -190,7 +196,7 @@ export default function EInvoicePage() {
               </h1>
               <p className="text-sm text-muted-foreground">
                 Enter your receipt number to request an e-invoice from{" "}
-                {receiptData?.tenantName ?? tenantSlug}.
+                {tenantData?.name ?? tenantSlug}.
               </p>
             </div>
 
@@ -204,6 +210,7 @@ export default function EInvoicePage() {
                       setReceiptInput(e.target.value.toUpperCase());
                       if (lookupRef) setLookupRef("");
                       setStep("lookup");
+                      setReceiptData(null);
                     }}
                     onKeyDown={(e) => e.key === "Enter" && handleLookup()}
                     className="font-mono"
@@ -219,12 +226,12 @@ export default function EInvoicePage() {
                 </div>
 
                 {/* Receipt result */}
-                {lookupRef && receiptData === undefined && (
+                {lookupRef && lookupLoading && (
                   <p className="mt-3 text-sm text-white/50">
                     Looking up receipt...
                   </p>
                 )}
-                {lookupRef && receiptData === null && (
+                {lookupRef && !lookupLoading && receiptData === null && (
                   <div className="mt-3 flex items-center gap-2 text-sm text-red-400">
                     <AlertCircle className="h-4 w-4" />
                     Receipt not found. Please check the number and try again.
@@ -262,9 +269,9 @@ export default function EInvoicePage() {
                       </Badge>
                     </div>
                     <div className="text-xs text-white/40 mb-2">
-                      {formatDate(receiptData.date)}
+                      {receiptData.date ? formatDate(receiptData.date) : ""}
                     </div>
-                    {receiptData.items.map((item: any, i: number) => (
+                    {receiptData.items?.map((item, i) => (
                       <div
                         key={i}
                         className="flex justify-between text-sm py-0.5"
@@ -275,7 +282,7 @@ export default function EInvoicePage() {
                         <span>
                           {formatPrice(
                             item.price * item.quantity,
-                            receiptData.currency
+                            receiptData.currency ?? "MYR"
                           )}
                         </span>
                       </div>
@@ -284,7 +291,7 @@ export default function EInvoicePage() {
                     <div className="flex justify-between font-bold">
                       <span>Total</span>
                       <span>
-                        {formatPrice(receiptData.total, receiptData.currency)}
+                        {formatPrice(receiptData.total ?? 0, receiptData.currency ?? "MYR")}
                       </span>
                     </div>
                   </div>

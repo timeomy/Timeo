@@ -12,5 +12,3 @@ export type { TimeoAuthContext, TenantSwitcherContext, TimeoRole, TenantInfo, Ro
 export { ROLES, isRoleAtLeast } from "../types";
 export { hasPermission, PERMISSIONS } from "../permissions";
 export type { Resource } from "../permissions";
-export { getAuthInfo, requireAuthInfo, requireTenantAuthInfo } from "../convex";
-export type { ConvexAuthInfo } from "../convex";

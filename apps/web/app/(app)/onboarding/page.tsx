@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "convex/react";
-import { api } from "@timeo/api";
+import { useCreateTenant } from "@timeo/api-client";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
 import {
   Button,
@@ -19,7 +18,7 @@ import { Zap, Building2, ArrowRight, Loader2, Check } from "lucide-react";
 export default function OnboardingPage() {
   const router = useRouter();
   const { isLoaded, isSignedIn, user } = useTimeoWebAuthContext();
-  const createTenant = useMutation(api.tenants.createForOnboarding);
+  const { mutateAsync: createTenant } = useCreateTenant();
 
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");

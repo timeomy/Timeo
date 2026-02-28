@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@timeo/api-client";
 import {
   Card,
   CardContent,
@@ -70,7 +70,7 @@ const roleColors: Record<string, string> = {
   customer: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
 };
 
-function formatDate(timestamp: number) {
+function formatDate(timestamp: number | string) {
   return new Date(timestamp).toLocaleDateString("en-MY", {
     year: "numeric",
     month: "short",
@@ -104,17 +104,29 @@ function StatMini({ icon: Icon, label, value, loading }: {
 export default function TenantDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const tenantId = params.id as string;
 
-  const tenant = useQuery(
-    api.platform.getTenantById,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
-  const stats = useQuery(
-    api.platform.getTenantStats,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
-  const updateTenant = useMutation(api.platform.updateTenant);
+  const { data: tenant, isLoading: tenantLoading } = useQuery({
+    queryKey: ["platform", "tenants", tenantId],
+    queryFn: () => api.get<any>(`/api/platform/tenants/${tenantId}`),
+    enabled: !!tenantId,
+  });
+
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ["platform", "tenants", tenantId, "stats"],
+    queryFn: () => api.get<any>(`/api/platform/tenants/${tenantId}/stats`),
+    enabled: !!tenantId,
+  });
+
+  const { mutateAsync: updateTenant } = useMutation({
+    mutationFn: (data: Record<string, unknown>) =>
+      api.put(`/api/platform/tenants/${tenantId}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["platform", "tenants", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["platform", "tenants"] });
+    },
+  });
 
   const [editName, setEditName] = useState<string | null>(null);
   const [editPlan, setEditPlan] = useState<string | null>(null);
@@ -166,10 +178,9 @@ export default function TenantDetailPage() {
 
     try {
       await updateTenant({
-        tenantId: tenantId as any,
         ...(editName.trim() !== tenant.name && { name: editName.trim() }),
-        ...(editPlan !== tenant.plan && { plan: editPlan as any }),
-        ...(editStatus !== tenant.status && { status: editStatus as any }),
+        ...(editPlan !== tenant.plan && { plan: editPlan }),
+        ...(editStatus !== tenant.status && { status: editStatus }),
       });
       cancelEditing();
     } catch (err: any) {
@@ -179,7 +190,7 @@ export default function TenantDetailPage() {
     }
   };
 
-  if (tenant === undefined) {
+  if (tenantLoading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -196,7 +207,7 @@ export default function TenantDetailPage() {
     );
   }
 
-  if (tenant === null) {
+  if (!tenant) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-destructive/10">
@@ -249,19 +260,19 @@ export default function TenantDetailPage() {
           icon={Users}
           label="Members"
           value={stats?.membersCount ?? 0}
-          loading={stats === undefined}
+          loading={statsLoading}
         />
         <StatMini
           icon={Calendar}
           label="Bookings"
           value={stats?.bookingsCount ?? 0}
-          loading={stats === undefined}
+          loading={statsLoading}
         />
         <StatMini
           icon={Briefcase}
           label="Services"
           value={stats?.servicesCount ?? 0}
-          loading={stats === undefined}
+          loading={statsLoading}
         />
       </div>
 
@@ -364,11 +375,11 @@ export default function TenantDetailPage() {
       <Card className="glass-card">
         <CardHeader>
           <CardTitle className="text-lg">
-            Members ({tenant.members.length})
+            Members ({tenant.members?.length ?? 0})
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {tenant.members.length === 0 ? (
+          {!tenant.members || tenant.members.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-8 text-center">
               <Users className="h-8 w-8 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">No members found.</p>
@@ -384,8 +395,8 @@ export default function TenantDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tenant.members.map((member) => (
-                  <TableRow key={member._id} className="border-white/[0.06]">
+                {tenant.members.map((member: any) => (
+                  <TableRow key={member.id} className="border-white/[0.06]">
                     <TableCell>
                       <div>
                         <p className="font-medium">{member.userName}</p>

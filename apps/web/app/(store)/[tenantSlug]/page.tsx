@@ -2,8 +2,10 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import {
+  useTenantBySlug,
+  useServices,
+} from "@timeo/api-client";
 import { formatPrice } from "@timeo/shared";
 import { Skeleton } from "@timeo/ui/web";
 import {
@@ -35,35 +37,17 @@ export default function TenantLandingPage() {
   const params = useParams();
   const tenantSlug = params.tenantSlug as string;
 
-  const tenant = useQuery(api.tenants.getBySlug, { slug: tenantSlug });
+  const { data: tenant, isLoading: tenantLoading } = useTenantBySlug(tenantSlug);
 
-  const services = useQuery(
-    api.services.listPublic,
-    tenant?._id ? { tenantId: tenant._id } : "skip"
-  );
-
-  const memberships = useQuery(
-    api.memberships.listPublic,
-    tenant?._id ? { tenantId: tenant._id } : "skip"
-  );
-
-  const sessionPackages = useQuery(
-    api.sessionPackages.listPublic,
-    tenant?._id ? { tenantId: tenant._id } : "skip"
-  );
-
-  const businessHours = useQuery(
-    api.scheduling.getBusinessHoursPublic,
-    tenant?._id ? { tenantId: tenant._id } : "skip"
-  );
+  const { data: services } = useServices(tenant?.id ?? "");
 
   // Loading state
-  if (tenant === undefined) {
+  if (tenantLoading) {
     return <LandingPageSkeleton />;
   }
 
   // Not found
-  if (tenant === null) {
+  if (!tenant) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
@@ -84,7 +68,7 @@ export default function TenantLandingPage() {
     );
   }
 
-  const businessName = tenant.branding?.businessName || tenant.name;
+  const businessName = (tenant.branding?.businessName as string | undefined) || tenant.name;
 
   return (
     <div className="-mx-4 -mt-8 sm:-mx-6 lg:-mx-8">
@@ -154,7 +138,7 @@ export default function TenantLandingPage() {
             </div>
             <div className="mx-auto mt-12 grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {services.map((service) => (
-                <div key={service._id} className="glass-card group p-6">
+                <div key={service.id} className="glass-card group p-6">
                   <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
                     <Dumbbell className="h-6 w-6 text-primary" />
                   </div>
@@ -173,200 +157,6 @@ export default function TenantLandingPage() {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-        </section>
-      )}
-
-      {/* ─── Memberships Section ───────────────────────────────────── */}
-      {memberships && memberships.length > 0 && (
-        <section id="memberships" className="relative py-20 sm:py-28">
-          <div className="absolute inset-0 -z-10 mesh-gradient opacity-50" />
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-2xl text-center">
-              <div className="glass-button mb-6 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm text-muted-foreground">
-                <Star className="h-4 w-4 text-primary" />
-                Membership plans
-              </div>
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                Choose Your Plan
-              </h2>
-              <p className="mt-4 text-lg text-muted-foreground">
-                Flexible plans to match your commitment level.
-              </p>
-            </div>
-            <div className="mx-auto mt-12 grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {memberships.map((membership, index) => {
-                const isPopular = index === 1 && memberships.length >= 2;
-                return (
-                  <div
-                    key={membership._id}
-                    className={`glass-card relative flex flex-col p-8 ${
-                      isPopular ? "ring-2 ring-primary/40" : ""
-                    }`}
-                  >
-                    {isPopular && (
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-xs font-bold text-primary-foreground">
-                        Most Popular
-                      </div>
-                    )}
-                    <h3 className="text-xl font-bold">{membership.name}</h3>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {membership.description}
-                    </p>
-                    <div className="mt-6 flex items-baseline gap-1">
-                      <span className="text-4xl font-bold text-primary text-glow">
-                        {formatPrice(membership.price, membership.currency)}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        /{membership.interval === "monthly" ? "mo" : "yr"}
-                      </span>
-                    </div>
-                    <ul className="mt-8 flex-1 space-y-3">
-                      {membership.features.map((feature, i) => (
-                        <li
-                          key={i}
-                          className="flex items-start gap-2.5 text-sm"
-                        >
-                          <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
-                          <span className="text-muted-foreground">
-                            {feature}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                    <a
-                      href="#contact"
-                      className={`mt-8 inline-flex h-11 items-center justify-center rounded-xl text-sm font-semibold transition-all ${
-                        isPopular
-                          ? "bg-primary text-primary-foreground shadow-lg hover:brightness-110 glow-yellow-sm"
-                          : "glass-button text-foreground"
-                      }`}
-                    >
-                      Get Started
-                    </a>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-        </section>
-      )}
-
-      {/* ─── Session Packages Section ──────────────────────────────── */}
-      {sessionPackages && sessionPackages.length > 0 && (
-        <section id="packages" className="relative py-20 sm:py-28">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-2xl text-center">
-              <div className="glass-button mb-6 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm text-muted-foreground">
-                <Package className="h-4 w-4 text-primary" />
-                Session packages
-              </div>
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                Training Packages
-              </h2>
-              <p className="mt-4 text-lg text-muted-foreground">
-                Buy sessions in bulk and save.
-              </p>
-            </div>
-            <div className="mx-auto mt-12 grid max-w-4xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {sessionPackages.map((pkg) => (
-                <div key={pkg._id} className="glass-card p-6 text-center">
-                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/20">
-                    <Users className="h-7 w-7 text-primary" />
-                  </div>
-                  <h3 className="text-lg font-bold">{pkg.name}</h3>
-                  {pkg.description && (
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {pkg.description}
-                    </p>
-                  )}
-                  <div className="mt-4 text-3xl font-bold text-primary text-glow">
-                    {pkg.sessionCount}
-                    <span className="text-base font-normal text-muted-foreground">
-                      {" "}
-                      sessions
-                    </span>
-                  </div>
-                  <div className="mt-2 text-lg font-semibold">
-                    {formatPrice(pkg.price, pkg.currency)}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {formatPrice(
-                      Math.round(pkg.price / pkg.sessionCount),
-                      pkg.currency
-                    )}{" "}
-                    per session
-                  </div>
-                  <a
-                    href="#contact"
-                    className="mt-6 inline-flex h-10 w-full items-center justify-center rounded-xl bg-primary/10 text-sm font-semibold text-primary ring-1 ring-primary/20 transition-all hover:bg-primary/20"
-                  >
-                    Purchase
-                  </a>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-        </section>
-      )}
-
-      {/* ─── Operating Hours Section ───────────────────────────────── */}
-      {businessHours && (
-        <section id="hours" className="relative py-20 sm:py-28">
-          <div className="absolute inset-0 -z-10 mesh-gradient opacity-30" />
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-2xl text-center">
-              <div className="glass-button mb-6 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm text-muted-foreground">
-                <Clock className="h-4 w-4 text-primary" />
-                When we&apos;re open
-              </div>
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                Operating Hours
-              </h2>
-            </div>
-            <div className="mx-auto mt-12 max-w-md">
-              <div className="glass-card divide-y divide-white/[0.06] overflow-hidden">
-                {businessHours.map((day) => {
-                  const today = new Date().getDay();
-                  const isToday = day.dayOfWeek === today;
-                  return (
-                    <div
-                      key={day.dayOfWeek}
-                      className={`flex items-center justify-between px-6 py-4 ${
-                        isToday ? "bg-primary/5" : ""
-                      }`}
-                    >
-                      <span
-                        className={`text-sm font-medium ${
-                          isToday ? "text-primary" : "text-foreground"
-                        }`}
-                      >
-                        {DAY_NAMES[day.dayOfWeek]}
-                        {isToday && (
-                          <span className="ml-2 text-xs text-primary">
-                            Today
-                          </span>
-                        )}
-                      </span>
-                      <span
-                        className={`text-sm ${
-                          day.isOpen
-                            ? "text-muted-foreground"
-                            : "text-muted-foreground/50"
-                        }`}
-                      >
-                        {day.isOpen
-                          ? `${day.openTime} - ${day.closeTime}`
-                          : "Closed"}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
             </div>
           </div>
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />

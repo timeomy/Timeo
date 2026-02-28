@@ -1,9 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
-import type { GenericId } from "convex/values";
+import {
+  useVouchers,
+  useCreateVoucher,
+  useUpdateVoucher,
+  useToggleVoucher,
+  useGiftCards,
+  useCreateGiftCard,
+  useTopupGiftCard,
+  useCancelGiftCard,
+  useReactivateGiftCard,
+  useDeleteGiftCard,
+} from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import { formatPrice } from "@timeo/shared";
 import {
@@ -211,19 +220,16 @@ function VouchersSection() {
   const { tenantId } = useTenantId();
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingId, setEditingId] = useState<GenericId<"vouchers"> | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<VoucherForm>(EMPTY_VOUCHER_FORM);
   const [saving, setSaving] = useState(false);
-  const [togglingId, setTogglingId] = useState<GenericId<"vouchers"> | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  const vouchers = useQuery(
-    api.vouchers.listByTenant,
-    tenantId ? { tenantId } : "skip"
-  );
+  const { data: vouchers, isLoading: vouchersLoading } = useVouchers(tenantId ?? "");
 
-  const createVoucher = useMutation(api.vouchers.create);
-  const updateVoucher = useMutation(api.vouchers.update);
-  const toggleActive = useMutation(api.vouchers.toggleActive);
+  const { mutateAsync: createVoucher } = useCreateVoucher(tenantId ?? "");
+  const { mutateAsync: updateVoucher } = useUpdateVoucher(tenantId ?? "");
+  const { mutateAsync: toggleActive } = useToggleVoucher(tenantId ?? "");
 
   const filtered =
     vouchers?.filter(
@@ -239,7 +245,7 @@ function VouchersSection() {
   }
 
   function openEdit(voucher: NonNullable<typeof vouchers>[number]) {
-    setEditingId(voucher._id);
+    setEditingId(voucher.id);
     setForm({
       code: voucher.code,
       type: voucher.type as VoucherType,
@@ -265,7 +271,7 @@ function VouchersSection() {
           value: Number(form.value),
           maxUses: form.maxUses ? Number(form.maxUses) : undefined,
           expiresAt: form.expiresAt
-            ? new Date(form.expiresAt).getTime()
+            ? new Date(form.expiresAt).toISOString()
             : undefined,
           source: form.source,
           partnerName: form.partnerName.trim() || undefined,
@@ -274,13 +280,12 @@ function VouchersSection() {
       } else {
         if (!tenantId) return;
         await createVoucher({
-          tenantId,
           code: form.code.trim(),
           type: form.type,
           value: Number(form.value),
           maxUses: form.maxUses ? Number(form.maxUses) : undefined,
           expiresAt: form.expiresAt
-            ? new Date(form.expiresAt).getTime()
+            ? new Date(form.expiresAt).toISOString()
             : undefined,
           source: form.source,
           partnerName: form.partnerName.trim() || undefined,
@@ -297,10 +302,10 @@ function VouchersSection() {
     }
   }
 
-  async function handleToggle(voucherId: GenericId<"vouchers">) {
+  async function handleToggle(voucherId: string) {
     setTogglingId(voucherId);
     try {
-      await toggleActive({ voucherId });
+      await toggleActive(voucherId);
     } catch (err) {
       console.error("Failed to toggle voucher:", err);
     } finally {
@@ -314,8 +319,8 @@ function VouchersSection() {
     return "Free";
   }
 
-  function formatDate(timestamp: number) {
-    return new Date(timestamp).toLocaleDateString("en-MY", {
+  function formatDate(isoString: string) {
+    return new Date(isoString).toLocaleDateString("en-MY", {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -382,7 +387,7 @@ function VouchersSection() {
       {/* Table */}
       <Card className="glass-card">
         <CardContent className="p-0">
-          {vouchers === undefined ? (
+          {vouchersLoading ? (
             <LoadingSkeleton />
           ) : filtered.length === 0 ? (
             <EmptyState
@@ -421,7 +426,7 @@ function VouchersSection() {
                   const sourceConfig = SOURCE_CONFIG[source];
                   return (
                     <TableRow
-                      key={voucher._id}
+                      key={voucher.id}
                       className="border-white/[0.06] hover:bg-white/[0.02]"
                     >
                       <TableCell>
@@ -447,7 +452,7 @@ function VouchersSection() {
                         </Badge>
                       </TableCell>
                       <TableCell className="font-medium text-white">
-                        {formatValue(voucher.type as VoucherType, voucher.value)}
+                        {formatValue(voucher.type as VoucherType, voucher.value ?? 0)}
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -498,8 +503,8 @@ function VouchersSection() {
                                 ? "text-yellow-400 hover:bg-yellow-500/10 hover:text-yellow-300"
                                 : "text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
                             )}
-                            disabled={togglingId === voucher._id}
-                            onClick={() => handleToggle(voucher._id)}
+                            disabled={togglingId === voucher.id}
+                            onClick={() => handleToggle(voucher.id)}
                           >
                             {voucher.isActive ? (
                               <ToggleRight className="h-3.5 w-3.5" />
@@ -665,16 +670,13 @@ function GiftCardsSection() {
   const [giftMessage, setGiftMessage] = useState("");
   const [creating, setCreating] = useState(false);
 
-  const giftCards = useQuery(
-    api.giftCards.listByTenant,
-    tenantId ? { tenantId } : "skip"
-  );
+  const { data: giftCards, isLoading: gcLoading } = useGiftCards(tenantId ?? "");
 
-  const createGiftCard = useMutation(api.giftCards.create);
-  const topupGiftCard = useMutation(api.giftCards.topup);
-  const cancelGiftCard = useMutation(api.giftCards.cancel);
-  const reactivateGiftCard = useMutation(api.giftCards.reactivate);
-  const removeGiftCard = useMutation(api.giftCards.remove);
+  const { mutateAsync: createGiftCard } = useCreateGiftCard(tenantId ?? "");
+  const { mutateAsync: topupGiftCard } = useTopupGiftCard(tenantId ?? "");
+  const { mutateAsync: cancelGiftCard } = useCancelGiftCard(tenantId ?? "");
+  const { mutateAsync: reactivateGiftCard } = useReactivateGiftCard(tenantId ?? "");
+  const { mutateAsync: removeGiftCard } = useDeleteGiftCard(tenantId ?? "");
 
   const filtered =
     giftCards?.filter(
@@ -700,7 +702,6 @@ function GiftCardsSection() {
     setCreating(true);
     try {
       await createGiftCard({
-        tenantId,
         initialBalance: amount,
         purchaserName: purchaserName.trim() || undefined,
         recipientName: recipientName.trim() || undefined,
@@ -726,10 +727,10 @@ function GiftCardsSection() {
   }
 
   async function handleTopup() {
-    if (!topupTarget || !topupAmount) return;
+    if (!topupTarget || !topupAmount || !tenantId) return;
     try {
       await topupGiftCard({
-        giftCardId: topupTarget._id,
+        giftCardId: topupTarget.id,
         amount: Number(topupAmount) * 100,
       });
       setTopupTarget(null);
@@ -740,8 +741,9 @@ function GiftCardsSection() {
   }
 
   async function handleCancel(cardId: string) {
+    if (!tenantId) return;
     try {
-      await cancelGiftCard({ giftCardId: cardId as any });
+      await cancelGiftCard(cardId);
       setSelectedCard(null);
     } catch (err) {
       console.error("Failed to cancel:", err);
@@ -749,8 +751,9 @@ function GiftCardsSection() {
   }
 
   async function handleReactivate(cardId: string) {
+    if (!tenantId) return;
     try {
-      await reactivateGiftCard({ giftCardId: cardId as any });
+      await reactivateGiftCard(cardId);
       setSelectedCard(null);
     } catch (err) {
       console.error("Failed to reactivate:", err);
@@ -759,16 +762,17 @@ function GiftCardsSection() {
 
   async function handleDelete(cardId: string) {
     if (!confirm("Are you sure you want to permanently delete this gift card? This cannot be undone.")) return;
+    if (!tenantId) return;
     try {
-      await removeGiftCard({ giftCardId: cardId as any });
+      await removeGiftCard(cardId);
       setSelectedCard(null);
     } catch (err) {
       console.error("Failed to delete:", err);
     }
   }
 
-  function formatDate(timestamp: number) {
-    return new Date(timestamp).toLocaleDateString("en-MY", {
+  function formatDate(isoString: string) {
+    return new Date(isoString).toLocaleDateString("en-MY", {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -836,7 +840,7 @@ function GiftCardsSection() {
       {/* Table */}
       <Card className="glass-card">
         <CardContent className="p-0">
-          {giftCards === undefined ? (
+          {gcLoading ? (
             <LoadingSkeleton />
           ) : filtered.length === 0 ? (
             <EmptyState
@@ -871,7 +875,7 @@ function GiftCardsSection() {
               </TableHeader>
               <TableBody>
                 {filtered.map((gc) => {
-                  const statusConfig = GC_STATUS_CONFIG[gc.status];
+                  const statusConfig = GC_STATUS_CONFIG[gc.status ?? "active"];
                   const usedPercent =
                     gc.initialBalance > 0
                       ? Math.round(
@@ -883,7 +887,7 @@ function GiftCardsSection() {
 
                   return (
                     <TableRow
-                      key={gc._id}
+                      key={gc.id}
                       className="border-white/[0.06] hover:bg-white/[0.02] cursor-pointer"
                       onClick={() => setSelectedCard(gc)}
                     >
@@ -1219,7 +1223,7 @@ function GiftCardsSection() {
                 <Button
                   variant="outline"
                   className="gap-1 text-red-400 border-red-500/30 hover:bg-red-500/10"
-                  onClick={() => handleDelete(selectedCard._id)}
+                  onClick={() => handleDelete(selectedCard.id)}
                 >
                   <Trash2 className="h-4 w-4" />
                   Delete
@@ -1229,7 +1233,7 @@ function GiftCardsSection() {
                     <Button
                       variant="outline"
                       className="gap-1 text-yellow-400 border-yellow-500/30 hover:bg-yellow-500/10"
-                      onClick={() => handleCancel(selectedCard._id)}
+                      onClick={() => handleCancel(selectedCard.id)}
                     >
                       <Ban className="h-4 w-4" />
                       Cancel Card
@@ -1252,7 +1256,7 @@ function GiftCardsSection() {
                     <Button
                       variant="outline"
                       className="gap-1 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
-                      onClick={() => handleReactivate(selectedCard._id)}
+                      onClick={() => handleReactivate(selectedCard.id)}
                     >
                       <RefreshCw className="h-4 w-4" />
                       Reactivate

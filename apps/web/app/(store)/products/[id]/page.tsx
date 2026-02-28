@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { useTimeoWebAuthContext } from "@timeo/auth/web";
+import { useProduct } from "@timeo/api-client";
 import { formatPrice } from "@timeo/shared";
 import {
   Card,
@@ -26,13 +26,10 @@ import {
 export default function ProductDetailPage() {
   const params = useParams();
   const productId = params.id as string;
+  const { activeTenantId } = useTimeoWebAuthContext();
   const [quantity, setQuantity] = useState(1);
 
-  const product = useQuery(api.products.getById, {
-    productId: productId as any,
-  });
-
-  const isLoading = product === undefined;
+  const { data: product, isLoading } = useProduct(activeTenantId ?? "", productId);
 
   const handleAddToCart = () => {
     alert(

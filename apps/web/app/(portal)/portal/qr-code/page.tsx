@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
+import { useMemberQrCode, useGenerateQrCode } from "@timeo/api-client";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import {
@@ -19,15 +18,8 @@ export default function QrCodePage() {
   const { tenantId, tenant } = useTenantId();
   const [generating, setGenerating] = useState(false);
 
-  const access = useQuery(api.auth.checkAccess, tenantId ? { tenantId } : "skip");
-  const ready = tenantId && access?.ready;
-
-  const qrCode = useQuery(
-    api.checkIns.getMyQrCode,
-    ready ? { tenantId } : "skip"
-  );
-
-  const generateQrCode = useMutation(api.checkIns.generateQrCode);
+  const { data: qrCode, isLoading } = useMemberQrCode(tenantId);
+  const { mutateAsync: generateQrCode } = useGenerateQrCode(tenantId ?? "");
 
   const displayName = user
     ? user.name ||
@@ -60,7 +52,7 @@ export default function QrCodePage() {
   }
 
   // Loading state
-  if (qrCode === undefined && tenantId) {
+  if (isLoading && tenantId) {
     return (
       <div className="space-y-6">
         <div>

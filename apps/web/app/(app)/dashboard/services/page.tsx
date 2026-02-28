@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
-import type { GenericId } from "convex/values";
+import {
+  useServices,
+  useCreateService,
+  useUpdateService,
+  useDeleteService,
+} from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import { formatPrice } from "@timeo/shared";
 import {
@@ -64,19 +67,16 @@ export default function ServicesPage() {
   const { tenantId } = useTenantId();
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingId, setEditingId] = useState<GenericId<"services"> | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ServiceForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [togglingId, setTogglingId] = useState<GenericId<"services"> | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  const services = useQuery(
-    api.services.list,
-    tenantId ? { tenantId: tenantId } : "skip",
-  );
+  const { data: services, isLoading } = useServices(tenantId ?? "");
 
-  const createService = useMutation(api.services.create);
-  const updateService = useMutation(api.services.update);
-  const toggleActive = useMutation(api.services.toggleActive);
+  const { mutateAsync: createService } = useCreateService(tenantId ?? "");
+  const { mutateAsync: updateService } = useUpdateService(tenantId ?? "");
+  const { mutateAsync: deleteService } = useDeleteService(tenantId ?? "");
 
   const filtered =
     services?.filter((s) =>
@@ -90,7 +90,7 @@ export default function ServicesPage() {
   }
 
   function openEdit(service: NonNullable<typeof services>[number]) {
-    setEditingId(service._id);
+    setEditingId(service.id);
     setForm({
       name: service.name,
       description: service.description ?? "",
@@ -114,9 +114,9 @@ export default function ServicesPage() {
         currency: form.currency,
       };
       if (editingId) {
-        await updateService({ serviceId: editingId, ...data });
+        await updateService({ id: editingId, ...data });
       } else {
-        await createService({ tenantId: tenantId!, ...data });
+        await createService(data);
       }
       setDialogOpen(false);
       setForm(EMPTY_FORM);
@@ -128,10 +128,11 @@ export default function ServicesPage() {
     }
   }
 
-  async function handleToggle(serviceId: GenericId<"services">) {
+  async function handleToggle(serviceId: string) {
+    if (!tenantId) return;
     setTogglingId(serviceId);
     try {
-      await toggleActive({ serviceId });
+      await deleteService(serviceId);
     } catch (err) {
       console.error("Failed to toggle service:", err);
     } finally {
@@ -155,9 +156,9 @@ export default function ServicesPage() {
             Services
           </h1>
           <p className="text-sm text-white/50">
-            {services === undefined
+            {isLoading
               ? "Loading..."
-              : `${services.length} service${services.length !== 1 ? "s" : ""}`}
+              : `${services?.length ?? 0} service${(services?.length ?? 0) !== 1 ? "s" : ""}`}
           </p>
         </div>
         <Button className="gap-2" onClick={openCreate}>
@@ -180,7 +181,7 @@ export default function ServicesPage() {
       {/* Table */}
       <Card className="glass-card">
         <CardContent className="p-0">
-          {services === undefined ? (
+          {isLoading ? (
             <LoadingSkeleton />
           ) : filtered.length === 0 ? (
             <EmptyState hasServices={(services?.length ?? 0) > 0} onAdd={openCreate} />
@@ -200,7 +201,7 @@ export default function ServicesPage() {
               <TableBody>
                 {filtered.map((service) => (
                   <TableRow
-                    key={service._id}
+                    key={service.id}
                     className="border-white/[0.06] hover:bg-white/[0.02]"
                   >
                     <TableCell>
@@ -255,8 +256,8 @@ export default function ServicesPage() {
                               ? "text-yellow-400 hover:bg-yellow-500/10 hover:text-yellow-300"
                               : "text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300",
                           )}
-                          disabled={togglingId === service._id}
-                          onClick={() => handleToggle(service._id)}
+                          disabled={togglingId === service.id}
+                          onClick={() => handleToggle(service.id)}
                         >
                           {service.isActive ? (
                             <>

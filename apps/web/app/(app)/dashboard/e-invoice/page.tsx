@@ -1,8 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
+import {
+  useEInvoiceProfile,
+  useSaveEInvoiceProfile,
+  useEInvoiceRequests,
+  useMarkEInvoiceSubmitted,
+  useMarkEInvoiceRejected,
+  useRevertEInvoiceToPending,
+} from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import { formatPrice } from "@timeo/shared";
 import {
@@ -175,11 +181,8 @@ function TaxpayerProfileSection({
   tenantId: any;
   tenant: any;
 }) {
-  const profile = useQuery(
-    api.eInvoice.getTaxpayerProfile,
-    tenantId ? { tenantId } : "skip"
-  );
-  const saveProfile = useMutation(api.eInvoice.saveTaxpayerProfile);
+  const { data: profile, isLoading } = useEInvoiceProfile(tenantId ?? "");
+  const { mutateAsync: saveProfile } = useSaveEInvoiceProfile(tenantId ?? "");
 
   const [taxpayerName, setTaxpayerName] = useState("");
   const [tin, setTin] = useState("");
@@ -243,7 +246,6 @@ function TaxpayerProfileSection({
       )?.description;
 
       await saveProfile({
-        tenantId,
         taxpayerName: taxpayerName.trim(),
         tin: tin.trim(),
         msicCode,
@@ -275,7 +277,7 @@ function TaxpayerProfileSection({
     }
   }
 
-  if (profile === undefined && tenantId) {
+  if (isLoading && tenantId) {
     return (
       <div className="space-y-4">
         {Array.from({ length: 4 }).map((_, i) => (
@@ -608,27 +610,19 @@ function RequestsSection({ tenantId }: { tenantId: any }) {
   const [rejectReason, setRejectReason] = useState("");
   const [submissionId, setSubmissionId] = useState("");
 
-  const requests = useQuery(
-    api.eInvoice.listByTenant,
-    tenantId
-      ? {
-          tenantId,
-          status:
-            statusFilter !== "all"
-              ? (statusFilter as "pending" | "submitted" | "rejected")
-              : undefined,
-        }
-      : "skip"
-  );
+  const { data: requests, isLoading } = useEInvoiceRequests(tenantId ?? "", {
+    status: statusFilter !== "all" ? (statusFilter as "pending" | "submitted" | "rejected") : undefined,
+  });
 
-  const markSubmitted = useMutation(api.eInvoice.markSubmitted);
-  const markRejected = useMutation(api.eInvoice.markRejected);
-  const revertToPending = useMutation(api.eInvoice.revertToPending);
+  const { mutateAsync: markSubmitted } = useMarkEInvoiceSubmitted(tenantId ?? "");
+  const { mutateAsync: markRejected } = useMarkEInvoiceRejected(tenantId ?? "");
+  const { mutateAsync: revertToPending } = useRevertEInvoiceToPending(tenantId ?? "");
 
   async function handleMarkSubmitted(requestId: string) {
+    if (!tenantId) return;
     try {
       await markSubmitted({
-        requestId: requestId as any,
+        requestId,
         lhdnSubmissionId: submissionId.trim() || undefined,
       });
       setSelectedReq(null);
@@ -639,8 +633,9 @@ function RequestsSection({ tenantId }: { tenantId: any }) {
   }
 
   async function handleRevert(requestId: string) {
+    if (!tenantId) return;
     try {
-      await revertToPending({ requestId: requestId as any });
+      await revertToPending({ requestId });
       setSelectedReq(null);
     } catch (err) {
       console.error("Failed to revert:", err);
@@ -648,10 +643,10 @@ function RequestsSection({ tenantId }: { tenantId: any }) {
   }
 
   async function handleReject() {
-    if (!rejectTarget || !rejectReason.trim()) return;
+    if (!rejectTarget || !rejectReason.trim() || !tenantId) return;
     try {
       await markRejected({
-        requestId: rejectTarget._id,
+        requestId: rejectTarget.id,
         reason: rejectReason.trim(),
       });
       setRejectTarget(null);
@@ -661,22 +656,20 @@ function RequestsSection({ tenantId }: { tenantId: any }) {
     }
   }
 
-  function formatDate(timestamp: number) {
-    return new Date(timestamp).toLocaleDateString("en-MY", {
+  function formatDate(isoString: string) {
+    return new Date(isoString).toLocaleDateString("en-MY", {
       day: "numeric",
       month: "short",
       year: "numeric",
     });
   }
 
-  function formatTime(timestamp: number) {
-    return new Date(timestamp).toLocaleTimeString("en-MY", {
+  function formatTime(isoString: string) {
+    return new Date(isoString).toLocaleTimeString("en-MY", {
       hour: "2-digit",
       minute: "2-digit",
     });
   }
-
-  const pendingCount = requests?.filter((r) => r.status === "pending").length ?? 0;
 
   return (
     <div className="space-y-6">
@@ -726,7 +719,7 @@ function RequestsSection({ tenantId }: { tenantId: any }) {
       {/* Requests Table */}
       <Card className="glass-card">
         <CardContent className="p-0">
-          {requests === undefined ? (
+          {isLoading ? (
             <div className="p-4 space-y-3">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Skeleton
@@ -735,7 +728,7 @@ function RequestsSection({ tenantId }: { tenantId: any }) {
                 />
               ))}
             </div>
-          ) : requests.length === 0 ? (
+          ) : !requests || requests.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <FileText className="h-6 w-6 text-white/30 mb-2" />
               <p className="text-sm text-white/50">No e-invoice requests</p>
@@ -765,7 +758,7 @@ function RequestsSection({ tenantId }: { tenantId: any }) {
                     ];
                   return (
                     <TableRow
-                      key={req._id}
+                      key={req.id}
                       className="border-white/[0.06] hover:bg-white/[0.02] cursor-pointer"
                       onClick={() => setSelectedReq(req)}
                     >
@@ -1015,7 +1008,7 @@ function RequestsSection({ tenantId }: { tenantId: any }) {
                     <Button
                       className="gap-1"
                       onClick={() =>
-                        handleMarkSubmitted(selectedReq._id)
+                        handleMarkSubmitted(selectedReq.id)
                       }
                     >
                       <CheckCircle2 className="h-4 w-4" />
@@ -1029,7 +1022,7 @@ function RequestsSection({ tenantId }: { tenantId: any }) {
                     <Button
                       variant="outline"
                       className="gap-1 text-yellow-400 border-yellow-500/30 hover:bg-yellow-500/10"
-                      onClick={() => handleRevert(selectedReq._id)}
+                      onClick={() => handleRevert(selectedReq.id)}
                     >
                       <Clock className="h-4 w-4" />
                       Revert to Pending

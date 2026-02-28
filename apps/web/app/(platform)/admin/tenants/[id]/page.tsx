@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
-import type { GenericId } from "convex/values";
+import {
+  useTenant,
+  useUpdateTenantSettings,
+  usePlatformFlags,
+  useUpdatePlatformFlag,
+} from "@timeo/api-client";
 import {
   Card,
   CardContent,
@@ -60,30 +63,9 @@ function Toggle({
   );
 }
 
-const PLAN_OPTIONS = [
-  { label: "Free", value: "free" },
-  { label: "Starter", value: "starter" },
-  { label: "Pro", value: "pro" },
-  { label: "Enterprise", value: "enterprise" },
-];
-
-const STATUS_OPTIONS = [
-  { label: "Active", value: "active" },
-  { label: "Suspended", value: "suspended" },
-  { label: "Trial", value: "trial" },
-];
-
-const PLAN_BADGE_VARIANTS: Record<string, string> = {
-  free: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
-  starter: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  pro: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  enterprise: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-};
-
 const STATUS_BADGE_VARIANTS: Record<string, string> = {
   active: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  trial: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  suspended: "bg-red-500/20 text-red-400 border-red-500/30",
+  inactive: "bg-red-500/20 text-red-400 border-red-500/30",
 };
 
 function StatMini({
@@ -117,41 +99,19 @@ function StatMini({
 export default function TenantDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const tenantId = params.id as GenericId<"tenants">;
+  const tenantId = params.id as string;
 
-  const tenant = useQuery(api.tenants.getById, { tenantId });
-  const updateTenant = useMutation(api.tenants.update);
-
-  // Platform-level stats (no tenant membership required)
-  const stats = useQuery(
-    api.platform.getTenantStats,
-    tenant ? { tenantId } : "skip"
-  );
-
-  const updateTenantSettings = useMutation(api.platform.updateTenantSettings);
-  const setFeatureFlag = useMutation(api.platform.setFeatureFlag);
-  const featureFlags = useQuery(
-    api.platform.listFeatureFlags,
-    tenant ? { tenantId } : "skip"
-  );
+  const { data: tenant, isLoading } = useTenant(tenantId);
+  const updateTenantSettingsMutation = useUpdateTenantSettings(tenantId);
+  const { data: featureFlags, isLoading: flagsLoading } = usePlatformFlags();
+  const updateFlagMutation = useUpdatePlatformFlag();
 
   const [editName, setEditName] = useState<string | null>(null);
-  const [editPlan, setEditPlan] = useState<string | null>(null);
-  const [editStatus, setEditStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Settings state
   const [timezone, setTimezone] = useState("");
-  const [bookingBuffer, setBookingBuffer] = useState<number | "">("");
-  const [autoConfirmBookings, setAutoConfirmBookings] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
-
-  // Door Camera state
-  const [cameraIp, setCameraIp] = useState("");
-  const [cameraPort, setCameraPort] = useState<number | "">("");
-  const [gpioPort, setGpioPort] = useState<number | "">("");
-  const [deviceSn, setDeviceSn] = useState("");
-  const [savingCamera, setSavingCamera] = useState(false);
 
   // Feature Flags state
   const [addFlagOpen, setAddFlagOpen] = useState(false);
@@ -162,55 +122,24 @@ export default function TenantDetailPage() {
   // Initialize settings from tenant
   useEffect(() => {
     if (!tenant) return;
-    setTimezone(tenant.settings?.timezone ?? "");
-    setBookingBuffer(tenant.settings?.bookingBuffer ?? "");
-    setAutoConfirmBookings(tenant.settings?.autoConfirmBookings ?? false);
-    setCameraIp(tenant.settings?.doorCamera?.ip ?? "");
-    setCameraPort(tenant.settings?.doorCamera?.port ?? "");
-    setGpioPort(tenant.settings?.doorCamera?.gpioPort ?? "");
-    setDeviceSn(tenant.settings?.doorCamera?.deviceSn ?? "");
+    setTimezone(tenant.timezone ?? "");
   }, [tenant]);
 
-  const loading = tenant === undefined;
-  const statsLoading = stats === undefined;
+  const loading = isLoading;
 
   // Derived editable values
   const currentName = editName ?? tenant?.name ?? "";
-  const currentPlan = editPlan ?? tenant?.plan ?? "free";
-  const currentStatus = editStatus ?? tenant?.status ?? "active";
 
-  const hasChanges =
-    (editName !== null && editName !== tenant?.name) ||
-    (editPlan !== null && editPlan !== tenant?.plan) ||
-    (editStatus !== null && editStatus !== tenant?.status);
+  const hasChanges = editName !== null && editName !== tenant?.name;
 
   async function handleSave() {
     if (!tenant || !hasChanges) return;
     setSaving(true);
     try {
-      const updates: {
-        tenantId: GenericId<"tenants">;
-        name?: string;
-        plan?: "free" | "starter" | "pro" | "enterprise";
-        status?: "active" | "suspended" | "trial";
-      } = { tenantId };
-
       if (editName !== null && editName !== tenant.name) {
-        updates.name = editName;
+        await updateTenantSettingsMutation.mutateAsync({ name: editName });
       }
-      if (editPlan !== null && editPlan !== tenant.plan) {
-        updates.plan = editPlan as "free" | "starter" | "pro" | "enterprise";
-      }
-      if (editStatus !== null && editStatus !== tenant.status) {
-        updates.status = editStatus as "active" | "suspended" | "trial";
-      }
-
-      await updateTenant(updates);
-
-      // Reset edit states
       setEditName(null);
-      setEditPlan(null);
-      setEditStatus(null);
     } catch (err: any) {
       alert(err.message || "Failed to update tenant.");
     } finally {
@@ -222,13 +151,8 @@ export default function TenantDetailPage() {
     if (!tenant) return;
     setSavingSettings(true);
     try {
-      await updateTenantSettings({
-        tenantId,
-        settings: {
-          timezone: timezone || undefined,
-          bookingBuffer: bookingBuffer === "" ? undefined : bookingBuffer,
-          autoConfirmBookings,
-        },
+      await updateTenantSettingsMutation.mutateAsync({
+        timezone: timezone || undefined,
       });
     } catch (err: any) {
       alert(err.message || "Failed to update settings.");
@@ -237,33 +161,9 @@ export default function TenantDetailPage() {
     }
   }
 
-  async function handleSaveDoorCamera() {
-    if (!tenant) return;
-    setSavingCamera(true);
-    try {
-      await updateTenantSettings({
-        tenantId,
-        settings: {
-          doorCamera: cameraIp
-            ? {
-                ip: cameraIp,
-                port: cameraPort === "" ? undefined : cameraPort,
-                gpioPort: gpioPort === "" ? undefined : gpioPort,
-                deviceSn: deviceSn || undefined,
-              }
-            : undefined,
-        },
-      });
-    } catch (err: any) {
-      alert(err.message || "Failed to save door camera settings.");
-    } finally {
-      setSavingCamera(false);
-    }
-  }
-
   async function handleToggleFlag(key: string, enabled: boolean) {
     try {
-      await setFeatureFlag({ key, enabled, tenantId });
+      await updateFlagMutation.mutateAsync({ key, enabled });
     } catch (err: any) {
       alert(err.message || "Failed to toggle feature flag.");
     }
@@ -273,10 +173,9 @@ export default function TenantDetailPage() {
     if (!newFlagKey.trim()) return;
     setSavingFlag(true);
     try {
-      await setFeatureFlag({
+      await updateFlagMutation.mutateAsync({
         key: newFlagKey.trim(),
         enabled: newFlagEnabled,
-        tenantId,
       });
       setNewFlagKey("");
       setNewFlagEnabled(true);
@@ -306,7 +205,7 @@ export default function TenantDetailPage() {
               <Skeleton className="h-12 w-12 rounded-xl" />
             ) : (
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-lg font-bold text-primary">
-                {tenant.name[0]?.toUpperCase() ?? "?"}
+                {tenant!.name[0]?.toUpperCase() ?? "?"}
               </div>
             )}
             <div>
@@ -318,10 +217,10 @@ export default function TenantDetailPage() {
               ) : (
                 <>
                   <h1 className="text-3xl font-bold tracking-tight">
-                    {tenant.name}
+                    {tenant!.name}
                   </h1>
                   <p className="mt-1 text-muted-foreground">
-                    @{tenant.slug}
+                    @{tenant!.slug}
                   </p>
                 </>
               )}
@@ -343,15 +242,13 @@ export default function TenantDetailPage() {
         <div className="flex gap-2">
           <Badge
             variant="outline"
-            className={PLAN_BADGE_VARIANTS[tenant.plan] ?? PLAN_BADGE_VARIANTS.free}
+            className={
+              tenant!.isActive
+                ? STATUS_BADGE_VARIANTS.active
+                : STATUS_BADGE_VARIANTS.inactive
+            }
           >
-            {tenant.plan} plan
-          </Badge>
-          <Badge
-            variant="outline"
-            className={STATUS_BADGE_VARIANTS[tenant.status] ?? STATUS_BADGE_VARIANTS.active}
-          >
-            {tenant.status}
+            {tenant!.isActive ? "active" : "inactive"}
           </Badge>
         </div>
       )}
@@ -359,22 +256,22 @@ export default function TenantDetailPage() {
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
         <StatMini
-          title="Members"
-          value={stats?.membersCount ?? 0}
-          icon={Users}
-          loading={statsLoading}
-        />
-        <StatMini
-          title="Bookings"
-          value={stats?.bookingsCount ?? 0}
-          icon={Calendar}
-          loading={statsLoading}
-        />
-        <StatMini
-          title="Services"
-          value={stats?.servicesCount ?? 0}
+          title="Currency"
+          value={tenant?.currency ?? "MYR"}
           icon={Package}
-          loading={statsLoading}
+          loading={loading}
+        />
+        <StatMini
+          title="Timezone"
+          value={tenant?.timezone ?? "Not set"}
+          icon={Calendar}
+          loading={loading}
+        />
+        <StatMini
+          title="Status"
+          value={tenant?.isActive ? "Active" : "Inactive"}
+          icon={Users}
+          loading={loading}
         />
       </div>
 
@@ -402,21 +299,6 @@ export default function TenantDetailPage() {
                 />
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Select
-                  label="Plan"
-                  options={PLAN_OPTIONS}
-                  value={currentPlan}
-                  onChange={(value: string) => setEditPlan(value)}
-                />
-                <Select
-                  label="Status"
-                  options={STATUS_OPTIONS}
-                  value={currentStatus}
-                  onChange={(value: string) => setEditStatus(value)}
-                />
-              </div>
-
               <Separator className="bg-white/[0.06]" />
 
               <div className="grid gap-4 sm:grid-cols-2">
@@ -424,14 +306,14 @@ export default function TenantDetailPage() {
                   <p className="text-sm font-medium text-muted-foreground">
                     Slug
                   </p>
-                  <p className="text-sm">@{tenant.slug}</p>
+                  <p className="text-sm">@{tenant!.slug}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">
                     Created
                   </p>
                   <p className="text-sm">
-                    {new Date(tenant.createdAt).toLocaleDateString("en-US", {
+                    {new Date(tenant!.createdAt).toLocaleDateString("en-US", {
                       year: "numeric",
                       month: "long",
                       day: "numeric",
@@ -443,16 +325,14 @@ export default function TenantDetailPage() {
                     Timezone
                   </p>
                   <p className="text-sm">
-                    {tenant.settings?.timezone ?? "Not set"}
+                    {tenant!.timezone ?? "Not set"}
                   </p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">
-                    Auto-confirm Bookings
+                    Currency
                   </p>
-                  <p className="text-sm">
-                    {tenant.settings?.autoConfirmBookings ? "Yes" : "No"}
-                  </p>
+                  <p className="text-sm">{tenant!.currency}</p>
                 </div>
               </div>
             </>
@@ -464,7 +344,7 @@ export default function TenantDetailPage() {
       {!loading && (
         <Card className="glass border-white/[0.08]">
           <CardHeader>
-            <CardTitle className="text-lg">Owner</CardTitle>
+            <CardTitle className="text-lg">Tenant Info</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4">
@@ -473,10 +353,10 @@ export default function TenantDetailPage() {
               </div>
               <div>
                 <p className="text-sm font-medium">
-                  Owner ID: {String(tenant.ownerId)}
+                  {tenant!.name}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Tenant ID: {String(tenant._id)}
+                  Tenant ID: {tenant!.id}
                 </p>
               </div>
             </div>
@@ -504,30 +384,6 @@ export default function TenantDetailPage() {
                 placeholder="Asia/Kuala_Lumpur"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Booking Buffer (minutes)
-              </label>
-              <Input
-                type="number"
-                value={bookingBuffer}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setBookingBuffer(
-                    e.target.value === "" ? "" : Number(e.target.value)
-                  )
-                }
-                placeholder="15"
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">
-                Auto-confirm Bookings
-              </label>
-              <Toggle
-                checked={autoConfirmBookings}
-                onCheckedChange={setAutoConfirmBookings}
-              />
-            </div>
             <Button
               onClick={handleSaveSettings}
               disabled={savingSettings}
@@ -535,84 +391,6 @@ export default function TenantDetailPage() {
             >
               <Save className="h-4 w-4" />
               {savingSettings ? "Saving..." : "Save Settings"}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Door Camera */}
-      {!loading && (
-        <Card className="glass border-white/[0.08]">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Camera className="h-5 w-5" />
-              Door Camera
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Configure the HA SDK face-recognition camera that controls door
-              access. The camera must be reachable from Convex servers.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
-                  Camera IP Address
-                </label>
-                <Input
-                  value={cameraIp}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setCameraIp(e.target.value)
-                  }
-                  placeholder="192.168.1.100"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">HTTP Port</label>
-                <Input
-                  type="number"
-                  value={cameraPort}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setCameraPort(
-                      e.target.value === "" ? "" : Number(e.target.value)
-                    )
-                  }
-                  placeholder="8000"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">GPIO Port</label>
-                <Input
-                  type="number"
-                  value={gpioPort}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setGpioPort(
-                      e.target.value === "" ? "" : Number(e.target.value)
-                    )
-                  }
-                  placeholder="1"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
-                  Device Serial Number
-                </label>
-                <Input
-                  value={deviceSn}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setDeviceSn(e.target.value)
-                  }
-                  placeholder="e.g. SN1234567890"
-                />
-              </div>
-            </div>
-            <Button
-              onClick={handleSaveDoorCamera}
-              disabled={savingCamera}
-              className="gap-2"
-            >
-              <Save className="h-4 w-4" />
-              {savingCamera ? "Saving..." : "Save Door Camera"}
             </Button>
           </CardContent>
         </Card>
@@ -637,20 +415,20 @@ export default function TenantDetailPage() {
             </Button>
           </CardHeader>
           <CardContent>
-            {featureFlags === undefined ? (
+            {flagsLoading ? (
               <div className="space-y-3">
                 <Skeleton className="h-10 w-full" />
                 <Skeleton className="h-10 w-full" />
               </div>
-            ) : featureFlags.length === 0 ? (
+            ) : !featureFlags || featureFlags.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No tenant-specific flags configured.
+                No platform flags configured.
               </p>
             ) : (
               <div className="space-y-3">
                 {featureFlags.map((flag) => (
                   <div
-                    key={flag._id}
+                    key={flag.key}
                     className="flex items-center justify-between rounded-lg border border-white/[0.06] p-3"
                   >
                     <span className="text-sm font-medium font-mono">

@@ -7,8 +7,7 @@ const nextConfig = {
   poweredByHeader: false,
   images: {
     remotePatterns: [
-      { protocol: "https", hostname: "**.convex.cloud" },
-      { protocol: "https", hostname: "**.convex.site" },
+      { protocol: "https", hostname: "**.timeo.my" },
       { protocol: "https", hostname: "uploadthing.com" },
       { protocol: "https", hostname: "**.uploadthing.com" },
     ],
@@ -16,13 +15,14 @@ const nextConfig = {
   },
   experimental: {
     outputFileTracingRoot: path.join(__dirname, "../../"),
-    optimizePackageImports: ["lucide-react", "framer-motion", "@timeo/ui", "convex"],
+    optimizePackageImports: ["lucide-react", "framer-motion", "@timeo/ui"],
   },
   transpilePackages: [
     "@timeo/ui",
     "@timeo/shared",
     "@timeo/auth",
     "@timeo/api",
+    "@timeo/api-client",
     "@timeo/payments",
     "@timeo/analytics",
     "@timeo/cms",

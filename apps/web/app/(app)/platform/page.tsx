@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { usePlatformTenants } from "@timeo/api-client";
 import {
   Card,
   CardContent,
@@ -59,20 +58,13 @@ function StatCard({
   );
 }
 
-function formatDate(timestamp: number) {
+function formatDate(timestamp: string | number) {
   return new Date(timestamp).toLocaleDateString("en-MY", {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
 }
-
-const planColors: Record<string, string> = {
-  free: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
-  starter: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  pro: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  enterprise: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-};
 
 const statusColors: Record<string, string> = {
   active: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
@@ -81,11 +73,12 @@ const statusColors: Record<string, string> = {
 };
 
 export default function PlatformDashboardPage() {
-  const health = useQuery(api.platform.getSystemHealth);
-  const tenants = useQuery(api.platform.listAllTenants);
+  const { data: tenants, isLoading } = usePlatformTenants();
 
-  const loading = health === undefined;
-  const recentTenants = tenants?.slice(-5).reverse() ?? [];
+  const totalTenants = tenants?.length ?? 0;
+  const activeTenants = tenants?.filter((t) => t.isActive).length ?? 0;
+  const totalMembers = tenants?.reduce((sum, t) => sum + (t.memberCount ?? 0), 0) ?? 0;
+  const recentTenants = tenants ? [...tenants].slice(-5).reverse() : [];
 
   return (
     <div className="space-y-8">
@@ -117,29 +110,28 @@ export default function PlatformDashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Tenants"
-          value={loading ? "" : health.totalTenants}
+          value={isLoading ? "" : totalTenants}
           icon={Building2}
-          description={loading ? "" : `${health.activeTenants} active`}
-          loading={loading}
+          description={isLoading ? "" : `${activeTenants} active`}
+          loading={isLoading}
         />
         <StatCard
-          title="Total Users"
-          value={loading ? "" : health.totalUsers}
+          title="Total Members"
+          value={isLoading ? "" : totalMembers}
           icon={Users}
-          loading={loading}
+          loading={isLoading}
         />
         <StatCard
-          title="Total Bookings"
-          value={loading ? "" : health.totalBookings}
+          title="Active Tenants"
+          value={isLoading ? "" : activeTenants}
           icon={Calendar}
-          description={loading ? "" : `${health.pendingBookings} pending`}
-          loading={loading}
+          loading={isLoading}
         />
         <StatCard
-          title="Pending Orders"
-          value={loading ? "" : health.pendingOrders}
+          title="Inactive Tenants"
+          value={isLoading ? "" : totalTenants - activeTenants}
           icon={Clock}
-          loading={loading}
+          loading={isLoading}
         />
       </div>
 
@@ -154,7 +146,7 @@ export default function PlatformDashboardPage() {
           </Link>
         </CardHeader>
         <CardContent>
-          {tenants === undefined ? (
+          {isLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 3 }).map((_, i) => (
                 <Skeleton key={i} className="h-14 w-full" />
@@ -177,8 +169,8 @@ export default function PlatformDashboardPage() {
             <div className="space-y-2">
               {recentTenants.map((tenant) => (
                 <Link
-                  key={tenant._id}
-                  href={`/platform/tenants/${tenant._id}`}
+                  key={tenant.id}
+                  href={`/platform/tenants/${tenant.id}`}
                   className="flex items-center justify-between rounded-lg border border-white/[0.06] p-3 transition-all hover:border-primary/20 hover:bg-white/[0.03]"
                 >
                   <div className="flex items-center gap-3">
@@ -191,11 +183,15 @@ export default function PlatformDashboardPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className={planColors[tenant.plan] ?? ""}>
-                      {tenant.plan}
-                    </Badge>
-                    <Badge variant="outline" className={statusColors[tenant.status] ?? ""}>
-                      {tenant.status}
+                    <Badge
+                      variant="outline"
+                      className={
+                        tenant.isActive
+                          ? statusColors.active
+                          : statusColors.suspended
+                      }
+                    >
+                      {tenant.isActive ? "active" : "inactive"}
                     </Badge>
                     <span className="hidden text-xs text-muted-foreground sm:inline">
                       {formatDate(tenant.createdAt)}
@@ -209,7 +205,7 @@ export default function PlatformDashboardPage() {
       </Card>
 
       {/* System Status */}
-      {!loading && (
+      {!isLoading && (
         <Card className="glass-card">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -219,7 +215,7 @@ export default function PlatformDashboardPage() {
               <div>
                 <p className="text-sm font-medium">System Healthy</p>
                 <p className="text-xs text-muted-foreground">
-                  Last checked: {new Date(health.timestamp).toLocaleTimeString("en-MY")}
+                  Last checked: {new Date().toLocaleTimeString("en-MY")}
                 </p>
               </div>
             </div>

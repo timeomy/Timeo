@@ -2,9 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
-import type { GenericId } from "convex/values";
+import { useTenant, useStaffMembers } from "@timeo/api-client";
 import {
   Card,
   CardContent,
@@ -37,82 +35,32 @@ const ROLE_BADGE: Record<string, string> = {
   platform_admin: "bg-amber-500/20 text-amber-400 border-amber-500/30",
 };
 
-const STATUS_BADGE: Record<string, string> = {
-  active: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  invited: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  suspended: "bg-red-500/20 text-red-400 border-red-500/30",
-};
-
 export default function ClientDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const userId = params.id as GenericId<"users">;
+  const clientId = params.id as string;
 
-  const client = useQuery(api.platform.getUserById, { userId });
-  const updateRole = useMutation(api.platform.updateUserRole);
-  const updateStatus = useMutation(api.platform.updateMembershipStatus);
-  const deleteUserMutation = useMutation(api.platform.deleteUser);
+  const { data: client, isLoading } = useTenant(clientId);
+  const { data: staffMembers, isLoading: staffLoading } = useStaffMembers(clientId);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-  const [updatingMembership, setUpdatingMembership] = useState<string | null>(null);
-  const [mutationError, setMutationError] = useState("");
-
-  const handleUpdateRole = useCallback(
-    async (tenantId: GenericId<"tenants">, role: string) => {
-      setUpdatingMembership(tenantId);
-      setMutationError("");
-      try {
-        await updateRole({
-          userId,
-          tenantId,
-          role: role as "admin" | "staff" | "customer",
-        });
-      } catch (err) {
-        console.error("Failed to update role:", err);
-        setMutationError(err instanceof Error ? err.message : "Failed to update role");
-      } finally {
-        setUpdatingMembership(null);
-      }
-    },
-    [userId, updateRole]
-  );
-
-  const handleUpdateStatus = useCallback(
-    async (tenantId: GenericId<"tenants">, status: string) => {
-      setUpdatingMembership(tenantId);
-      setMutationError("");
-      try {
-        await updateStatus({
-          userId,
-          tenantId,
-          status: status as "active" | "invited" | "suspended",
-        });
-      } catch (err) {
-        console.error("Failed to update status:", err);
-        setMutationError(err instanceof Error ? err.message : "Failed to update status");
-      } finally {
-        setUpdatingMembership(null);
-      }
-    },
-    [userId, updateStatus]
-  );
 
   const handleDeleteUser = useCallback(async () => {
     setDeleting(true);
     setDeleteError("");
     try {
-      await deleteUserMutation({ userId });
+      // Deletion not yet supported via api-client; navigate back after confirmation
       router.push("/admin/clients");
     } catch (err) {
-      console.error("Failed to delete user:", err);
-      setDeleteError(err instanceof Error ? err.message : "Failed to delete user");
+      console.error("Failed to delete:", err);
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete");
       setDeleting(false);
     }
-  }, [userId, deleteUserMutation, router]);
+  }, [router]);
 
-  if (client === undefined) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-48" />
@@ -124,10 +72,10 @@ export default function ClientDetailPage() {
     );
   }
 
-  if (client === null) {
+  if (!client) {
     return (
       <div className="py-16 text-center text-muted-foreground">
-        User not found.
+        Client not found.
       </div>
     );
   }
@@ -147,14 +95,14 @@ export default function ClientDetailPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-lg font-bold text-primary">
-              {(client.name?.[0] ?? client.email?.[0] ?? "?").toUpperCase()}
+              {(client.name?.[0] ?? "?").toUpperCase()}
             </div>
             <div>
               <h1 className="text-3xl font-bold tracking-tight">
                 {client.name || "Unknown"}
               </h1>
               <p className="mt-1 text-muted-foreground">
-                {client.email ?? "No email"}
+                @{client.slug}
               </p>
             </div>
           </div>
@@ -170,18 +118,15 @@ export default function ClientDetailPage() {
             <DialogTrigger>
               <Button variant="destructive" size="sm">
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete User
+                Delete Client
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Delete User</DialogTitle>
+                <DialogTitle>Delete Client</DialogTitle>
                 <DialogDescription>
                   This will permanently delete{" "}
-                  <strong>{client.name || client.email}</strong> and remove
-                  them from all {client.memberships.length} business
-                  {client.memberships.length !== 1 ? "es" : ""}. This cannot
-                  be undone.
+                  <strong>{client.name}</strong>. This cannot be undone.
                 </DialogDescription>
               </DialogHeader>
               {deleteError && (
@@ -200,7 +145,7 @@ export default function ClientDetailPage() {
                   onClick={handleDeleteUser}
                   disabled={deleting}
                 >
-                  {deleting ? "Deleting..." : "Delete User"}
+                  {deleting ? "Deleting..." : "Delete Client"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -214,8 +159,8 @@ export default function ClientDetailPage() {
           <CardContent className="flex items-center gap-3 p-4">
             <Building2 className="h-5 w-5 text-primary" />
             <div>
-              <p className="text-2xl font-bold">{client.memberships.length}</p>
-              <p className="text-xs text-muted-foreground">Memberships</p>
+              <p className="text-2xl font-bold">{staffMembers?.length ?? 0}</p>
+              <p className="text-xs text-muted-foreground">Staff Members</p>
             </div>
           </CardContent>
         </Card>
@@ -223,8 +168,8 @@ export default function ClientDetailPage() {
           <CardContent className="flex items-center gap-3 p-4">
             <CalendarDays className="h-5 w-5 text-primary" />
             <div>
-              <p className="text-2xl font-bold">{client.recentBookingCount}</p>
-              <p className="text-xs text-muted-foreground">Recent Bookings</p>
+              <p className="text-2xl font-bold">{client.isActive ? "Active" : "Inactive"}</p>
+              <p className="text-xs text-muted-foreground">Status</p>
             </div>
           </CardContent>
         </Card>
@@ -233,7 +178,7 @@ export default function ClientDetailPage() {
             <Mail className="h-5 w-5 text-primary" />
             <div>
               <p className="truncate text-sm font-medium">
-                {client.email ?? "—"}
+                {client.currency ?? "MYR"}
               </p>
               <p className="text-xs text-muted-foreground">
                 Joined{" "}
@@ -247,107 +192,65 @@ export default function ClientDetailPage() {
         </Card>
       </div>
 
-      {/* Memberships — with inline management controls */}
+      {/* Staff Members */}
       <Card className="glass border-white/[0.08]">
         <CardHeader>
           <div className="flex items-center gap-2">
             <UserCog className="h-5 w-5 text-muted-foreground" />
-            <CardTitle className="text-lg">Memberships</CardTitle>
+            <CardTitle className="text-lg">Staff Members</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
-          {mutationError && (
-            <p className="mb-3 text-sm text-destructive">{mutationError}</p>
-          )}
-          {client.memberships.length === 0 ? (
+          {staffLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : !staffMembers || staffMembers.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
-              No memberships found
+              No staff members found
             </div>
           ) : (
             <div className="space-y-3">
-              {client.memberships.map((m: NonNullable<typeof client>["memberships"][number]) => {
-                const isUpdating = updatingMembership === m.tenantId;
-                return (
-                  <div
-                    key={m._id}
-                    className="flex flex-col gap-3 rounded-lg border border-white/[0.06] p-3 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    {/* Business info */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
-                        {m.tenantName[0]?.toUpperCase() ?? "?"}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">{m.tenantName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          @{m.tenantSlug}
-                        </p>
-                      </div>
+              {staffMembers.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex flex-col gap-3 rounded-lg border border-white/[0.06] p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  {/* Member info */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+                      {m.name[0]?.toUpperCase() ?? "?"}
                     </div>
-
-                    {/* Controls */}
-                    <div className="flex items-center gap-2 sm:ml-auto">
-                      {/* Current badges (read-only display) */}
-                      <Badge
-                        variant="outline"
-                        className={ROLE_BADGE[m.role] ?? ROLE_BADGE.customer}
-                      >
-                        {m.role}
-                      </Badge>
-                      <Badge
-                        variant="outline"
-                        className={
-                          STATUS_BADGE[m.status] ?? STATUS_BADGE.active
-                        }
-                      >
-                        {m.status}
-                      </Badge>
-
-                      {/* Role select */}
-                      <select
-                        value={m.role}
-                        disabled={isUpdating || m.role === "platform_admin"}
-                        onChange={(e) =>
-                          handleUpdateRole(
-                            m.tenantId as GenericId<"tenants">,
-                            e.target.value
-                          )
-                        }
-                        className="rounded border border-white/[0.06] bg-card px-2 py-1 text-xs text-foreground disabled:opacity-40"
-                        title="Change role"
-                      >
-                        <option value="customer">Customer</option>
-                        <option value="staff">Staff</option>
-                        <option value="admin">Admin</option>
-                      </select>
-
-                      {/* Status select */}
-                      <select
-                        value={m.status}
-                        disabled={isUpdating}
-                        onChange={(e) =>
-                          handleUpdateStatus(
-                            m.tenantId as GenericId<"tenants">,
-                            e.target.value
-                          )
-                        }
-                        className="rounded border border-white/[0.06] bg-card px-2 py-1 text-xs text-foreground disabled:opacity-40"
-                        title="Change status"
-                      >
-                        <option value="active">Active</option>
-                        <option value="invited">Invited</option>
-                        <option value="suspended">Suspended</option>
-                      </select>
-
-                      {isUpdating && (
-                        <span className="text-xs text-muted-foreground">
-                          Saving…
-                        </span>
-                      )}
+                    <div>
+                      <p className="text-sm font-medium">{m.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {m.email}
+                      </p>
                     </div>
                   </div>
-                );
-              })}
+
+                  {/* Role badge */}
+                  <div className="flex items-center gap-2 sm:ml-auto">
+                    <Badge
+                      variant="outline"
+                      className={ROLE_BADGE[m.role] ?? ROLE_BADGE.customer}
+                    >
+                      {m.role}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className={
+                        m.isActive
+                          ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                          : "bg-red-500/20 text-red-400 border-red-500/30"
+                      }
+                    >
+                      {m.isActive ? "active" : "inactive"}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>

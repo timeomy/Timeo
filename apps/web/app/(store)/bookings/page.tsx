@@ -2,8 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { useMyBookings } from "@timeo/api-client";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
 import { formatDate, formatTime } from "@timeo/shared";
 import {
@@ -72,12 +71,7 @@ function getStatusLabel(status: string): string {
 export default function BookingsPage() {
   const { activeTenantId, isSignedIn } = useTimeoWebAuthContext();
 
-  const bookings = useQuery(
-    api.bookings.listByCustomer,
-    activeTenantId ? { tenantId: activeTenantId as any } : "skip"
-  );
-
-  const isLoading = bookings === undefined;
+  const { data: bookings, isLoading } = useMyBookings(activeTenantId ?? "");
 
   const { upcoming, past } = useMemo(() => {
     if (!bookings) return { upcoming: [], past: [] };
@@ -85,14 +79,14 @@ export default function BookingsPage() {
     const now = Date.now();
     const upcoming = bookings.filter(
       (b) =>
-        b.startTime > now &&
+        new Date(b.startTime).getTime() > now &&
         b.status !== "cancelled" &&
         b.status !== "completed" &&
         b.status !== "no_show"
     );
     const past = bookings.filter(
       (b) =>
-        b.startTime <= now ||
+        new Date(b.startTime).getTime() <= now ||
         b.status === "cancelled" ||
         b.status === "completed" ||
         b.status === "no_show"
@@ -183,10 +177,10 @@ function BookingsTable({
   bookings,
 }: {
   bookings: Array<{
-    _id: string;
-    serviceName: string;
-    startTime: number;
-    endTime: number;
+    id: string;
+    serviceName?: string;
+    startTime: string | number;
+    endTime: string | number;
     status: string;
     staffName?: string;
   }>;
@@ -208,7 +202,7 @@ function BookingsTable({
           </TableHeader>
           <TableBody>
             {bookings.map((booking) => (
-              <TableRow key={booking._id}>
+              <TableRow key={booking.id}>
                 <TableCell className="font-medium">
                   {booking.serviceName}
                 </TableCell>
@@ -221,7 +215,7 @@ function BookingsTable({
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Link href={`/bookings/${booking._id}`}>
+                  <Link href={`/bookings/${booking.id}`}>
                     <Button variant="ghost" size="sm" className="gap-1.5">
                       <Eye className="h-3.5 w-3.5" />
                       View
@@ -237,7 +231,7 @@ function BookingsTable({
       {/* Mobile Cards */}
       <div className="space-y-3 md:hidden">
         {bookings.map((booking) => (
-          <Link key={booking._id} href={`/bookings/${booking._id}`}>
+          <Link key={booking.id} href={`/bookings/${booking.id}`}>
             <Card className="transition-shadow hover:shadow-md">
               <CardContent className="py-4">
                 <div className="flex items-start justify-between gap-3">

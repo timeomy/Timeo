@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { usePlatformTenants } from "@timeo/api-client";
 import {
   Card,
   CardContent,
@@ -19,31 +18,20 @@ import {
 } from "@timeo/ui/web";
 import { Building2, Search } from "lucide-react";
 
-const PLAN_BADGE_VARIANTS: Record<string, string> = {
-  free: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
-  starter: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  pro: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  enterprise: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-};
-
 const STATUS_BADGE_VARIANTS: Record<string, string> = {
   active: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  trial: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  suspended: "bg-red-500/20 text-red-400 border-red-500/30",
+  inactive: "bg-red-500/20 text-red-400 border-red-500/30",
 };
 
 export default function TenantsPage() {
   const router = useRouter();
-  const tenants = useQuery(api.platform.listAllTenants);
+  const { data: tenants, isLoading } = usePlatformTenants();
   const [search, setSearch] = useState("");
-
-  const loading = tenants === undefined;
 
   const filtered = tenants?.filter(
     (t) =>
       t.name.toLowerCase().includes(search.toLowerCase()) ||
-      t.slug.toLowerCase().includes(search.toLowerCase()) ||
-      t.ownerEmail.toLowerCase().includes(search.toLowerCase())
+      t.slug.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -53,9 +41,9 @@ export default function TenantsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Tenants</h1>
           <p className="mt-1 text-muted-foreground">
-            {loading
+            {isLoading
               ? "Loading tenants..."
-              : `${tenants.length} business${tenants.length !== 1 ? "es" : ""} registered`}
+              : `${tenants?.length ?? 0} business${(tenants?.length ?? 0) !== 1 ? "es" : ""} registered`}
           </p>
         </div>
       </div>
@@ -64,7 +52,7 @@ export default function TenantsPage() {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Search by name, slug, or email..."
+          placeholder="Search by name or slug..."
           value={search}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
           className="pl-9"
@@ -74,7 +62,7 @@ export default function TenantsPage() {
       {/* Table */}
       <Card className="glass border-white/[0.08]">
         <CardContent className="p-0">
-          {loading ? (
+          {isLoading ? (
             <div className="space-y-4 p-6">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-4">
@@ -108,18 +96,18 @@ export default function TenantsPage() {
                 <TableRow className="border-white/[0.06]">
                   <TableHead>Name</TableHead>
                   <TableHead>Slug</TableHead>
-                  <TableHead>Plan</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Owner</TableHead>
+                  <TableHead>Members</TableHead>
+                  <TableHead>Revenue</TableHead>
                   <TableHead>Created</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map((tenant) => (
                   <TableRow
-                    key={tenant._id}
+                    key={tenant.id}
                     className="cursor-pointer border-white/[0.06] transition-colors hover:bg-white/[0.03]"
-                    onClick={() => router.push(`/admin/tenants/${tenant._id}`)}
+                    onClick={() => router.push(`/admin/tenants/${tenant.id}`)}
                   >
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -138,31 +126,23 @@ export default function TenantsPage() {
                       <Badge
                         variant="outline"
                         className={
-                          PLAN_BADGE_VARIANTS[tenant.plan] ??
-                          PLAN_BADGE_VARIANTS.free
+                          tenant.isActive
+                            ? STATUS_BADGE_VARIANTS.active
+                            : STATUS_BADGE_VARIANTS.inactive
                         }
                       >
-                        {tenant.plan}
+                        {tenant.isActive ? "active" : "inactive"}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={
-                          STATUS_BADGE_VARIANTS[tenant.status] ??
-                          STATUS_BADGE_VARIANTS.active
-                        }
-                      >
-                        {tenant.status}
-                      </Badge>
+                      <span className="text-sm">{tenant.memberCount}</span>
                     </TableCell>
                     <TableCell>
-                      <div>
-                        <p className="text-sm">{tenant.ownerName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {tenant.ownerEmail}
-                        </p>
-                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        {tenant.revenue > 0
+                          ? `RM ${(tenant.revenue / 100).toFixed(2)}`
+                          : "\u2014"}
+                      </span>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(tenant.createdAt).toLocaleDateString()}

@@ -1,9 +1,18 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
-import type { GenericId } from "convex/values";
+import {
+  usePosTransactions,
+  useCreatePosTransaction,
+  useVoidPosTransaction,
+  useDeletePosTransaction,
+  useDailySummary,
+  useMonthlyStatement,
+  useSessionPackages,
+  useServices,
+  useProducts,
+  useValidateVoucher,
+} from "@timeo/api-client";
 import { QRCodeSVG } from "qrcode.react";
 import QRCode from "qrcode";
 import { useTenantId } from "@/hooks/use-tenant-id";
@@ -125,7 +134,6 @@ export default function PosPage() {
   // Transaction list state
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [customerEmail, setCustomerEmail] = useState("");
-  const [lookupEmail, setLookupEmail] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [voucherCode, setVoucherCode] = useState("");
@@ -145,58 +153,27 @@ export default function PosPage() {
   const [statementYear, setStatementYear] = useState(now.getFullYear());
   const [statementMonth, setStatementMonth] = useState(now.getMonth());
 
-  const transactions = useQuery(
-    api.pos.listTransactions,
-    tenantId ? { tenantId } : "skip",
+  const { data: transactions, isLoading: txLoading } = usePosTransactions(tenantId ?? "");
+
+  const { data: summary } = useDailySummary(tenantId ?? "");
+
+  const { data: statement, isLoading: statementLoading } = useMonthlyStatement(
+    tenantId ?? "",
+    viewMode === "statement" ? { year: statementYear, month: statementMonth } : undefined,
   );
 
-  const summary = useQuery(
-    api.pos.getDailySummary,
-    tenantId ? { tenantId } : "skip",
+  const { data: packages } = useSessionPackages(tenantId ?? "");
+  const { data: services } = useServices(tenantId ?? "");
+  const { data: products } = useProducts(tenantId ?? "");
+
+  const { data: voucherValidation } = useValidateVoucher(
+    tenantId ?? "",
+    voucherCode.trim() ? { code: voucherCode.trim() } : undefined,
   );
 
-  const statement = useQuery(
-    api.pos.getMonthlyStatement,
-    tenantId && viewMode === "statement"
-      ? { tenantId, year: statementYear, month: statementMonth }
-      : "skip",
-  );
-
-  const packages = useQuery(
-    api.sessionPackages.listByTenant,
-    tenantId ? { tenantId } : "skip",
-  );
-
-  const services = useQuery(
-    api.services.list,
-    tenantId ? { tenantId } : "skip",
-  );
-
-  const products = useQuery(
-    api.products.list,
-    tenantId ? { tenantId } : "skip",
-  );
-
-  const voucherValidation = useQuery(
-    api.vouchers.validateCode,
-    tenantId && voucherCode.trim()
-      ? { tenantId, code: voucherCode.trim() }
-      : "skip",
-  );
-
-  const createTransaction = useMutation(api.pos.createTransaction);
-  const voidTransaction = useMutation(api.pos.voidTransaction);
-  const deleteTransaction = useMutation(api.pos.deleteTransaction);
-
-  const lookedUpUser = useQuery(
-    api.users.getByEmail,
-    lookupEmail ? { email: lookupEmail } : "skip",
-  );
-
-  function handleLookup() {
-    if (!customerEmail.trim()) return;
-    setLookupEmail(customerEmail.trim());
-  }
+  const { mutateAsync: createTransaction } = useCreatePosTransaction(tenantId ?? "");
+  const { mutateAsync: voidTransaction } = useVoidPosTransaction(tenantId ?? "");
+  const { mutateAsync: deleteTransaction } = useDeletePosTransaction(tenantId ?? "");
 
   function addToCart(item: CartItem) {
     const existing = cart.find(
@@ -231,12 +208,11 @@ export default function PosPage() {
   const total = Math.max(0, subtotal - discount);
 
   async function handleCheckout() {
-    if (!tenantId || !lookedUpUser || cart.length === 0) return;
+    if (!tenantId || !customerEmail.trim() || cart.length === 0) return;
     setProcessing(true);
     try {
       const result = await createTransaction({
-        tenantId,
-        customerId: lookedUpUser._id,
+        customerEmail: customerEmail.trim(),
         items: cart.map((item) => ({
           type: item.type,
           referenceId: item.referenceId,
@@ -248,11 +224,11 @@ export default function PosPage() {
         discount: discount > 0 ? discount : undefined,
         voucherId:
           voucherValidation?.valid && voucherValidation.voucher
-            ? (voucherValidation.voucher._id as GenericId<"vouchers">)
+            ? voucherValidation.voucher.id
             : undefined,
         notes: notes || undefined,
       });
-      setLastReceipt(result.receiptNumber);
+      setLastReceipt(result.receiptNumber ?? null);
       setCheckoutOpen(false);
       resetCheckout();
     } catch (err) {
@@ -264,7 +240,6 @@ export default function PosPage() {
 
   function resetCheckout() {
     setCustomerEmail("");
-    setLookupEmail(null);
     setCart([]);
     setPaymentMethod("cash");
     setVoucherCode("");
@@ -272,24 +247,25 @@ export default function PosPage() {
   }
 
   async function handleVoid() {
-    if (!voidTarget) return;
+    if (!voidTarget || !tenantId) return;
     try {
       await voidTransaction({
-        transactionId: voidTarget._id,
+        transactionId: voidTarget.id,
         reason: voidReason || undefined,
       });
       setVoidTarget(null);
       setVoidReason("");
-      if (selectedTx?._id === voidTarget._id) setSelectedTx(null);
+      if (selectedTx?.id === voidTarget.id) setSelectedTx(null);
     } catch (err) {
       console.error("Failed to void transaction:", err);
     }
   }
 
-  async function handleDelete(transactionId: GenericId<"posTransactions">) {
+  async function handleDelete(transactionId: string) {
+    if (!tenantId) return;
     try {
-      await deleteTransaction({ transactionId });
-      if (selectedTx?._id === transactionId) setSelectedTx(null);
+      await deleteTransaction(transactionId);
+      if (selectedTx?.id === transactionId) setSelectedTx(null);
     } catch (err) {
       console.error("Failed to delete transaction:", err);
     }
@@ -434,16 +410,16 @@ export default function PosPage() {
     return `${symbol} ${(amountCents / 100).toFixed(2)}`;
   }
 
-  function formatDate(timestamp: number) {
-    return new Date(timestamp).toLocaleDateString("en-MY", {
+  function formatDate(isoString: string) {
+    return new Date(isoString).toLocaleDateString("en-MY", {
       day: "numeric",
       month: "short",
       year: "numeric",
     });
   }
 
-  function formatTime(timestamp: number) {
-    return new Date(timestamp).toLocaleTimeString("en-MY", {
+  function formatTime(isoString: string) {
+    return new Date(isoString).toLocaleTimeString("en-MY", {
       hour: "2-digit",
       minute: "2-digit",
     });
@@ -480,9 +456,9 @@ export default function PosPage() {
             Point of Sale
           </h1>
           <p className="text-sm text-white/50">
-            {transactions === undefined
+            {txLoading
               ? "Loading..."
-              : `${transactions.length} recent transactions`}
+              : `${transactions?.length ?? 0} recent transactions`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -606,9 +582,9 @@ export default function PosPage() {
           {/* Recent Transactions */}
           <Card className="glass-card">
             <CardContent className="p-0">
-              {transactions === undefined ? (
+              {txLoading ? (
                 <LoadingSkeleton />
-              ) : transactions.length === 0 ? (
+              ) : (transactions?.length ?? 0) === 0 ? (
                 <EmptyState />
               ) : (
                 <Table>
@@ -626,7 +602,7 @@ export default function PosPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {transactions.map((tx) => {
+                    {transactions!.map((tx) => {
                       const PayIcon =
                         PAYMENT_ICON[tx.paymentMethod as PaymentMethod] ??
                         DollarSign;
@@ -634,7 +610,7 @@ export default function PosPage() {
                         STATUS_CONFIG[tx.status as keyof typeof STATUS_CONFIG];
                       return (
                         <TableRow
-                          key={tx._id}
+                          key={tx.id}
                           className="border-white/[0.06] hover:bg-white/[0.02] cursor-pointer"
                           onClick={() => setSelectedTx(tx)}
                         >
@@ -662,11 +638,11 @@ export default function PosPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-white/70">
-                            {tx.items.length} item
-                            {tx.items.length !== 1 ? "s" : ""}
+                            {(tx.items ?? []).length} item
+                            {(tx.items ?? []).length !== 1 ? "s" : ""}
                           </TableCell>
                           <TableCell className="font-medium text-white">
-                            {formatPrice(tx.total, tx.currency)}
+                            {formatPrice(tx.total ?? 0, tx.currency)}
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1.5 text-white/70">
@@ -711,7 +687,7 @@ export default function PosPage() {
                                   size="sm"
                                   variant="ghost"
                                   className="h-7 gap-1 text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                                  onClick={() => handleDelete(tx._id)}
+                                  onClick={() => handleDelete(tx.id)}
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
@@ -731,6 +707,7 @@ export default function PosPage() {
         /* Statement View */
         <StatementView
           statement={statement}
+          isLoading={statementLoading}
           year={statementYear}
           month={statementMonth}
           onPrevMonth={prevMonth}
@@ -898,7 +875,7 @@ export default function PosPage() {
                     variant="outline"
                     className="gap-1 text-red-400 border-red-500/30 hover:bg-red-500/10"
                     onClick={() => {
-                      handleDelete(selectedTx._id);
+                      handleDelete(selectedTx.id);
                     }}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -971,55 +948,20 @@ export default function PosPage() {
           <DialogHeader>
             <DialogTitle>New Transaction</DialogTitle>
             <DialogDescription>
-              Select a customer, add items, and process payment.
+              Enter the customer email, add items, and process payment.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Customer Lookup */}
+            {/* Customer Email */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Customer Email</label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="customer@example.com"
-                  value={customerEmail}
-                  onChange={(e) => {
-                    setCustomerEmail(e.target.value);
-                    setLookupEmail(null);
-                  }}
-                  type="email"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleLookup}
-                  disabled={!customerEmail.trim()}
-                  className="shrink-0"
-                >
-                  <Search className="h-4 w-4" />
-                </Button>
-              </div>
-              {lookupEmail && lookedUpUser === undefined && (
-                <p className="text-sm text-white/50">Searching...</p>
-              )}
-              {lookupEmail && lookedUpUser === null && (
-                <p className="text-sm text-yellow-400">
-                  No user found with that email.
-                </p>
-              )}
-              {lookedUpUser && (
-                <div className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.03] p-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
-                    {(lookedUpUser.name?.[0] ?? "?").toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{lookedUpUser.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {lookedUpUser.email}
-                    </p>
-                  </div>
-                </div>
-              )}
+              <Input
+                placeholder="customer@example.com"
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
+                type="email"
+              />
             </div>
 
             {/* Item Selection */}
@@ -1031,11 +973,11 @@ export default function PosPage() {
                     <p className="text-xs text-white/40 font-medium">Packages</p>
                     {activePackages.map((pkg) => (
                       <button
-                        key={pkg._id}
+                        key={pkg.id}
                         onClick={() =>
                           addToCart({
                             type: "session_package",
-                            referenceId: pkg._id,
+                            referenceId: pkg.id,
                             name: pkg.name,
                             price: pkg.price,
                             quantity: 1,
@@ -1056,11 +998,11 @@ export default function PosPage() {
                     <p className="text-xs text-white/40 font-medium">Services</p>
                     {activeServices.slice(0, 5).map((svc: any) => (
                       <button
-                        key={svc._id}
+                        key={svc.id}
                         onClick={() =>
                           addToCart({
                             type: "service",
-                            referenceId: svc._id,
+                            referenceId: svc.id,
                             name: svc.name,
                             price: svc.price,
                             quantity: 1,
@@ -1081,11 +1023,11 @@ export default function PosPage() {
                     <p className="text-xs text-white/40 font-medium">Products</p>
                     {activeProducts.slice(0, 5).map((prod: any) => (
                       <button
-                        key={prod._id}
+                        key={prod.id}
                         onClick={() =>
                           addToCart({
                             type: "product",
-                            referenceId: prod._id,
+                            referenceId: prod.id,
                             name: prod.name,
                             price: prod.price,
                             quantity: 1,
@@ -1191,7 +1133,7 @@ export default function PosPage() {
             </Button>
             <Button
               onClick={handleCheckout}
-              disabled={processing || !lookedUpUser || cart.length === 0}
+              disabled={processing || !customerEmail.trim() || cart.length === 0}
             >
               {processing
                 ? "Processing..."
@@ -1207,6 +1149,7 @@ export default function PosPage() {
 // ─── Statement View ─────────────────────────────────────────────────────
 function StatementView({
   statement,
+  isLoading,
   year,
   month,
   onPrevMonth,
@@ -1214,21 +1157,22 @@ function StatementView({
   isAdmin,
 }: {
   statement: any;
+  isLoading: boolean;
   year: number;
   month: number;
   onPrevMonth: () => void;
   onNextMonth: () => void;
   isAdmin: boolean;
 }) {
-  function formatDate(timestamp: number) {
-    return new Date(timestamp).toLocaleDateString("en-MY", {
+  function formatDate(isoString: string) {
+    return new Date(isoString).toLocaleDateString("en-MY", {
       day: "numeric",
       month: "short",
     });
   }
 
-  function formatTime(timestamp: number) {
-    return new Date(timestamp).toLocaleTimeString("en-MY", {
+  function formatTime(isoString: string) {
+    return new Date(isoString).toLocaleTimeString("en-MY", {
       hour: "2-digit",
       minute: "2-digit",
     });
@@ -1252,7 +1196,7 @@ function StatementView({
         </Button>
       </div>
 
-      {statement === undefined ? (
+      {isLoading ? (
         <div className="space-y-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-20 w-full bg-white/[0.06] rounded-xl" />
@@ -1266,7 +1210,7 @@ function StatementView({
               <CardContent className="p-4">
                 <p className="text-xs text-white/40 mb-1">Revenue</p>
                 <p className="text-xl font-bold text-emerald-400">
-                  {formatPrice(statement.totalRevenue, "MYR")}
+                  {formatPrice(statement?.totalRevenue ?? 0, "MYR")}
                 </p>
               </CardContent>
             </Card>
@@ -1274,7 +1218,7 @@ function StatementView({
               <CardContent className="p-4">
                 <p className="text-xs text-white/40 mb-1">Transactions</p>
                 <p className="text-xl font-bold text-white">
-                  {statement.totalTransactions}
+                  {statement?.totalTransactions ?? 0}
                 </p>
               </CardContent>
             </Card>
@@ -1282,7 +1226,7 @@ function StatementView({
               <CardContent className="p-4">
                 <p className="text-xs text-white/40 mb-1">Discounts</p>
                 <p className="text-xl font-bold text-yellow-400">
-                  {formatPrice(statement.totalDiscount, "MYR")}
+                  {formatPrice(statement?.totalDiscount ?? 0, "MYR")}
                 </p>
               </CardContent>
             </Card>
@@ -1290,7 +1234,7 @@ function StatementView({
               <CardContent className="p-4">
                 <p className="text-xs text-white/40 mb-1">Voided</p>
                 <p className="text-xl font-bold text-red-400">
-                  {statement.voidedCount} ({formatPrice(statement.voidedTotal, "MYR")})
+                  {statement?.voidedCount ?? 0} ({formatPrice(statement?.voidedTotal ?? 0, "MYR")})
                 </p>
               </CardContent>
             </Card>
@@ -1301,7 +1245,7 @@ function StatementView({
             <CardContent className="p-4">
               <p className="text-sm font-medium text-white/60 mb-3">By Payment Method</p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {Object.entries(statement.byPaymentMethod).map(([method, amount]) => (
+                {Object.entries(statement?.byPaymentMethod ?? {}).map(([method, amount]) => (
                   <div key={method} className="flex items-center gap-2">
                     {(() => {
                       const Icon = PAYMENT_ICON[method as PaymentMethod] ?? DollarSign;
@@ -1326,7 +1270,7 @@ function StatementView({
             <CardContent className="p-4">
               <p className="text-sm font-medium text-white/60 mb-3">By Category</p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {Object.entries(statement.byItemType).map(([type, amount]) => (
+                {Object.entries(statement?.byItemType ?? {}).map(([type, amount]) => (
                   <div key={type}>
                     <p className="text-xs text-white/40">
                       {ITEM_TYPE_LABEL[type] ?? type}
@@ -1343,7 +1287,7 @@ function StatementView({
           {/* Transaction List */}
           <Card className="glass-card">
             <CardContent className="p-0">
-              {statement.transactions.length === 0 ? (
+              {(statement?.transactions?.length ?? 0) === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <FileText className="h-6 w-6 text-white/30 mb-2" />
                   <p className="text-sm text-white/50">No transactions this month</p>
@@ -1360,12 +1304,12 @@ function StatementView({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {statement.transactions.map((tx: any) => {
+                    {statement!.transactions.map((tx: any) => {
                       const statusConfig =
                         STATUS_CONFIG[tx.status as keyof typeof STATUS_CONFIG];
                       return (
                         <TableRow
-                          key={tx._id}
+                          key={tx.id}
                           className="border-white/[0.06] hover:bg-white/[0.02]"
                         >
                           <TableCell className="text-white/70">
@@ -1378,7 +1322,7 @@ function StatementView({
                             {tx.customerName}
                           </TableCell>
                           <TableCell className="font-medium text-white">
-                            {formatPrice(tx.total, tx.currency)}
+                            {formatPrice(tx.total ?? 0, tx.currency)}
                           </TableCell>
                           <TableCell>
                             <Badge

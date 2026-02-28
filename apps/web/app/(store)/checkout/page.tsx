@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useQuery, useAction } from "convex/react";
-import { api } from "@timeo/api";
+import { useOrders, useCreateStripePayment } from "@timeo/api-client";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
 import { formatPrice } from "@timeo/shared";
 import {
@@ -44,12 +43,10 @@ export default function CheckoutPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
 
-  const order = useQuery(
-    api.orders.getById,
-    orderId ? { orderId: orderId as any } : "skip"
-  );
+  const { data: orders, isLoading: ordersLoading } = useOrders(activeTenantId ?? "");
+  const order = orders?.find((o) => o.id === orderId);
 
-  const createPaymentIntent = useAction(api.payments.createPaymentIntent);
+  const { mutateAsync: createPaymentIntent } = useCreateStripePayment(activeTenantId ?? "");
 
   // Initialize payment intent when order is loaded
   useEffect(() => {
@@ -58,8 +55,7 @@ export default function CheckoutPage() {
     async function initPayment() {
       try {
         const result = await createPaymentIntent({
-          tenantId: activeTenantId as any,
-          orderId: order!._id,
+          orderId: order!.id,
           amount: order!.totalAmount,
           currency: order!.currency,
           customerId: order!.customerId,
@@ -175,7 +171,7 @@ export default function CheckoutPage() {
                   </div>
                   <span className="font-medium">
                     {formatPrice(
-                      item.snapshotPrice * item.quantity,
+                      (item.snapshotPrice ?? 0) * item.quantity,
                       order.currency
                     )}
                   </span>

@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { useOrders } from "@timeo/api-client";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
 import { formatDate, formatPrice } from "@timeo/shared";
 import {
@@ -64,12 +63,7 @@ function getOrderStatusLabel(status: string): string {
 export default function OrdersPage() {
   const { activeTenantId, isSignedIn } = useTimeoWebAuthContext();
 
-  const orders = useQuery(
-    api.orders.listByCustomer,
-    activeTenantId ? { tenantId: activeTenantId as any } : "skip"
-  );
-
-  const isLoading = orders === undefined;
+  const { data: orders, isLoading } = useOrders(activeTenantId ?? "");
 
   if (!isSignedIn) {
     return (
@@ -160,9 +154,9 @@ export default function OrdersPage() {
               </TableHeader>
               <TableBody>
                 {orders.map((order) => (
-                  <TableRow key={order._id}>
+                  <TableRow key={order.id}>
                     <TableCell className="font-mono text-sm">
-                      #{order._id.slice(-8).toUpperCase()}
+                      #{order.id.slice(-8).toUpperCase()}
                     </TableCell>
                     <TableCell>{formatDate(order.createdAt)}</TableCell>
                     <TableCell>
@@ -196,13 +190,13 @@ export default function OrdersPage() {
           {/* Mobile Cards */}
           <div className="space-y-3 md:hidden">
             {orders.map((order) => (
-              <Card key={order._id}>
+              <Card key={order.id}>
                 <CardContent className="py-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-sm font-medium">
-                          #{order._id.slice(-8).toUpperCase()}
+                          #{order.id.slice(-8).toUpperCase()}
                         </span>
                         <Badge
                           variant={getOrderStatusVariant(order.status)}

@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { useMyBookings, useSessionCredits, useVouchers } from "@timeo/api-client";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import {
@@ -24,27 +23,9 @@ export default function PortalHomePage() {
   const { user } = useTimeoWebAuthContext();
   const { tenantId, tenant } = useTenantId();
 
-  // Wait for user + membership to exist before querying tenant-scoped data
-  const access = useQuery(
-    api.auth.checkAccess,
-    tenantId ? { tenantId } : "skip"
-  );
-  const ready = tenantId && access?.ready;
-
-  const bookings = useQuery(
-    api.bookings.listByCustomer,
-    ready ? { tenantId } : "skip"
-  );
-
-  const creditBalance = useQuery(
-    api.sessionCredits.getBalance,
-    ready ? { tenantId } : "skip"
-  );
-
-  const vouchers = useQuery(
-    api.vouchers.getMyVouchers,
-    ready ? { tenantId } : "skip"
-  );
+  const { data: bookings, isLoading: bookingsLoading } = useMyBookings(tenantId);
+  const { data: credits, isLoading: creditsLoading } = useSessionCredits(tenantId);
+  const { data: vouchers, isLoading: vouchersLoading } = useVouchers(tenantId);
 
   const firstName = user?.name?.split(" ")[0] ?? "there";
 
@@ -54,15 +35,15 @@ export default function PortalHomePage() {
     bookings?.filter(
       (b) =>
         (b.status === "pending" || b.status === "confirmed") &&
-        b.startTime > now
+        new Date(b.startTime).getTime() > now
     ).length ?? 0;
+
+  const totalRemaining =
+    credits?.reduce((sum, c) => sum + (c.remaining ?? 0), 0) ?? 0;
 
   const activeVoucherCount = vouchers?.length ?? 0;
 
-  const isLoading =
-    bookings === undefined ||
-    creditBalance === undefined ||
-    vouchers === undefined;
+  const isLoading = bookingsLoading || creditsLoading || vouchersLoading;
 
   return (
     <div className="space-y-8">
@@ -113,7 +94,7 @@ export default function PortalHomePage() {
                   <Skeleton className="h-7 w-10 bg-white/[0.06]" />
                 ) : (
                   <p className="text-2xl font-bold text-white">
-                    {creditBalance?.totalRemaining ?? 0}
+                    {totalRemaining}
                   </p>
                 )}
                 <p className="text-xs text-white/50">Session Credits</p>
@@ -220,7 +201,7 @@ export default function PortalHomePage() {
           <div className="space-y-3">
             {bookings.slice(0, 3).map((booking) => (
               <Card
-                key={booking._id}
+                key={booking.id}
                 className="glass border-white/[0.08]"
               >
                 <CardContent className="flex items-center justify-between p-4">

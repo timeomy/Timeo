@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { useServices } from "@timeo/api-client";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
 import { formatPrice } from "@timeo/shared";
 import {
@@ -24,17 +23,12 @@ export default function ServicesPage() {
   const { activeTenantId } = useTimeoWebAuthContext();
   const [searchQuery, setSearchQuery] = useState("");
 
-  const services = useQuery(
-    api.services.list,
-    activeTenantId ? { tenantId: activeTenantId as any } : "skip"
-  );
-
-  const isLoading = services === undefined;
+  const { data: services, isLoading } = useServices(activeTenantId ?? "");
 
   const filteredServices = services?.filter(
     (service) =>
       service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      service.description.toLowerCase().includes(searchQuery.toLowerCase())
+      (service.description ?? "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -119,7 +113,7 @@ export default function ServicesPage() {
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredServices.map((service) => (
             <Card
-              key={service._id}
+              key={service.id}
               className="group flex flex-col transition-shadow hover:shadow-md"
             >
               <CardHeader>
@@ -142,7 +136,7 @@ export default function ServicesPage() {
                 </div>
               </CardContent>
               <CardFooter>
-                <Link href={`/services/${service._id}`} className="w-full">
+                <Link href={`/services/${service.id}`} className="w-full">
                   <Button className="w-full gap-2 transition-all group-hover:gap-3">
                     Book Now
                     <ArrowRight className="h-4 w-4" />

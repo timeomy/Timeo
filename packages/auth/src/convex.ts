@@ -1,3 +1,7 @@
+/**
+ * @deprecated This file is Convex-specific and will be deleted after the Convex → PostgreSQL migration.
+ * Use packages/auth/src/server.ts instead.
+ */
 import type { TimeoRole } from "./types";
 
 /**

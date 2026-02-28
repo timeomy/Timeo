@@ -2,8 +2,14 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import {
+  useRevenueOverview,
+  useBookingAnalytics,
+  useOrderAnalytics,
+  useCheckIns,
+  useCheckInStats,
+  useStaffMembers,
+} from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import { useTimeoWebAuthContext, isRoleAtLeast } from "@timeo/auth/web";
 import { formatPrice } from "@timeo/shared";
@@ -82,21 +88,12 @@ function StatCard({
 
 // ─── Admin Dashboard ──────────────────────────────────────────────────────
 
-function AdminDashboard({ tenantId }: { tenantId: any }) {
-  const revenue = useQuery(
-    api.analytics.getRevenueOverview,
-    tenantId ? { tenantId, period: "month" } : "skip"
-  );
-  const bookings = useQuery(
-    api.analytics.getBookingAnalytics,
-    tenantId ? { tenantId, period: "month" } : "skip"
-  );
-  const orders = useQuery(
-    api.analytics.getOrderAnalytics,
-    tenantId ? { tenantId, period: "month" } : "skip"
-  );
+function AdminDashboard({ tenantId }: { tenantId: string }) {
+  const { data: revenue, isLoading: revenueLoading } = useRevenueOverview(tenantId, "month");
+  const { data: bookings, isLoading: bookingsLoading } = useBookingAnalytics(tenantId, "month");
+  const { data: orders, isLoading: ordersLoading } = useOrderAnalytics(tenantId, "month");
 
-  const loading = revenue === undefined || bookings === undefined || orders === undefined;
+  const loading = revenueLoading || bookingsLoading || ordersLoading;
 
   return (
     <>
@@ -213,25 +210,13 @@ function AdminDashboard({ tenantId }: { tenantId: any }) {
 
 // ─── Staff Dashboard ──────────────────────────────────────────────────────
 
-function StaffDashboard({ tenantId }: { tenantId: any }) {
-  const bookings = useQuery(
-    api.analytics.getBookingAnalytics,
-    tenantId ? { tenantId, period: "month" } : "skip"
-  );
-  const checkInStats = useQuery(
-    api.checkIns.getStats,
-    tenantId ? { tenantId } : "skip"
-  );
-  const recentCheckIns = useQuery(
-    api.checkIns.listByTenant,
-    tenantId ? { tenantId } : "skip"
-  );
-  const members = useQuery(
-    api.tenantMemberships.listByTenant,
-    tenantId ? { tenantId } : "skip"
-  );
+function StaffDashboard({ tenantId }: { tenantId: string }) {
+  const { data: bookings, isLoading: bookingsLoading } = useBookingAnalytics(tenantId, "month");
+  const { data: stats, isLoading: statsLoading } = useCheckInStats(tenantId);
+  const { data: recentCheckIns } = useCheckIns(tenantId);
+  const { data: members, isLoading: membersLoading } = useStaffMembers(tenantId);
 
-  const loading = bookings === undefined || checkInStats === undefined;
+  const loading = bookingsLoading || statsLoading;
   const todayCheckIns = recentCheckIns?.slice(0, 5) ?? [];
   const activeMembers = members?.filter((m: any) => m.status === "active").length ?? 0;
 
@@ -241,9 +226,9 @@ function StaffDashboard({ tenantId }: { tenantId: any }) {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Today's Check-ins"
-          value={loading ? "" : checkInStats?.today ?? 0}
+          value={loading ? "" : stats?.today ?? 0}
           icon={ScanLine}
-          description={`${checkInStats?.thisWeek ?? 0} this week`}
+          description={`${stats?.thisWeek ?? 0} this week`}
           loading={loading}
           index={0}
         />
@@ -257,17 +242,17 @@ function StaffDashboard({ tenantId }: { tenantId: any }) {
         />
         <StatCard
           title="Active Members"
-          value={members === undefined ? "" : activeMembers}
+          value={membersLoading ? "" : activeMembers}
           icon={UserCheck}
           description="In your business"
-          loading={members === undefined}
+          loading={membersLoading}
           index={2}
         />
         <StatCard
           title="Check-in Methods"
-          value={loading ? "" : `${checkInStats?.byMethod?.qr ?? 0} QR`}
+          value={loading ? "" : `${stats?.byMethod?.qr ?? 0} QR`}
           icon={CreditCard}
-          description={loading ? "" : `${checkInStats?.byMethod?.manual ?? 0} manual today`}
+          description={loading ? "" : `${stats?.byMethod?.manual ?? 0} manual today`}
           loading={loading}
           index={3}
         />
@@ -303,7 +288,7 @@ function StaffDashboard({ tenantId }: { tenantId: any }) {
             {todayCheckIns.length > 0 ? (
               <div className="space-y-3">
                 {todayCheckIns.map((ci: any) => (
-                  <div key={ci._id} className="flex items-center justify-between text-sm">
+                  <div key={ci.id} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                       <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                         {(ci.userName?.[0] ?? "?").toUpperCase()}
@@ -320,7 +305,7 @@ function StaffDashboard({ tenantId }: { tenantId: any }) {
                         {ci.method}
                       </Badge>
                       <span className="text-xs text-white/40">
-                        {new Date(ci.timestamp).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" })}
+                        {new Date(ci.checkedInAt).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" })}
                       </span>
                     </div>
                   </div>
@@ -426,10 +411,12 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {isAdmin ? (
-        <AdminDashboard tenantId={tenantId} />
-      ) : (
-        <StaffDashboard tenantId={tenantId} />
+      {tenantId && (
+        isAdmin ? (
+          <AdminDashboard tenantId={tenantId} />
+        ) : (
+          <StaffDashboard tenantId={tenantId} />
+        )
       )}
     </div>
   );

@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
-import type { GenericId } from "convex/values";
+import {
+  useStaffMembers,
+  useUpdateStaffRole,
+  useRemoveStaffMember,
+  useInviteStaff,
+} from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import {
   Card,
@@ -52,48 +55,30 @@ const STATUS_BADGE_VARIANTS: Record<string, string> = {
 export default function TeamPage() {
   const { tenantId } = useTenantId();
 
-  const members = useQuery(
-    api.tenantMemberships.listByTenant,
-    tenantId ? { tenantId: tenantId } : "skip"
-  );
+  const { data: members, isLoading } = useStaffMembers(tenantId ?? "");
 
-  const updateRole = useMutation(api.tenantMemberships.updateRole);
-  const suspendMember = useMutation(api.tenantMemberships.suspend);
-  const inviteMember = useMutation(api.tenantMemberships.invite);
+  const { mutateAsync: updateRole } = useUpdateStaffRole(tenantId ?? "");
+  const { mutateAsync: removeMember } = useRemoveStaffMember(tenantId ?? "");
+  const { mutateAsync: inviteMember } = useInviteStaff(tenantId ?? "");
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<MemberRole>("staff");
-  const [lookupEmail, setLookupEmail] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
 
-  const lookedUpUser = useQuery(
-    api.users.getByEmail,
-    lookupEmail ? { email: lookupEmail } : "skip"
-  );
+  // Simple inline lookup state (no Convex user lookup available in new stack)
+  const [lookupStatus] = useState<"idle">("idle");
 
-  const foundUser = lookedUpUser ?? null;
-  const lookupStatus: "idle" | "searching" | "found" | "not_found" =
-    lookupEmail === null
-      ? "idle"
-      : lookedUpUser === undefined
-        ? "searching"
-        : lookedUpUser !== null
-          ? "found"
-          : "not_found";
-
-  function handleLookup() {
-    if (!inviteEmail.trim()) return;
-    setLookupEmail(inviteEmail.trim());
+  function resetInviteForm() {
+    setInviteEmail("");
   }
 
   async function handleInvite() {
-    if (!tenantId || !foundUser) return;
+    if (!tenantId || !inviteEmail.trim()) return;
     setSaving("invite");
     try {
       await inviteMember({
-        tenantId: tenantId,
-        userId: foundUser._id,
+        email: inviteEmail.trim(),
         role: inviteRole,
       });
       setInviteOpen(false);
@@ -105,20 +90,11 @@ export default function TeamPage() {
     }
   }
 
-  function resetInviteForm() {
-    setInviteEmail("");
-    setLookupEmail(null);
-  }
-
-  async function handleRoleChange(membershipId: GenericId<"tenantMemberships">, role: MemberRole) {
+  async function handleRoleChange(userId: string, role: MemberRole) {
     if (!tenantId) return;
-    setSaving(membershipId);
+    setSaving(userId);
     try {
-      await updateRole({
-        tenantId: tenantId,
-        membershipId,
-        role,
-      });
+      await updateRole({ userId, role });
     } catch (err: any) {
       alert(err.message || "Failed to update role.");
     } finally {
@@ -126,23 +102,20 @@ export default function TeamPage() {
     }
   }
 
-  async function handleSuspend(membershipId: GenericId<"tenantMemberships">) {
+  async function handleSuspend(userId: string) {
     if (!tenantId) return;
-    if (!confirm("Are you sure you want to suspend this member?")) return;
-    setSaving(membershipId);
+    if (!confirm("Are you sure you want to remove this member?")) return;
+    setSaving(userId);
     try {
-      await suspendMember({
-        tenantId: tenantId,
-        membershipId,
-      });
+      await removeMember(userId);
     } catch (err: any) {
-      alert(err.message || "Failed to suspend member.");
+      alert(err.message || "Failed to remove member.");
     } finally {
       setSaving(null);
     }
   }
 
-  const loading = members === undefined;
+  const loading = isLoading;
 
   return (
     <div className="space-y-8">
@@ -171,57 +144,20 @@ export default function TeamPage() {
             <DialogHeader>
               <DialogTitle>Invite Team Member</DialogTitle>
               <DialogDescription>
-                Look up a user by email to invite them to your team.
+                Enter the email address of the team member you want to invite.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Email Address</label>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="member@example.com"
-                    value={inviteEmail}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                      setInviteEmail(e.target.value);
-                      setLookupEmail(null);
-                    }}
-                    type="email"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleLookup}
-                    disabled={!inviteEmail.trim()}
-                    className="shrink-0"
-                  >
-                    <Search className="h-4 w-4" />
-                  </Button>
-                </div>
-                {lookupStatus === "searching" && (
-                  <p className="text-sm text-white/50">
-                    Searching...
-                  </p>
-                )}
-                {lookupStatus === "not_found" && (
-                  <p className="text-sm text-yellow-400">
-                    No user found with that email. They must sign up first before you can invite them.
-                  </p>
-                )}
-                {foundUser && (
-                  <div className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.03] p-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
-                      {(foundUser.name?.[0] || foundUser.email?.[0] || "?").toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">
-                        {foundUser.name || "Unknown"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {foundUser.email}
-                      </p>
-                    </div>
-                  </div>
-                )}
+                <Input
+                  placeholder="member@example.com"
+                  value={inviteEmail}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    setInviteEmail(e.target.value);
+                  }}
+                  type="email"
+                />
               </div>
               <Select
                 label="Role"
@@ -236,7 +172,7 @@ export default function TeamPage() {
               </Button>
               <Button
                 onClick={handleInvite}
-                disabled={!foundUser || saving === "invite"}
+                disabled={!inviteEmail.trim() || saving === "invite"}
               >
                 {saving === "invite" ? "Inviting..." : "Send Invite"}
               </Button>
@@ -288,7 +224,7 @@ export default function TeamPage() {
               </TableHeader>
               <TableBody>
                 {members.map((member: any) => (
-                  <TableRow key={member._id} className="border-white/[0.06]">
+                  <TableRow key={member.id} className="border-white/[0.06]">
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
@@ -341,17 +277,17 @@ export default function TeamPage() {
                           options={ROLE_OPTIONS}
                           value={member.role}
                           onChange={(role: string) =>
-                            handleRoleChange(member._id, role as MemberRole)
+                            handleRoleChange(member.userId ?? member.id, role as MemberRole)
                           }
-                          disabled={saving === member._id}
+                          disabled={saving === (member.userId ?? member.id)}
                           className="w-[120px]"
                         />
                         {member.status !== "suspended" && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleSuspend(member._id)}
-                            disabled={saving === member._id}
+                            onClick={() => handleSuspend(member.userId ?? member.id)}
+                            disabled={saving === (member.userId ?? member.id)}
                             className="h-8 text-red-400 hover:bg-red-500/10 hover:text-red-300"
                           >
                             <Ban className="h-4 w-4" />
