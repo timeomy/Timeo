@@ -64,7 +64,7 @@ export default function BookingsScreen() {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (b) =>
-          b.serviceName.toLowerCase().includes(query) ||
+          b.serviceName?.toLowerCase().includes(query) ||
           b.customerName?.toLowerCase().includes(query) ||
           (b.staffName && b.staffName.toLowerCase().includes(query))
       );
@@ -75,7 +75,7 @@ export default function BookingsScreen() {
   const handleConfirm = useCallback(
     async (bookingId: string) => {
       try {
-        await confirmBooking.mutateAsync({ bookingId });
+        await confirmBooking.mutateAsync(bookingId);
       } catch (err) {
         Alert.alert("Error", err instanceof Error ? err.message : "Failed to confirm booking");
       }
@@ -106,7 +106,7 @@ export default function BookingsScreen() {
   const handleComplete = useCallback(
     async (bookingId: string) => {
       try {
-        await completeBooking.mutateAsync({ bookingId });
+        await completeBooking.mutateAsync(bookingId);
       } catch (err) {
         Alert.alert("Error", err instanceof Error ? err.message : "Failed to complete booking");
       }
@@ -180,7 +180,7 @@ export default function BookingsScreen() {
         renderItem={({ item }) => (
           <View>
             <BookingCard
-              serviceName={item.serviceName}
+              serviceName={item.serviceName ?? "Service"}
               staffName={item.staffName}
               status={item.status}
               startTime={new Date(item.startTime).getTime()}

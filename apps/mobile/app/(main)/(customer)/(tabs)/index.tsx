@@ -104,8 +104,7 @@ export default function HomeScreen() {
             <Button
               variant="outline"
               onPress={() => router.push("/(main)/(customer)/(tabs)/services")}
-              className="self-start"
-              style={{ borderColor: "#0B0B0F30" }}
+              style={{ borderColor: "#0B0B0F30", alignSelf: "flex-start" }}
             >
               <View className="flex-row items-center">
                 <CalendarPlus size={16} color="#0B0B0F" />
@@ -125,8 +124,8 @@ export default function HomeScreen() {
       >
         {isLoadingServices ? (
           <View className="flex-row gap-3">
-            <Skeleton className="h-28 flex-1 rounded-2xl" />
-            <Skeleton className="h-28 flex-1 rounded-2xl" />
+            <Skeleton height={112} borderRadius={16} />
+            <Skeleton height={112} borderRadius={16} />
           </View>
         ) : !services || services.length === 0 ? (
           <EmptyState
@@ -169,8 +168,8 @@ export default function HomeScreen() {
       >
         {isLoadingProducts ? (
           <View className="flex-row gap-3">
-            <Skeleton className="h-52 flex-1 rounded-2xl" />
-            <Skeleton className="h-52 flex-1 rounded-2xl" />
+            <Skeleton height={208} borderRadius={16} />
+            <Skeleton height={208} borderRadius={16} />
           </View>
         ) : !products || products.length === 0 ? (
           <EmptyState

@@ -60,7 +60,7 @@ export default function CheckInsScreen() {
   const [showManualCheckIn, setShowManualCheckIn] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
 
-  const { data: checkIns, isLoading, refetch, isRefetching } = useCheckIns(tenantId, { today: true });
+  const { data: checkIns, isLoading, refetch, isRefetching } = useCheckIns(tenantId, { date: new Date().toISOString().split("T")[0] });
   const { data: stats } = useCheckInStats(tenantId);
   const { data: members } = useStaffMembers(tenantId);
   const createCheckIn = useCreateCheckIn(tenantId ?? "");
@@ -71,8 +71,8 @@ export default function CheckInsScreen() {
     return members
       .filter(
         (m) =>
-          m.userName?.toLowerCase().includes(q) ||
-          m.userEmail?.toLowerCase().includes(q)
+          m.name?.toLowerCase().includes(q) ||
+          m.email?.toLowerCase().includes(q)
       )
       .slice(0, 10);
   }, [members, memberSearch]);
@@ -279,7 +279,7 @@ export default function CheckInsScreen() {
               <View key={member.id}>
                 {index > 0 && <Separator />}
                 <TouchableOpacity
-                  onPress={() => handleManualCheckIn(member.userId ?? member.id, member.userName ?? "Member")}
+                  onPress={() => handleManualCheckIn(member.userId ?? member.id, member.name ?? "Member")}
                   className="flex-row items-center py-3"
                 >
                   <View
@@ -287,15 +287,15 @@ export default function CheckInsScreen() {
                     style={{ backgroundColor: theme.colors.primary + "15" }}
                   >
                     <Text className="text-xs font-bold" style={{ color: theme.colors.primary }}>
-                      {(member.userName ?? "?").charAt(0).toUpperCase()}
+                      {(member.name ?? "?").charAt(0).toUpperCase()}
                     </Text>
                   </View>
                   <View className="flex-1">
                     <Text className="text-sm font-medium" style={{ color: theme.colors.text }}>
-                      {member.userName}
+                      {member.name}
                     </Text>
                     <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>
-                      {member.userEmail}
+                      {member.email}
                     </Text>
                   </View>
                 </TouchableOpacity>

@@ -187,7 +187,7 @@ export default function OrdersScreen() {
                 status={item.status}
                 totalAmount={item.totalAmount}
                 currency={item.currency}
-                itemCount={item.itemCount}
+                itemCount={item.itemCount ?? 0}
                 createdAt={new Date(item.createdAt).getTime()}
                 onPress={() => router.push(`/orders/${item.id}`)}
               />

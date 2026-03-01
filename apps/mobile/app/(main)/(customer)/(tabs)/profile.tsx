@@ -87,7 +87,7 @@ export default function ProfileScreen() {
       <Header title="Profile" />
 
       {/* Profile Card */}
-      <Card className="mt-2">
+      <Card>
         <View className="items-center">
           <Avatar
             src={user?.imageUrl}
@@ -435,7 +435,7 @@ export default function ProfileScreen() {
       <Spacer size={24} />
 
       {/* Sign Out */}
-      <Button variant="destructive" size="lg" onPress={handleSignOut} className="w-full">
+      <Button variant="destructive" size="lg" onPress={handleSignOut} style={{ width: "100%" }}>
         <View className="flex-row items-center">
           <LogOut size={18} color="#FFFFFF" />
           <Text className="ml-2 text-base font-semibold text-white">Sign Out</Text>

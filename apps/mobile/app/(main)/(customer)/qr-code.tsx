@@ -32,7 +32,7 @@ export default function QrCodeScreen() {
     if (!tenantId) return;
     setIsGenerating(true);
     try {
-      await generateQrCode.mutateAsync();
+      await generateQrCode.mutateAsync({});
     } catch (err) {
       Alert.alert(
         "Error",

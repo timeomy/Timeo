@@ -203,7 +203,7 @@ export default function ProductDetailScreen() {
             <Button
               size="lg"
               onPress={handleAddToCart}
-              className="min-w-[160px]"
+              style={{ minWidth: 160 }}
             >
               <View className="flex-row items-center">
                 <ShoppingBag size={18} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />

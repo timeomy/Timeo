@@ -84,7 +84,7 @@ export default function NewTransactionScreen() {
   const customerOptions = useMemo(() => {
     if (!members) return [];
     return members.map((m) => ({
-      label: `${m.userName} (${m.userEmail})`,
+      label: `${m.name} (${m.email})`,
       value: m.userId ?? m.id,
     }));
   }, [members]);

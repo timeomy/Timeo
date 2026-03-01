@@ -241,7 +241,7 @@ export default function BookingDetailScreen() {
             size="lg"
             loading={isCancelling}
             onPress={handleCancel}
-            className="w-full"
+            style={{ width: "100%" }}
           >
             Cancel Booking
           </Button>

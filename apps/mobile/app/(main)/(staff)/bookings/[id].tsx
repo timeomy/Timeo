@@ -63,7 +63,7 @@ export default function BookingDetailScreen() {
   const handleConfirm = useCallback(async () => {
     if (!id) return;
     try {
-      await confirmBooking.mutateAsync({ bookingId: id });
+      await confirmBooking.mutateAsync(id);
     } catch (err) {
       Alert.alert(
         "Error",
@@ -100,7 +100,7 @@ export default function BookingDetailScreen() {
   const handleComplete = useCallback(async () => {
     if (!id) return;
     try {
-      await completeBooking.mutateAsync({ bookingId: id });
+      await completeBooking.mutateAsync(id);
     } catch (err) {
       Alert.alert(
         "Error",
@@ -121,7 +121,7 @@ export default function BookingDetailScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await markNoShow.mutateAsync({ bookingId: id });
+              await markNoShow.mutateAsync(id);
             } catch (err) {
               Alert.alert(
                 "Error",

@@ -107,7 +107,7 @@ export default function MembershipsScreen() {
         ) : (
           <Section title="Available Plans">
             {activeMemberships.map((membership) => (
-              <Card key={membership.id} className="mb-4">
+              <Card key={membership.id}>
                 <View className="p-1">
                   <Row justify="between" align="start">
                     <View className="flex-1">
@@ -149,7 +149,6 @@ export default function MembershipsScreen() {
                             key={idx}
                             align="center"
                             gap={8}
-                            className="mb-1.5"
                           >
                             <CheckCircle2
                               size={14}

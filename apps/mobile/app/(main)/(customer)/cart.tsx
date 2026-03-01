@@ -282,7 +282,7 @@ export default function CartScreen() {
               size="lg"
               loading={isCheckingOut}
               onPress={handleCheckout}
-              className="w-full"
+              style={{ width: "100%" }}
             >
               Checkout
             </Button>

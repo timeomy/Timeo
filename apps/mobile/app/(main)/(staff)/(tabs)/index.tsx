@@ -234,7 +234,7 @@ export default function Dashboard() {
               {upcomingBookings.map((booking) => (
                 <BookingCard
                   key={booking.id}
-                  serviceName={booking.serviceName}
+                  serviceName={booking.serviceName ?? "Service"}
                   staffName={booking.staffName}
                   status={booking.status}
                   startTime={new Date(booking.startTime).getTime()}
@@ -267,7 +267,7 @@ export default function Dashboard() {
                   status={order.status}
                   totalAmount={order.totalAmount}
                   currency={order.currency}
-                  itemCount={order.itemCount}
+                  itemCount={order.itemCount ?? 0}
                   createdAt={new Date(order.createdAt).getTime()}
                   onPress={() => router.push(`/orders/${order.id}`)}
                 />

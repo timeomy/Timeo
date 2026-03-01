@@ -299,9 +299,9 @@ export default function TenantDetailScreen() {
                 </View>
                 <Switch
                   value={flag.enabled}
-                  onValueChange={() =>
-                    updateFlag.mutateAsync({ key: flag.key, enabled: !flag.enabled })
-                  }
+                  onValueChange={() => {
+                    updateFlag.mutateAsync({ key: flag.key, enabled: !flag.enabled });
+                  }}
                   trackColor={{ false: theme.colors.border, true: theme.colors.primary + "80" }}
                   thumbColor={flag.enabled ? theme.colors.primary : theme.colors.textSecondary}
                 />

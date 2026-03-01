@@ -23,7 +23,7 @@ export default function ScanQRScreen() {
       setScanned(true);
       setProcessing(true);
       try {
-        await checkInByQr.mutateAsync({ code: data });
+        await checkInByQr.mutateAsync(data);
         Alert.alert("Success", "Member checked in successfully!", [
           { text: "OK", onPress: () => router.back() },
         ]);

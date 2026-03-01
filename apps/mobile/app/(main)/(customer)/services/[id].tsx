@@ -467,7 +467,7 @@ export default function ServiceDetailScreen() {
               loading={isBooking}
               onPress={handleBook}
               disabled={!selectedSlot}
-              className="min-w-[140px]"
+              style={{ minWidth: 140 }}
             >
               Book Now
             </Button>
