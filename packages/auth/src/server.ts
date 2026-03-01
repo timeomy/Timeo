@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { db } from "@timeo/db";
+import { db, user, session, account, verification } from "@timeo/db";
 
 const siteUrl = process.env.SITE_URL ?? "http://localhost:3000";
 const apiUrl = process.env.API_URL ?? "http://localhost:4000";
@@ -8,15 +8,23 @@ const apiUrl = process.env.API_URL ?? "http://localhost:4000";
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
+    // Explicitly map Better Auth models to our Drizzle tables.
+    // Better Auth expects singular model names (user, session, account, verification).
+    schema: { user, session, account, verification },
   }),
   baseURL: apiUrl,
   basePath: "/api/auth",
   secret: process.env.BETTER_AUTH_SECRET!,
-  trustedOrigins: [siteUrl, "http://localhost:3000", "http://localhost:4000"],
+  // Include both 3000 and 3001 since Next.js auto-assigns 3001 when 3000 is taken
+  trustedOrigins: [siteUrl, "http://localhost:3000", "http://localhost:3001", "http://localhost:4000"],
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
     sendResetPassword: async ({ user, url }) => {
+      if (!process.env.RESEND_API_KEY) {
+        console.log(`[dev] Reset password email → ${user.email}: ${url}`);
+        return;
+      }
       const { Resend } = await import("resend");
       const resend = new Resend(process.env.RESEND_API_KEY);
       const safeUrl = url.replace(/[<>"'&]/g, "");
@@ -30,6 +38,10 @@ export const auth = betterAuth({
   },
   emailVerification: {
     sendVerificationEmail: async ({ user, url }) => {
+      if (!process.env.RESEND_API_KEY) {
+        console.log(`[dev] Verification email → ${user.email}: ${url}`);
+        return;
+      }
       const { Resend } = await import("resend");
       const resend = new Resend(process.env.RESEND_API_KEY);
       const safeUrl = url.replace(/[<>"'&]/g, "");
