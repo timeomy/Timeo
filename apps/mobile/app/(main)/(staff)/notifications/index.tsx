@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useRouter } from "expo-router";
 import { NotificationsScreen } from "@timeo/ui";
+import { useTimeoAuth } from "@timeo/auth";
 import {
   useNotifications,
   useMarkNotificationRead,
@@ -9,10 +10,12 @@ import {
 
 export default function StaffNotificationsPage() {
   const router = useRouter();
+  const { activeTenantId } = useTimeoAuth();
+  const tenantId = activeTenantId as string;
 
-  const { data: notifications } = useNotifications();
-  const markAsRead = useMarkNotificationRead();
-  const markAllAsRead = useMarkAllNotificationsRead();
+  const { data: notifications } = useNotifications(tenantId);
+  const markAsRead = useMarkNotificationRead(tenantId);
+  const markAllAsRead = useMarkAllNotificationsRead(tenantId);
 
   const mappedNotifications = useMemo(
     () =>
@@ -30,7 +33,7 @@ export default function StaffNotificationsPage() {
 
   const handleMarkAsRead = useCallback(
     (notificationId: string) => {
-      markAsRead.mutate({ notificationId });
+      markAsRead.mutate(notificationId);
     },
     [markAsRead],
   );

@@ -1,5 +1,5 @@
 {
-  "extends": "@timeo/config-ts/tsconfig.json",
+  "extends": "@timeo/config-ts/tsconfig.base.json",
   "compilerOptions": {
     "allowJs": true,
     "jsx": "react-native",

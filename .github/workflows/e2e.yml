@@ -47,6 +47,11 @@ jobs:
         env:
           DATABASE_URL: postgresql://timeo:timeo@localhost:5432/timeo
 
+      - name: Seed test data
+        run: pnpm --filter @timeo/db seed
+        env:
+          DATABASE_URL: postgresql://timeo:timeo@localhost:5432/timeo
+
       - name: Start Hono API
         run: |
           pnpm --filter @timeo/api dev &
@@ -85,7 +90,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: apps/web
 
-      - run: npx playwright test e2e/auth.spec.ts --reporter=list
+      - name: Run Playwright E2E tests
+        run: npx playwright test e2e/auth.spec.ts e2e/onboarding.spec.ts e2e/bookings.spec.ts e2e/platform.spec.ts --reporter=list
         working-directory: apps/web
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
