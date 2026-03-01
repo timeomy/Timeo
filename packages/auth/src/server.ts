@@ -5,6 +5,18 @@ import { db, user, session, account, verification } from "@timeo/db";
 const siteUrl = process.env.SITE_URL ?? "http://localhost:3000";
 const apiUrl = process.env.API_URL ?? "http://localhost:4000";
 
+// Trusted origins: always include the configured site + API URLs plus dev defaults.
+// In production SITE_URL=https://timeo.my and API_URL=https://api.timeo.my.
+const trustedOrigins = Array.from(
+  new Set([
+    siteUrl,
+    apiUrl,
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:4000",
+  ])
+);
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -16,7 +28,7 @@ export const auth = betterAuth({
   basePath: "/api/auth",
   secret: process.env.BETTER_AUTH_SECRET!,
   // Include both 3000 and 3001 since Next.js auto-assigns 3001 when 3000 is taken
-  trustedOrigins: [siteUrl, "http://localhost:3000", "http://localhost:3001", "http://localhost:4000"],
+  trustedOrigins,
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
