@@ -125,7 +125,7 @@ describe("GET /api/tenants", () => {
       headers: { Origin: "http://localhost:3000" },
     });
     expect(res.status).toBe(401);
-    const body = await res.json();
+    const body = await res.json() as Record<string, unknown>;
     expectError(body, "UNAUTHORIZED");
   });
 
@@ -157,7 +157,7 @@ describe("GET /api/tenants", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as Record<string, unknown>;
     expect(body.success).toBe(true);
   });
 });
@@ -180,7 +180,7 @@ describe("GET /api/tenants/by-slug/:slug", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as Record<string, unknown>;
     const data = expectSuccess(body);
     expect(data).toHaveProperty("id", TEST_TENANT.id);
   });
@@ -198,7 +198,7 @@ describe("GET /api/tenants/by-slug/:slug", () => {
     });
 
     expect(res.status).toBe(404);
-    const body = await res.json();
+    const body = await res.json() as Record<string, unknown>;
     expectError(body, "NOT_FOUND");
   });
 });
@@ -237,7 +237,7 @@ describe("POST /api/tenants", () => {
     });
 
     expect(res.status).toBe(201);
-    const body = await res.json();
+    const body = await res.json() as Record<string, unknown>;
     const data = expectSuccess(body);
     expect(data).toHaveProperty("tenantId");
   });
@@ -271,7 +271,7 @@ describe("POST /api/tenants", () => {
     });
 
     expect(res.status).toBe(409);
-    const body = await res.json();
+    const body = await res.json() as Record<string, unknown>;
     expectError(body, "CONFLICT");
   });
 

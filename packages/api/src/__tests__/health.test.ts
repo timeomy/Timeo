@@ -63,7 +63,7 @@ describe("GET /health", () => {
     const res = await app.request("/health");
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await res.json() as Record<string, unknown>;
     const data = expectSuccess(body);
 
     expect(data).toHaveProperty("status", "ok");
@@ -73,7 +73,7 @@ describe("GET /health", () => {
 
   it("returns a valid ISO timestamp", async () => {
     const res = await app.request("/health");
-    const body = await res.json();
+    const body = await res.json() as Record<string, unknown>;
     const data = body.data as { timestamp: string };
 
     const parsed = new Date(data.timestamp);

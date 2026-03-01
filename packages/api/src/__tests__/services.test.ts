@@ -139,7 +139,7 @@ describe("GET /api/tenants/:tenantId/services", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as Record<string, unknown>;
     expect(body.success).toBe(true);
   });
 });
@@ -169,7 +169,7 @@ describe("POST /api/tenants/:tenantId/services", () => {
     });
 
     expect(res.status).toBe(201);
-    const body = await res.json();
+    const body = await res.json() as Record<string, unknown>;
     const data = expectSuccess(body);
     expect(data).toHaveProperty("id");
   });
@@ -227,7 +227,7 @@ describe("DELETE /api/tenants/:tenantId/services/:serviceId", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as Record<string, unknown>;
     expectSuccess(body);
     expect(mockDb.update).toHaveBeenCalled();
   });

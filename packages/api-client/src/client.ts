@@ -1,3 +1,6 @@
+// eslint-disable-next-line no-var
+declare var window: unknown;
+
 type ApiResponse<T> =
   | { success: true; data: T }
   | { success: false; error: { code: string; message: string } };
