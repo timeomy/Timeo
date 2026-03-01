@@ -1,14 +1,113 @@
-import { View, Text, ScrollView } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import React, { useState, useMemo, useCallback } from "react";
+import { View, FlatList, RefreshControl } from "react-native";
+import { useRouter } from "expo-router";
+import { ShoppingBag } from "lucide-react-native";
+import {
+  Screen,
+  Header,
+  SearchInput,
+  ProductCard,
+  LoadingScreen,
+  EmptyState,
+  useTheme,
+} from "@timeo/ui";
+import { useTimeoAuth } from "@timeo/auth";
+import { useProducts } from "@timeo/api-client";
+import { useCart } from "@/providers/cart";
 
-// TODO: Migrate full screen from apps/customer/
-export default function CustomerProductsScreen() {
+export default function ProductsScreen() {
+  const router = useRouter();
+  const theme = useTheme();
+  const { activeTenantId } = useTimeoAuth();
+  const { addItem } = useCart();
+  const [search, setSearch] = useState("");
+
+  const { data: products, isLoading, refetch, isRefetching } = useProducts(activeTenantId);
+
+  const filteredProducts = useMemo(() => {
+    if (!products) return [];
+    if (!search.trim()) return products;
+    const query = search.toLowerCase().trim();
+    return products.filter(
+      (p) =>
+        p.name.toLowerCase().includes(query) ||
+        (p.description ?? "").toLowerCase().includes(query)
+    );
+  }, [products, search]);
+
+  const onRefresh = useCallback(() => {
+    refetch();
+  }, [refetch]);
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading products..." />;
+  }
+
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <ScrollView className="flex-1 p-4">
-        <Text className="text-xl font-bold mb-2">Products</Text>
-        <Text className="text-gray-500">TODO: Migrate products list from original app</Text>
-      </ScrollView>
-    </SafeAreaView>
+    <Screen padded={false}>
+      <Header title="Products" />
+      <View className="px-4 pb-3">
+        <SearchInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search products..."
+        />
+      </View>
+
+      {filteredProducts.length === 0 ? (
+        <EmptyState
+          title={search ? "No results found" : "No products available"}
+          description={
+            search
+              ? `No products match "${search}". Try a different search.`
+              : "This business hasn't added any products yet."
+          }
+          icon={<ShoppingBag size={32} color={theme.colors.textSecondary} />}
+          action={
+            search
+              ? { label: "Clear Search", onPress: () => setSearch("") }
+              : undefined
+          }
+        />
+      ) : (
+        <FlatList
+          data={filteredProducts}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+          columnWrapperStyle={{ gap: 12 }}
+          ItemSeparatorComponent={() => <View className="h-3" />}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={onRefresh}
+              tintColor={theme.colors.primary}
+            />
+          }
+          renderItem={({ item }) => (
+            <View className="flex-1">
+              <ProductCard
+                name={item.name}
+                description={item.description}
+                price={item.price}
+                currency={item.currency}
+                image={item.imageUrl}
+                onPress={() => router.push(`/products/${item.id}` as any)}
+                onAddToCart={() =>
+                  addItem({
+                    productId: item.id,
+                    name: item.name,
+                    price: item.price,
+                    image: item.imageUrl,
+                    currency: item.currency,
+                  })
+                }
+              />
+            </View>
+          )}
+        />
+      )}
+    </Screen>
   );
 }

@@ -1,0 +1,74 @@
+name: API Integration Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/api/**"
+      - "packages/db/**"
+      - "packages/auth/**"
+      - "packages/shared/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "packages/api/**"
+      - "packages/db/**"
+      - "packages/auth/**"
+      - "packages/shared/**"
+
+jobs:
+  api-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: timeo
+          POSTGRES_PASSWORD: timeo
+          POSTGRES_DB: timeo
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run DB migrations
+        run: pnpm --filter @timeo/db exec drizzle-kit migrate
+        env:
+          DATABASE_URL: postgresql://timeo:timeo@localhost:5432/timeo
+
+      - name: Run API integration tests
+        run: pnpm --filter @timeo/api test
+        env:
+          DATABASE_URL: postgresql://timeo:timeo@localhost:5432/timeo
+          REDIS_URL: redis://localhost:6379
+          BETTER_AUTH_SECRET: ci-test-secret-min-32-chars-pad
+          JWT_SECRET: ci-test-jwt-secret-min-32-chars
+          SITE_URL: http://localhost:3000
+          API_URL: http://localhost:4000
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: api-test-results
+          path: packages/api/test-results/

@@ -4,15 +4,27 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@timeo/auth/web";
-import { Loader2, Mail } from "lucide-react";
+import { Loader2, Mail, RefreshCw } from "lucide-react";
+
+const isDev = process.env.NODE_ENV === "development";
 
 export default function VerifyEmailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
+  const email = searchParams.get("email");
 
   const [status, setStatus] = useState<"idle" | "verifying" | "done" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [resendStatus, setResendStatus] = useState<"idle" | "sending" | "sent">("idle");
+
+  async function handleResend() {
+    if (!email || resendStatus === "sending") return;
+    setResendStatus("sending");
+    await authClient.sendVerificationEmail({ email, callbackURL: "/" }).catch(() => null);
+    setResendStatus("sent");
+    setTimeout(() => setResendStatus("idle"), 5000);
+  }
 
   useEffect(() => {
     if (!token) return;
@@ -115,9 +127,30 @@ export default function VerifyEmailPage() {
         </div>
 
         <div className="space-y-4">
-          <p className="text-center text-xs text-muted-foreground">
-            Didn&apos;t receive it? Check your spam folder.
-          </p>
+          {isDev && (
+            <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-center text-xs text-yellow-600 dark:text-yellow-400">
+              <strong>Dev mode:</strong> Check the API server terminal for the verification link.
+            </div>
+          )}
+
+          {email ? (
+            <button
+              onClick={handleResend}
+              disabled={resendStatus === "sending" || resendStatus === "sent"}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-60"
+            >
+              {resendStatus === "sending" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {resendStatus === "sent" ? "Email sent — check your terminal" : "Resend verification email"}
+            </button>
+          ) : (
+            <p className="text-center text-xs text-muted-foreground">
+              Didn&apos;t receive it? Check your spam folder.
+            </p>
+          )}
 
           <div className="border-t pt-4 text-center">
             <Link

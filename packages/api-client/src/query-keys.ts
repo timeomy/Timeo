@@ -96,10 +96,19 @@ export const queryKeys = {
 
   platform: {
     tenants: () => ["platform", "tenants"] as const,
+    tenant: (id: string) => ["platform", "tenants", id] as const,
     config: () => ["platform", "config"] as const,
     flags: () => ["platform", "flags"] as const,
+    flag: (key: string) => ["platform", "flags", key] as const,
     logs: () => ["platform", "logs"] as const,
     overview: () => ["platform", "overview"] as const,
+    stats: () => ["platform", "stats"] as const,
+    health: () => ["platform", "health"] as const,
+    users: () => ["platform", "users"] as const,
+    user: (id: string) => ["platform", "users", id] as const,
+    subscriptions: () => ["platform", "subscriptions"] as const,
+    analytics: (range: string) => ["platform", "analytics", range] as const,
+    auditLogs: () => ["platform", "audit-logs"] as const,
   },
 
   files: {

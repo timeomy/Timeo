@@ -2,7 +2,7 @@ import * as React from "react";
 import { ImageOff, Loader2 } from "lucide-react";
 import { cn } from "../lib/cn";
 
-export interface WebConvexImageProps {
+export interface WebRemoteImageProps {
   url: string | null | undefined;
   alt?: string;
   fallback?: React.ReactNode;
@@ -12,7 +12,7 @@ export interface WebConvexImageProps {
   rounded?: boolean;
 }
 
-export function ConvexImage({
+export function RemoteImage({
   url,
   alt = "",
   fallback,
@@ -20,7 +20,7 @@ export function ConvexImage({
   height = "100%",
   className,
   rounded = false,
-}: WebConvexImageProps) {
+}: WebRemoteImageProps) {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(false);
 

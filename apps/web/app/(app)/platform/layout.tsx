@@ -5,25 +5,31 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTimeoWebAuthContext, isRoleAtLeast } from "@timeo/auth/web";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
-import {
-  Separator,
-  cn,
-} from "@timeo/ui/web";
+import { Separator, cn } from "@timeo/ui/web";
 import {
   LayoutDashboard,
   Building2,
-  Settings,
+  Users,
+  CreditCard,
+  BarChart3,
+  ScrollText,
+  Flag,
   Zap,
   Menu,
   LogOut,
   ChevronLeft,
   Shield,
 } from "lucide-react";
+import { SystemHealthBar } from "@/components/platform/system-health-bar";
 
 const platformLinks = [
-  { href: "/platform", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/platform/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/platform/tenants", label: "Tenants", icon: Building2 },
-  { href: "/platform/config", label: "Config", icon: Settings },
+  { href: "/platform/users", label: "Users", icon: Users },
+  { href: "/platform/billing", label: "Billing", icon: CreditCard },
+  { href: "/platform/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/platform/activity", label: "Activity Log", icon: ScrollText },
+  { href: "/platform/flags", label: "Feature Flags", icon: Flag },
 ];
 
 function PlatformSidebar({ onNavigate }: { onNavigate?: () => void }) {
@@ -35,7 +41,11 @@ function PlatformSidebar({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="p-4">
-        <Link href="/platform" className="flex items-center gap-2" onClick={onNavigate}>
+        <Link
+          href="/platform/dashboard"
+          className="flex items-center gap-2"
+          onClick={onNavigate}
+        >
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
             <Zap className="h-5 w-5 text-primary-foreground" />
           </div>
@@ -49,8 +59,15 @@ function PlatformSidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="px-3 pb-3">
         <div className="flex items-center gap-2 rounded-lg bg-primary/5 px-3 py-2">
           <Shield className="h-4 w-4 text-primary" />
-          <span className="text-xs font-medium text-primary">Platform Admin</span>
+          <span className="text-xs font-medium text-primary">
+            Platform Admin
+          </span>
         </div>
+      </div>
+
+      {/* System Health Bar */}
+      <div className="px-3 pb-3">
+        <SystemHealthBar />
       </div>
 
       <Separator className="bg-white/[0.06]" />
@@ -60,7 +77,7 @@ function PlatformSidebar({ onNavigate }: { onNavigate?: () => void }) {
         {platformLinks.map((link) => {
           const isActive =
             pathname === link.href ||
-            (link.href !== "/platform" && pathname.startsWith(link.href + "/"));
+            pathname.startsWith(link.href + "/");
           return (
             <Link
               key={link.href}
@@ -70,10 +87,12 @@ function PlatformSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
                 isActive
                   ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
+                  : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground",
               )}
             >
-              <link.icon className={cn("h-4 w-4", isActive && "text-primary")} />
+              <link.icon
+                className={cn("h-4 w-4", isActive && "text-primary")}
+              />
               {link.label}
             </Link>
           );
@@ -104,7 +123,9 @@ function PlatformSidebar({ onNavigate }: { onNavigate?: () => void }) {
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">{displayName}</p>
             {user?.email && (
-              <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {user.email}
+              </p>
             )}
           </div>
           <button
@@ -120,7 +141,11 @@ function PlatformSidebar({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export default function PlatformLayout({ children }: { children: React.ReactNode }) {
+export default function PlatformLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const router = useRouter();
   const { isLoaded, isSignedIn, activeRole } = useTimeoWebAuthContext();
   useEnsureUser(!!isSignedIn);

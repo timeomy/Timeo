@@ -9,7 +9,7 @@ import {
 import { ImageOff } from "lucide-react-native";
 import { useTheme } from "../theme";
 
-export interface ConvexImageProps {
+export interface RemoteImageProps {
   url: string | null | undefined;
   fallback?: React.ReactNode;
   width: number;
@@ -18,14 +18,14 @@ export interface ConvexImageProps {
   style?: StyleProp<ImageStyle>;
 }
 
-export function ConvexImage({
+export function RemoteImage({
   url,
   fallback,
   width,
   height,
   borderRadius = 0,
   style,
-}: ConvexImageProps) {
+}: RemoteImageProps) {
   const theme = useTheme();
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(false);

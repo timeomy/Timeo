@@ -36,6 +36,10 @@ export default function CustomerTabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="products"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",

@@ -43,7 +43,11 @@ export function useUploadFile(tenantId: string) {
         },
       );
 
-      const json = await response.json();
+      const json = (await response.json()) as {
+        success: boolean;
+        data?: { fileId: string; url: string };
+        error?: { message: string };
+      };
       if (!json.success) {
         throw new Error(json.error?.message ?? "Upload failed");
       }

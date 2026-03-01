@@ -51,9 +51,9 @@ export {
   type WebImageUploaderProps as ImageUploaderProps,
 } from "./ImageUploader";
 export {
-  ConvexImage,
-  type WebConvexImageProps as ConvexImageProps,
-} from "./ConvexImage";
+  RemoteImage,
+  type WebRemoteImageProps as RemoteImageProps,
+} from "./RemoteImage";
 
 // Charts
 export {

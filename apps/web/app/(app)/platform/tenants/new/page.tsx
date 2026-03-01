@@ -28,6 +28,22 @@ const planOptions = [
   { label: "Enterprise", value: "enterprise" },
 ];
 
+const countryOptions = [
+  { label: "Malaysia (MY)", value: "MY" },
+  { label: "Singapore (SG)", value: "SG" },
+  { label: "Thailand (TH)", value: "TH" },
+  { label: "Indonesia (ID)", value: "ID" },
+  { label: "Philippines (PH)", value: "PH" },
+];
+
+const currencyOptions = [
+  { label: "MYR — Malaysian Ringgit", value: "MYR" },
+  { label: "SGD — Singapore Dollar", value: "SGD" },
+  { label: "THB — Thai Baht", value: "THB" },
+  { label: "IDR — Indonesian Rupiah", value: "IDR" },
+  { label: "PHP — Philippine Peso", value: "PHP" },
+];
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -39,17 +55,22 @@ function slugify(value: string) {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+interface CreateTenantPayload {
+  name: string;
+  slug: string;
+  plan: string;
+  ownerEmail: string;
+  country: string;
+  currency: string;
+}
+
 export default function CreateTenantPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
   const { mutateAsync: createTenant } = useMutation({
-    mutationFn: (data: {
-      name: string;
-      slug: string;
-      plan: string;
-      ownerEmail: string;
-    }) => api.post("/api/platform/tenants", data),
+    mutationFn: (data: CreateTenantPayload) =>
+      api.post<{ id: string }>("/api/platform/tenants", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platform", "tenants"] });
     },
@@ -60,8 +81,10 @@ export default function CreateTenantPage() {
   const [slugEdited, setSlugEdited] = useState(false);
   const [plan, setPlan] = useState("free");
   const [ownerEmail, setOwnerEmail] = useState("");
+  const [country, setCountry] = useState("MY");
+  const [currency, setCurrency] = useState("MYR");
   const [creating, setCreating] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [createdId, setCreatedId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const handleNameChange = (value: string) => {
@@ -73,7 +96,12 @@ export default function CreateTenantPage() {
   };
 
   const handleSlugChange = (value: string) => {
-    setSlug(value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 48));
+    setSlug(
+      value
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "")
+        .slice(0, 48),
+    );
     setSlugEdited(true);
     setError("");
   };
@@ -82,11 +110,13 @@ export default function CreateTenantPage() {
     if (!name.trim()) return "Business name is required.";
     if (!slug.trim()) return "Slug is required.";
     if (slug.length < 3) return "Slug must be at least 3 characters.";
-    if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(slug) && slug.length > 1) {
+    if (slug.length > 1 && !/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(slug)) {
       return "Slug must start and end with a letter or number.";
     }
     if (!ownerEmail.trim()) return "Owner email is required.";
-    if (!EMAIL_RE.test(ownerEmail.trim())) return "Please enter a valid email address.";
+    if (!EMAIL_RE.test(ownerEmail.trim())) {
+      return "Please enter a valid email address.";
+    }
     return null;
   };
 
@@ -101,39 +131,49 @@ export default function CreateTenantPage() {
     setError("");
 
     try {
-      await createTenant({
+      const result = await createTenant({
         name: name.trim(),
         slug: slug.trim(),
         plan,
         ownerEmail: ownerEmail.trim().toLowerCase(),
+        country,
+        currency,
       });
-      setSuccess(true);
-      setTimeout(() => router.push("/platform/tenants"), 1500);
-    } catch (err: any) {
-      setError(err?.message || "Failed to create tenant.");
+      const id = (result as { id: string }).id ?? null;
+      setCreatedId(id);
+      setTimeout(
+        () => router.push(id ? `/platform/tenants/${id}` : "/platform/tenants"),
+        1500,
+      );
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : "Failed to create tenant.",
+      );
       setCreating(false);
     }
   };
 
-  if (success) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Card className="glass border-white/[0.08] w-full max-w-lg">
-          <CardContent className="py-12 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-              <Check className="h-8 w-8 text-primary" />
-            </div>
-            <h2 className="text-2xl font-bold">Tenant Created</h2>
-            <p className="mt-2 text-muted-foreground">
-              Redirecting to tenants list...
-            </p>
-            <div className="mt-6">
-              <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+  if (createdId !== null || (creating && !error)) {
+    if (createdId !== null) {
+      return (
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <Card className="glass w-full max-w-lg border-white/[0.08]">
+            <CardContent className="py-12 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                <Check className="h-8 w-8 text-primary" />
+              </div>
+              <h2 className="text-2xl font-bold">Tenant Created</h2>
+              <p className="mt-2 text-muted-foreground">
+                Redirecting to tenant detail page...
+              </p>
+              <div className="mt-6">
+                <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
   }
 
   return (
@@ -161,7 +201,9 @@ export default function CreateTenantPage() {
             <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
               <Building2 className="h-7 w-7 text-primary" />
             </div>
-            <CardTitle className="text-center text-xl">Business Details</CardTitle>
+            <CardTitle className="text-center text-xl">
+              Business Details
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             <Input
@@ -172,11 +214,12 @@ export default function CreateTenantPage() {
               disabled={creating}
             />
 
+            {/* Slug */}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-foreground">
                 URL Slug
               </label>
-              <div className="flex items-center gap-0 overflow-hidden rounded-xl border border-input bg-background">
+              <div className="flex items-center overflow-hidden rounded-xl border border-input bg-background">
                 <span className="flex-shrink-0 border-r border-input bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
                   timeo.my/
                 </span>
@@ -189,17 +232,10 @@ export default function CreateTenantPage() {
                 />
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Public storefront URL. Only lowercase letters, numbers, and hyphens.
+                Public storefront URL. Only lowercase letters, numbers, and
+                hyphens.
               </p>
             </div>
-
-            <Select
-              label="Plan"
-              options={planOptions}
-              value={plan}
-              onChange={setPlan}
-              disabled={creating}
-            />
 
             <Input
               label="Owner Email"
@@ -216,6 +252,31 @@ export default function CreateTenantPage() {
               The owner must have an existing account. They will be assigned as
               tenant admin.
             </p>
+
+            <Select
+              label="Plan"
+              options={planOptions}
+              value={plan}
+              onChange={setPlan}
+              disabled={creating}
+            />
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Select
+                label="Country"
+                options={countryOptions}
+                value={country}
+                onChange={setCountry}
+                disabled={creating}
+              />
+              <Select
+                label="Currency"
+                options={currencyOptions}
+                value={currency}
+                onChange={setCurrency}
+                disabled={creating}
+              />
+            </div>
 
             {error && (
               <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3">
@@ -236,10 +297,12 @@ export default function CreateTenantPage() {
                 className="flex-1 gap-2"
                 onClick={handleCreate}
                 disabled={creating || !name.trim() || !ownerEmail.trim()}
-                loading={creating}
               >
                 {creating ? (
-                  "Creating..."
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
                 ) : (
                   <>
                     Create Tenant

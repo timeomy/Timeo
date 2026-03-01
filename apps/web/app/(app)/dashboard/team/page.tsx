@@ -30,7 +30,7 @@ import {
   Select,
   Skeleton,
 } from "@timeo/ui/web";
-import { Users, UserPlus, Ban, Search } from "lucide-react";
+import { Users, UserPlus, Ban } from "lucide-react";
 
 type MemberRole = "admin" | "staff" | "customer";
 
@@ -65,9 +65,6 @@ export default function TeamPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<MemberRole>("staff");
   const [saving, setSaving] = useState<string | null>(null);
-
-  // Simple inline lookup state (no Convex user lookup available in new stack)
-  const [lookupStatus] = useState<"idle">("idle");
 
   function resetInviteForm() {
     setInviteEmail("");

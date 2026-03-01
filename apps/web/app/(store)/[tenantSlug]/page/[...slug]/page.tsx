@@ -8,13 +8,10 @@ interface PageProps {
 }
 
 /**
- * Resolves a Convex tenant ID from slug for CMS queries.
- * In production, this would call the Convex API. For now, we use the slug
- * directly as the tenantId filter since Payload stores it that way.
+ * Resolves a tenant ID from slug for CMS queries.
+ * Payload CMS stores tenantId as the slug for portability.
  */
 async function resolveTenantId(tenantSlug: string): Promise<string> {
-  // The CMS stores tenantId as the Convex tenant slug for portability.
-  // In production, you'd resolve this via the Convex `getBySlug` query.
   return tenantSlug;
 }
 

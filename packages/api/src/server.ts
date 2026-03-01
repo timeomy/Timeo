@@ -1,4 +1,3 @@
-import { createServer } from "node:http";
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
 import { initSocketIO } from "./realtime/socket.js";
@@ -14,18 +13,15 @@ async function main() {
 
   const app = createApp();
 
-  const httpServer = createServer();
-
-  // Attach Socket.io to the HTTP server
-  initSocketIO(httpServer);
-
-  // Use Hono as the HTTP handler
-  serve(
-    { fetch: app.fetch, port: PORT, serverOptions: { server: httpServer } },
+  // serve() returns the underlying Node.js HTTP server — attach Socket.io to it
+  const httpServer = serve(
+    { fetch: app.fetch, port: PORT },
     (info) => {
       console.log(`API server running on http://localhost:${info.port}`);
     },
   );
+
+  initSocketIO(httpServer);
 }
 
 main().catch(console.error);

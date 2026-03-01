@@ -4,7 +4,7 @@ import { useRole, useTimeoAuth } from "@timeo/auth";
 
 export default function RoleRouter() {
   const { isLoaded, isSignedIn } = useTimeoAuth();
-  const { role, isPlatformAdmin, isAdmin, isStaff } = useRole();
+  const { isPlatformAdmin, isAdmin, isStaff } = useRole();
 
   if (!isLoaded) {
     return (

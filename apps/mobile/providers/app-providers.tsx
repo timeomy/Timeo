@@ -1,6 +1,7 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TimeoAuthProvider } from "@timeo/auth";
+import { CartProvider } from "./cart";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,7 +20,9 @@ export function AppProviders({ children }: AppProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
       <TimeoAuthProvider>
-        {children}
+        <CartProvider>
+          {children}
+        </CartProvider>
       </TimeoAuthProvider>
     </QueryClientProvider>
   );

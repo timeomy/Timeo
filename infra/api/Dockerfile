@@ -1,8 +1,8 @@
 FROM node:20-alpine AS base
 WORKDIR /app
-RUN npm install -g pnpm@9
+RUN corepack enable && corepack prepare pnpm@9 --activate
 
-# Dependencies stage
+# ─── Dependencies ────────────────────────────────────────────────────────────
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/db/package.json ./packages/db/
@@ -12,16 +12,17 @@ COPY packages/api/package.json ./packages/api/
 COPY packages/config-ts/package.json ./packages/config-ts/
 RUN pnpm install --frozen-lockfile --filter @timeo/api... --filter @timeo/db
 
-# Builder stage
+# ─── Builder ─────────────────────────────────────────────────────────────────
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages/db/node_modules ./packages/db/node_modules
+COPY --from=deps /app/packages/auth/node_modules ./packages/auth/node_modules
 COPY --from=deps /app/packages/api/node_modules ./packages/api/node_modules
 COPY packages/ ./packages/
 COPY turbo.json ./
 RUN pnpm --filter @timeo/api build
 
-# Runner stage
+# ─── Runner ──────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production

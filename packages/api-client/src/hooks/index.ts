@@ -146,12 +146,22 @@ export {
 } from "./analytics";
 
 export {
+  usePlatformStats,
   usePlatformTenants,
   usePlatformConfig,
   usePlatformFlags,
   usePlatformLogs,
   useUpdatePlatformFlag,
   useUpdatePlatformConfig,
+  useCreatePlatformTenant,
+  useUpdatePlatformTenant,
+  useDeletePlatformTenant,
+  useSuspendPlatformTenant,
+  useImpersonateTenant,
+  usePlatformUsers,
+  usePlatformSubscriptions,
+  useUpdatePlatformSubscription,
+  useCancelPlatformSubscription,
 } from "./platform";
 
 export {

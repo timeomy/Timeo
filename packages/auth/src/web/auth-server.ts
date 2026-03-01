@@ -20,11 +20,14 @@ async function proxyAuth(req: Request): Promise<Response> {
   const res = await fetch(target, {
     method: req.method,
     headers,
-    body: req.method !== "GET" && req.method !== "HEAD" ? req.body : undefined,
-    // @ts-ignore — Node.js requires duplex for streaming request bodies
+    body:
+      req.method !== "GET" && req.method !== "HEAD"
+        ? (req.body as BodyInit | undefined)
+        : undefined,
+    // @ts-expect-error — Node.js requires duplex for streaming request bodies
     duplex: "half",
   });
-  return new Response(res.body, {
+  return new Response(res.body as BodyInit | null, {
     status: res.status,
     statusText: res.statusText,
     headers: res.headers,

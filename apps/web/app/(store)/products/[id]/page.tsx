@@ -13,7 +13,7 @@ import {
   Badge,
   Skeleton,
   Separator,
-  ConvexImage,
+  RemoteImage,
 } from "@timeo/ui/web";
 import {
   ArrowLeft,
@@ -84,7 +84,7 @@ export default function ProductDetailPage() {
 
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Product Image */}
-        <ConvexImage
+        <RemoteImage
           url={product.imageUrl}
           alt={product.name}
           className="aspect-square w-full"

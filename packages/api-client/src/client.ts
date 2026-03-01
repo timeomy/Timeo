@@ -42,7 +42,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
     },
   });
 
-  const json: ApiResponse<T> = await response.json();
+  const json = (await response.json()) as ApiResponse<T>;
 
   if (json.success === false) {
     throw new ApiError(json.error.code, json.error.message);

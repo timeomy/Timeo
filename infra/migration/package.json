@@ -1,0 +1,24 @@
+{
+  "name": "@timeo/migration",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "export": "tsx export-convex.ts",
+    "transform": "tsx transform.ts",
+    "import": "tsx import-postgres.ts",
+    "verify": "tsx verify.ts",
+    "migrate": "tsx export-convex.ts && tsx transform.ts && tsx import-postgres.ts && tsx verify.ts"
+  },
+  "dependencies": {
+    "convex": "^1.17.0",
+    "@timeo/db": "workspace:*",
+    "drizzle-orm": "^0.39.0",
+    "postgres": "^3.4.5",
+    "nanoid": "^5.0.9"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

@@ -76,9 +76,9 @@ export {
   type ImageUploaderProps,
 } from "./components/ImageUploader";
 export {
-  ConvexImage,
-  type ConvexImageProps,
-} from "./components/ConvexImage";
+  RemoteImage,
+  type RemoteImageProps,
+} from "./components/RemoteImage";
 
 // Notification Components
 export {

@@ -26,6 +26,7 @@ const nextConfig = {
     "@timeo/analytics",
     "@timeo/cms",
     "@timeo/notifications",
+    "recharts",
   ],
   async headers() {
     return [
