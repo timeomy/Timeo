@@ -3,15 +3,6 @@ name: EAS Build
 on:
   workflow_dispatch:
     inputs:
-      app:
-        description: "Which app to build"
-        required: true
-        type: choice
-        options:
-          - customer
-          - staff
-          - admin
-          - platform
       profile:
         description: "Build profile"
         required: true
@@ -35,14 +26,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v4
         with:
           version: 9
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "pnpm"
+          cache: pnpm
 
       - uses: expo/expo-github-action@v8
         with:
@@ -51,6 +42,6 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build ${{ inputs.app }} (${{ inputs.profile }}, ${{ inputs.platform }})
-        working-directory: apps/${{ inputs.app }}
+      - name: Build mobile (${{ inputs.profile }}, ${{ inputs.platform }})
+        working-directory: apps/mobile
         run: eas build --profile ${{ inputs.profile }} --platform ${{ inputs.platform }} --non-interactive

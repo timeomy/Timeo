@@ -1,10 +1,12 @@
-import { View, Text } from "react-native";
+import { useRouter } from "expo-router";
+import { ResetPasswordScreen } from "@timeo/auth";
 
-export default function ResetPasswordScreen() {
+export default function ResetPassword() {
+  const router = useRouter();
+
   return (
-    <View className="flex-1 items-center justify-center p-6">
-      <Text className="text-2xl font-bold mb-8">Reset Password</Text>
-      <Text className="text-gray-500">TODO: Implement reset password form</Text>
-    </View>
+    <ResetPasswordScreen
+      onBackToSignIn={() => router.push("/(auth)/sign-in")}
+    />
   );
 }

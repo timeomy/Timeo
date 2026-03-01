@@ -10,6 +10,24 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: timeo
+          POSTGRES_PASSWORD: timeo
+          POSTGRES_DB: timeo
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+
     steps:
       - uses: actions/checkout@v4
 
@@ -24,13 +42,54 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Run DB migrations
+        run: pnpm --filter @timeo/db exec drizzle-kit migrate
+        env:
+          DATABASE_URL: postgresql://timeo:timeo@localhost:5432/timeo
+
+      - name: Start Hono API
+        run: |
+          pnpm --filter @timeo/api dev &
+          echo "Waiting for API..."
+          for i in $(seq 1 30); do
+            curl -s http://localhost:4000/health && break || sleep 2
+          done
+        env:
+          DATABASE_URL: postgresql://timeo:timeo@localhost:5432/timeo
+          REDIS_URL: redis://localhost:6379
+          API_URL: http://localhost:4000
+          BETTER_AUTH_SECRET: ci-test-secret-min-32-chars-pad
+          SITE_URL: http://localhost:3000
+          JWT_SECRET: ci-test-jwt-secret-min-32-chars
+
+      - name: Build Next.js web app
+        run: pnpm --filter @timeo/web build
+        env:
+          DATABASE_URL: postgresql://timeo:timeo@localhost:5432/timeo
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+          BETTER_AUTH_SECRET: ci-test-secret-min-32-chars-pad
+
+      - name: Start Next.js web app
+        run: |
+          pnpm --filter @timeo/web start &
+          echo "Waiting for Next.js..."
+          for i in $(seq 1 30); do
+            curl -s http://localhost:3000 && break || sleep 2
+          done
+        env:
+          DATABASE_URL: postgresql://timeo:timeo@localhost:5432/timeo
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+          PORT: 3000
+
       - run: npx playwright install --with-deps chromium
         working-directory: apps/web
 
       - run: npx playwright test e2e/auth.spec.ts --reporter=list
         working-directory: apps/web
         env:
-          PLAYWRIGHT_BASE_URL: https://timeo.my
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          NEXT_PUBLIC_API_URL: http://localhost:4000
 
       - uses: actions/upload-artifact@v4
         if: failure()

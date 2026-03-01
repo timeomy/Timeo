@@ -6,8 +6,8 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
-import { membershipIntervalEnum, orderStatusEnum } from "./enums.js";
-import { tenants, users } from "./core.js";
+import { membershipIntervalEnum, orderStatusEnum } from "./enums";
+import { tenants, users } from "./core";
 
 // ─── Products ────────────────────────────────────────────────────────────────
 export const products = pgTable(

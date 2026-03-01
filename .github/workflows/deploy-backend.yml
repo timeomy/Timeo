@@ -14,8 +14,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Dokploy deployment
+      - name: Deploy API via Dokploy
         run: |
           curl -X POST "${{ secrets.DOKPLOY_WEBHOOK_URL }}" \
-            -H "Content-Type: application/json" \
-            --fail-with-body
+            -H "Authorization: Bearer ${{ secrets.DOKPLOY_TOKEN }}" \
+            --fail

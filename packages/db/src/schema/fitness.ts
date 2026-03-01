@@ -7,10 +7,10 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
-import { checkInMethodEnum, sessionTypeEnum } from "./enums.js";
-import { tenants, users } from "./core.js";
-import { services } from "./booking.js";
-import { bookings } from "./booking.js";
+import { checkInMethodEnum, sessionTypeEnum } from "./enums";
+import { tenants, users } from "./core";
+import { services } from "./booking";
+import { bookings } from "./booking";
 
 // ─── Check-ins ───────────────────────────────────────────────────────────────
 export const checkIns = pgTable(

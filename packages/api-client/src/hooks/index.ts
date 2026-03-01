@@ -3,7 +3,7 @@ export {
   useSignIn,
   useSignUp,
   useSignOut,
-} from "./auth.js";
+} from "./auth";
 
 export {
   useMyTenants,
@@ -13,7 +13,7 @@ export {
   useUpdateTenantSettings,
   useUpdateTenantBranding,
   useInviteStaff,
-} from "./tenants.js";
+} from "./tenants";
 
 export {
   useBookings,
@@ -24,7 +24,7 @@ export {
   useCancelBooking,
   useCompleteBooking,
   useMarkNoShow,
-} from "./bookings.js";
+} from "./bookings";
 
 export {
   useServices,
@@ -32,7 +32,7 @@ export {
   useCreateService,
   useUpdateService,
   useDeleteService,
-} from "./services.js";
+} from "./services";
 
 export {
   useProducts,
@@ -40,21 +40,21 @@ export {
   useCreateProduct,
   useUpdateProduct,
   useDeleteProduct,
-} from "./products.js";
+} from "./products";
 
 export {
   useOrders,
   useOrder,
   useCreateOrder,
   useUpdateOrderStatus,
-} from "./orders.js";
+} from "./orders";
 
 export {
   usePayments,
   usePayment,
   useCreateStripePayment,
   useCreateRevenueMonsterPayment,
-} from "./payments.js";
+} from "./payments";
 
 export {
   usePosTransactions,
@@ -65,14 +65,14 @@ export {
   useDailySummary,
   useMonthlyStatement,
   useValidateVoucher,
-} from "./pos.js";
+} from "./pos";
 
 export {
   useCheckIns,
   useCheckInStats,
   useCreateCheckIn,
   useCheckInByQr,
-} from "./check-ins.js";
+} from "./check-ins";
 
 export {
   useSessionPackages,
@@ -86,7 +86,7 @@ export {
   useAdjustSessionCredits,
   useCreateSessionLog,
   useDeleteSessionLog,
-} from "./sessions.js";
+} from "./sessions";
 
 export {
   useMemberships,
@@ -95,7 +95,7 @@ export {
   useUpdateMembership,
   useDeleteMembership,
   useSubscribeToMembership,
-} from "./memberships.js";
+} from "./memberships";
 
 export {
   useVouchers,
@@ -105,7 +105,7 @@ export {
   useDeleteVoucher,
   useToggleVoucher,
   useRedeemVoucher,
-} from "./vouchers.js";
+} from "./vouchers";
 
 export {
   useGiftCards,
@@ -117,7 +117,7 @@ export {
   useCancelGiftCard,
   useReactivateGiftCard,
   useDeleteGiftCard,
-} from "./gift-cards.js";
+} from "./gift-cards";
 
 export {
   useStaffAvailability,
@@ -127,13 +127,13 @@ export {
   useBlockedSlots,
   useCreateBlockedSlot,
   useDeleteBlockedSlot,
-} from "./scheduling.js";
+} from "./scheduling";
 
 export {
   useNotifications,
   useMarkNotificationRead,
   useMarkAllNotificationsRead,
-} from "./notifications.js";
+} from "./notifications";
 
 export {
   useRevenueOverview,
@@ -143,7 +143,7 @@ export {
   useTopProducts,
   useCustomerAnalytics,
   useStaffPerformance,
-} from "./analytics.js";
+} from "./analytics";
 
 export {
   usePlatformTenants,
@@ -152,13 +152,13 @@ export {
   usePlatformLogs,
   useUpdatePlatformFlag,
   useUpdatePlatformConfig,
-} from "./platform.js";
+} from "./platform";
 
 export {
   useFiles,
   useUploadFile,
   useDeleteFile,
-} from "./files.js";
+} from "./files";
 
 export {
   useEInvoiceRequests,
@@ -169,15 +169,15 @@ export {
   useMarkEInvoiceSubmitted,
   useMarkEInvoiceRejected,
   useRevertEInvoiceToPending,
-} from "./einvoice.js";
+} from "./einvoice";
 
 export {
   useStaffMembers,
   useUpdateStaffRole,
   useRemoveStaffMember,
-} from "./staff.js";
+} from "./staff";
 
 export {
   useMemberQrCode,
   useGenerateQrCode,
-} from "./qr-code.js";
+} from "./qr-code";

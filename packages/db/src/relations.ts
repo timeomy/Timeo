@@ -34,7 +34,7 @@ import {
   auditLogs,
   files,
   eInvoiceRequests,
-} from "./schema/index.js";
+} from "./schema/index";
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 export const usersRelations = relations(users, ({ many }) => ({

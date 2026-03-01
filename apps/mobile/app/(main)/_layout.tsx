@@ -1,38 +1,43 @@
 import { Redirect } from "expo-router";
-import { View, ActivityIndicator } from "react-native";
-
-type Role = "customer" | "staff" | "admin" | "platform_admin";
-
-// TODO: Replace with actual auth hook from @timeo/auth
-function useActiveRole(): { role: Role | null; isLoading: boolean } {
-  // Stub - will be replaced with real auth context
-  return { role: "customer", isLoading: false };
-}
+import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { useRole, useTimeoAuth } from "@timeo/auth";
 
 export default function RoleRouter() {
-  const { role, isLoading } = useActiveRole();
+  const { isLoaded, isSignedIn } = useTimeoAuth();
+  const { role, isPlatformAdmin, isAdmin, isStaff } = useRole();
 
-  if (isLoading) {
+  if (!isLoaded) {
     return (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="large" />
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color="#FFB300" />
       </View>
     );
   }
 
-  if (!role) {
+  if (!isSignedIn) {
     return <Redirect href="/(auth)/sign-in" />;
   }
 
-  switch (role) {
-    case "platform_admin":
-      return <Redirect href="/(main)/(platform)/(tabs)" />;
-    case "admin":
-      return <Redirect href="/(main)/(admin)/(tabs)" />;
-    case "staff":
-      return <Redirect href="/(main)/(staff)/(tabs)" />;
-    case "customer":
-    default:
-      return <Redirect href="/(main)/(customer)/(tabs)" />;
+  if (isPlatformAdmin) {
+    return <Redirect href="/(main)/(platform)/(tabs)" />;
   }
+
+  if (isAdmin) {
+    return <Redirect href="/(main)/(admin)/(tabs)" />;
+  }
+
+  if (isStaff) {
+    return <Redirect href="/(main)/(staff)/(tabs)" />;
+  }
+
+  return <Redirect href="/(main)/(customer)/(tabs)" />;
 }
+
+const styles = StyleSheet.create({
+  loading: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#0B0B0F",
+  },
+});

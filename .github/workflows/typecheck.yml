@@ -24,6 +24,8 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
+        env:
+          DATABASE_URL: postgresql://fake:fake@localhost:5432/fake
 
       - name: Lint
         run: pnpm lint

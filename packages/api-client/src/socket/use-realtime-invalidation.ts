@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getSocket } from "./socket-client.js";
-import { queryKeys } from "../query-keys.js";
+import { getSocket } from "./socket-client";
+import { queryKeys } from "../query-keys";
 
 export function useRealtimeInvalidation(
   event: string,

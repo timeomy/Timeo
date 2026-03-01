@@ -12,7 +12,7 @@ import {
   paymentGatewayEnum,
   tenantPlanEnum,
   tenantStatusEnum,
-} from "./enums.js";
+} from "./enums";
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 export const users = pgTable(

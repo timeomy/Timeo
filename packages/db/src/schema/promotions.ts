@@ -11,8 +11,8 @@ import {
   giftCardTransactionTypeEnum,
   voucherSourceEnum,
   voucherTypeEnum,
-} from "./enums.js";
-import { tenants, users } from "./core.js";
+} from "./enums";
+import { tenants, users } from "./core";
 
 // ─── Vouchers ────────────────────────────────────────────────────────────────
 export const vouchers = pgTable(

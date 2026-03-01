@@ -6,7 +6,7 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
-import { tenants, users } from "./core.js";
+import { tenants, users } from "./core";
 
 // ─── Platform Config ─────────────────────────────────────────────────────────
 export const platformConfig = pgTable(

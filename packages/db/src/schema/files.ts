@@ -5,8 +5,8 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
-import { fileTypeEnum } from "./enums.js";
-import { tenants, users } from "./core.js";
+import { fileTypeEnum } from "./enums";
+import { tenants, users } from "./core";
 
 // ─── Files ───────────────────────────────────────────────────────────────────
 export const files = pgTable(

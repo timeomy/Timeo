@@ -1,5 +1,6 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { TimeoAuthProvider } from "@timeo/auth";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,7 +18,9 @@ interface AppProvidersProps {
 export function AppProviders({ children }: AppProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
-      {children}
+      <TimeoAuthProvider>
+        {children}
+      </TimeoAuthProvider>
     </QueryClientProvider>
   );
 }

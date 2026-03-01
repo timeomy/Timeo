@@ -10,8 +10,8 @@ import {
 import {
   notificationTypeEnum,
   pushTokenPlatformEnum,
-} from "./enums.js";
-import { tenants, users } from "./core.js";
+} from "./enums";
+import { tenants, users } from "./core";
 
 // ─── Notifications ───────────────────────────────────────────────────────────
 export const notifications = pgTable(

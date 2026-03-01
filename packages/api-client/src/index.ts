@@ -20,13 +20,13 @@
  */
 
 // Client
-export { api, ApiError } from "./client.js";
+export { api, ApiError } from "./client";
 
 // Query keys
-export { queryKeys } from "./query-keys.js";
+export { queryKeys } from "./query-keys";
 
 // All hooks
-export * from "./hooks/index.js";
+export * from "./hooks/index";
 
 // Socket
 export {
@@ -35,11 +35,11 @@ export {
   disconnectSocket,
   joinTenantRoom,
   joinUserRoom,
-} from "./socket/socket-client.js";
-export { useSocket } from "./socket/use-socket.js";
+} from "./socket/socket-client";
+export { useSocket } from "./socket/use-socket";
 export {
   useRealtimeInvalidation,
   useTenantRealtime,
-} from "./socket/use-realtime-invalidation.js";
-export { SocketEvents } from "./socket/events.js";
-export type { SocketEvent } from "./socket/events.js";
+} from "./socket/use-realtime-invalidation";
+export { SocketEvents } from "./socket/events";
+export type { SocketEvent } from "./socket/events";

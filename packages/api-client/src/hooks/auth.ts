@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../client.js";
+import { api } from "../client";
 
 interface User {
   id: string;

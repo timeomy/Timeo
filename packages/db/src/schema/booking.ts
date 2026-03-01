@@ -7,8 +7,8 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
-import { bookingEventTypeEnum, bookingStatusEnum } from "./enums.js";
-import { tenants, users } from "./core.js";
+import { bookingEventTypeEnum, bookingStatusEnum } from "./enums";
+import { tenants, users } from "./core";
 
 // ─── Services ────────────────────────────────────────────────────────────────
 export const services = pgTable(

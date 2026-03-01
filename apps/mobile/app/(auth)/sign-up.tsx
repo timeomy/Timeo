@@ -1,11 +1,13 @@
-import { View, Text } from "react-native";
+import { useRouter } from "expo-router";
+import { SignUpScreen } from "@timeo/auth";
 
-// TODO: Replace with full sign-up form using @timeo/auth screens
-export default function SignUpScreen() {
+export default function SignUp() {
+  const router = useRouter();
+
   return (
-    <View className="flex-1 items-center justify-center p-6">
-      <Text className="text-2xl font-bold mb-8">Create Account</Text>
-      <Text className="text-gray-500">TODO: Implement sign-up form</Text>
-    </View>
+    <SignUpScreen
+      onSignIn={() => router.push("/(auth)/sign-in")}
+      onSuccess={() => router.replace("/(main)")}
+    />
   );
 }

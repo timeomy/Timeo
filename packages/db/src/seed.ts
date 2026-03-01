@@ -1,5 +1,5 @@
-import { db } from "./client.js";
-import { generateId } from "./id.js";
+import { db } from "./client";
+import { generateId } from "./id";
 import {
   users,
   tenants,
@@ -9,7 +9,7 @@ import {
   memberships,
   products,
   platformConfig,
-} from "./schema/index.js";
+} from "./schema/index";
 
 async function seed() {
   console.log("Seeding database...");

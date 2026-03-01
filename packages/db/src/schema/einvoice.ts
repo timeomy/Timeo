@@ -5,9 +5,9 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
-import { eInvoiceIdTypeEnum, eInvoiceStatusEnum } from "./enums.js";
-import { tenants } from "./core.js";
-import { posTransactions } from "./payments.js";
+import { eInvoiceIdTypeEnum, eInvoiceStatusEnum } from "./enums";
+import { tenants } from "./core";
+import { posTransactions } from "./payments";
 
 // ─── e-Invoice Requests ──────────────────────────────────────────────────────
 export const eInvoiceRequests = pgTable(

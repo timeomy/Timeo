@@ -13,12 +13,12 @@ import {
   posTransactionStatusEnum,
   stripeAccountStatusEnum,
   subscriptionStatusEnum,
-} from "./enums.js";
-import { tenants, users } from "./core.js";
-import { orders } from "./commerce.js";
-import { bookings } from "./booking.js";
-import { memberships } from "./commerce.js";
-import { vouchers } from "./promotions.js";
+} from "./enums";
+import { tenants, users } from "./core";
+import { orders } from "./commerce";
+import { bookings } from "./booking";
+import { memberships } from "./commerce";
+import { vouchers } from "./promotions";
 
 // ─── Payments ────────────────────────────────────────────────────────────────
 export const payments = pgTable(
