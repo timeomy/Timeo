@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./server": "./src/server.ts",
+    "./email": "./src/email.ts",
     "./web": "./src/web/index.ts",
     "./web/server": "./src/web/auth-server.ts"
   },
@@ -20,7 +21,7 @@
     "better-auth": "^1.4.18",
     "expo-secure-store": "~15.0.8",
     "nanoid": "^5.0.9",
-    "resend": "^4.0.0"
+    "nodemailer": "^6.9.0"
   },
   "peerDependencies": {
     "expo": "*",
@@ -37,6 +38,7 @@
   },
   "devDependencies": {
     "@timeo/config-ts": "workspace:*",
+    "@types/nodemailer": "^6.4.17",
     "@types/react": "~19.1.0",
     "typescript": "^5.3.3"
   }

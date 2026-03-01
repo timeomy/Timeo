@@ -1,6 +1,7 @@
 import { db } from "@timeo/db";
 import { bookings, services, users, tenants } from "@timeo/db/schema";
 import { and, eq, gt, lt } from "drizzle-orm";
+import { sendMail } from "@timeo/auth/email";
 import { bookingReminderEmail } from "../lib/email-templates.js";
 
 /**
@@ -35,15 +36,18 @@ export async function runSendBookingReminders() {
     if (!row.customer?.email || !row.service?.name || !row.tenant?.name)
       continue;
 
-    const _template = bookingReminderEmail({
+    const template = bookingReminderEmail({
       customerName: row.customer.name,
       serviceName: row.service.name,
       startTime: row.booking.start_time.toISOString(),
       tenantName: row.tenant.name,
     });
 
-    // TODO: Send via Resend when configured
-    // await resend.emails.send({ from: ..., to: row.customer.email, ...template });
+    await sendMail({
+      to: row.customer.email,
+      subject: template.subject,
+      html: template.html,
+    });
     sent++;
   }
 

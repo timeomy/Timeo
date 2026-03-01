@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db, user, session, account, verification } from "@timeo/db";
+import { sendMail } from "./email.js";
 
 const siteUrl = process.env.SITE_URL ?? "http://localhost:3000";
 const apiUrl = process.env.API_URL ?? "http://localhost:4000";
@@ -33,15 +34,8 @@ export const auth = betterAuth({
     enabled: true,
     requireEmailVerification: true,
     sendResetPassword: async ({ user, url }) => {
-      if (!process.env.RESEND_API_KEY) {
-        console.log(`[dev] Reset password email → ${user.email}: ${url}`);
-        return;
-      }
-      const { Resend } = await import("resend");
-      const resend = new Resend(process.env.RESEND_API_KEY);
       const safeUrl = url.replace(/[<>"'&]/g, "");
-      await resend.emails.send({
-        from: process.env.EMAIL_FROM ?? "noreply@timeo.my",
+      await sendMail({
         to: user.email,
         subject: "Reset your Timeo password",
         html: `<p>Click <a href="${safeUrl}">here</a> to reset your password. This link expires in 1 hour.</p>`,
@@ -50,15 +44,8 @@ export const auth = betterAuth({
   },
   emailVerification: {
     sendVerificationEmail: async ({ user, url }) => {
-      if (!process.env.RESEND_API_KEY) {
-        console.log(`[dev] Verification email → ${user.email}: ${url}`);
-        return;
-      }
-      const { Resend } = await import("resend");
-      const resend = new Resend(process.env.RESEND_API_KEY);
       const safeUrl = url.replace(/[<>"'&]/g, "");
-      await resend.emails.send({
-        from: process.env.EMAIL_FROM ?? "noreply@timeo.my",
+      await sendMail({
         to: user.email,
         subject: "Verify your Timeo email",
         html: `<p>Click <a href="${safeUrl}">here</a> to verify your email address.</p>`,

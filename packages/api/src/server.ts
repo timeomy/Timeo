@@ -34,8 +34,8 @@ function validateEnv(): void {
 
   // Warn about optional vars in production
   if (process.env.NODE_ENV === "production") {
-    if (!process.env.RESEND_API_KEY) {
-      console.warn("Warning: RESEND_API_KEY not set — emails will not be sent");
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.warn("Warning: SMTP_USER/SMTP_PASS not set — emails will not be sent");
     }
     if (!process.env.REVENUE_MONSTER_CLIENT_ID) {
       console.warn("Warning: REVENUE_MONSTER_CLIENT_ID not set — Revenue Monster payments disabled");

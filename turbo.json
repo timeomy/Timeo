@@ -20,7 +20,11 @@
     "STRIPE_CONNECT_WEBHOOK_SECRET",
     "REVENUE_MONSTER_CLIENT_ID",
     "REVENUE_MONSTER_CLIENT_SECRET",
-    "RESEND_API_KEY"
+    "SMTP_HOST",
+    "SMTP_PORT",
+    "SMTP_USER",
+    "SMTP_PASS",
+    "EMAIL_FROM"
   ],
   "tasks": {
     "build": {
