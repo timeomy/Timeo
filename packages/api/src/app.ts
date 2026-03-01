@@ -23,6 +23,7 @@ import { filesRouter } from "./routes/files.routes.js";
 import { einvoiceRouter } from "./routes/einvoice.routes.js";
 import { paymentsRouter } from "./routes/payments.routes.js";
 import { stripeWebhookRouter } from "./routes/webhooks/stripe.js";
+import { revenueMonsterWebhookRouter } from "./routes/webhooks/revenue-monster.js";
 import { doorWebhookRouter } from "./routes/webhooks/door.js";
 import { healthRouter } from "./routes/health.js";
 
@@ -65,6 +66,7 @@ export function createApp() {
 
   // Webhooks (no auth middleware - verified via signatures)
   app.route("/webhooks/stripe", stripeWebhookRouter);
+  app.route("/webhooks/revenue-monster", revenueMonsterWebhookRouter);
   app.route("/webhooks/door", doorWebhookRouter);
 
   return app;

@@ -9,7 +9,7 @@ export function getStripe(): Stripe {
       throw new Error("STRIPE_SECRET_KEY environment variable is not set");
     }
     stripeInstance = new Stripe(key, {
-      apiVersion: "2025-01-27.acacia",
+      apiVersion: "2025-02-24.acacia",
       typescript: true,
     });
   }

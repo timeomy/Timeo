@@ -1,16 +1,19 @@
 import { Tabs } from "expo-router";
-import { LayoutDashboard, Building2, Flag } from "lucide-react-native";
+import { LayoutDashboard, Building2, Users, Flag } from "lucide-react-native";
+import { useTheme } from "@timeo/ui";
 
 export default function PlatformTabsLayout() {
+  const theme = useTheme();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#FFB300",
-        tabBarInactiveTintColor: "#88878F",
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.textSecondary,
         tabBarStyle: {
-          backgroundColor: "#0B0B0F",
-          borderTopColor: "#252530",
+          backgroundColor: theme.colors.background,
+          borderTopColor: theme.colors.border,
         },
       }}
     >
@@ -30,12 +33,15 @@ export default function PlatformTabsLayout() {
       />
       <Tabs.Screen
         name="clients"
-        options={{ href: null }}
+        options={{
+          title: "Users",
+          tabBarIcon: ({ color, size }) => <Users size={size} color={color} />,
+        }}
       />
       <Tabs.Screen
         name="flags"
         options={{
-          title: "Feature Flags",
+          title: "Flags",
           tabBarIcon: ({ color, size }) => <Flag size={size} color={color} />,
         }}
       />

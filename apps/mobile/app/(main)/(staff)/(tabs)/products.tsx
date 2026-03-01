@@ -1,21 +1,19 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
   FlatList,
   RefreshControl,
   TouchableOpacity,
-  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Package, Plus } from "lucide-react-native";
+import { Package } from "lucide-react-native";
 import { useTimeoAuth } from "@timeo/auth";
 import { useProducts } from "@timeo/api-client";
 import {
   Screen,
   Header,
   SearchInput,
-  Switch,
   PriceDisplay,
   Badge,
   EmptyState,

@@ -1,0 +1,16 @@
+# Timeo daily database backup — runs at 2:00 AM server time
+#
+# Installation:
+#   1. SSH into the VPS
+#   2. Run: crontab -e
+#   3. Paste the line below (adjust path if Timeo is not at /opt/timeo)
+#   4. Save and exit
+#
+# Verify: crontab -l
+# Logs:   tail -f /var/log/timeo-backup.log
+#
+# The backup script runs inside the backup Docker container, which connects
+# to PostgreSQL over the timeo-net Docker network. It keeps the last 30 daily
+# backups and optionally uploads to S3 (if S3_BACKUP_BUCKET is set in .env).
+
+0 2 * * * cd /opt/timeo && docker compose -f docker-compose.prod.yml run --rm backup >> /var/log/timeo-backup.log 2>&1

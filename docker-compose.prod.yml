@@ -1,0 +1,197 @@
+## Production Docker Compose — Timeo
+##
+## Usage:
+##   docker compose -f docker-compose.prod.yml up -d
+##
+## Requires .env file with all secrets (see .env.example).
+## Traefik must be running separately and connected to the timeo-net network.
+## Volumes must be pre-created: docker volume create pgdata && docker volume create redisdata
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: timeo-postgres
+    restart: always
+    command:
+      - postgres
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - log_min_duration_statement=1000
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-timeo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-timeo}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-timeo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - timeo-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: timeo-redis
+    restart: always
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --appendonly yes
+      --save ""
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - timeo-net
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/api/Dockerfile
+    container_name: timeo-api
+    restart: always
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-timeo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-timeo}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - timeo-net
+    labels:
+      - "traefik.enable=true"
+      # HTTP → HTTPS redirect
+      - "traefik.http.routers.api-http.rule=Host(`api.timeo.my`)"
+      - "traefik.http.routers.api-http.entrypoints=web"
+      - "traefik.http.routers.api-http.middlewares=redirect-to-https"
+      # HTTPS
+      - "traefik.http.routers.api.rule=Host(`api.timeo.my`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls=true"
+      - "traefik.http.routers.api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.api.loadbalancer.server.port=4000"
+      # Middleware
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://api.timeo.my
+        NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:-}
+        NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
+        NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-https://app.posthog.com}
+    container_name: timeo-web
+    restart: always
+    env_file: .env
+    environment:
+      NEXT_PUBLIC_API_URL: https://api.timeo.my
+      NEXT_PUBLIC_SITE_URL: https://timeo.my
+      NODE_ENV: production
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - timeo-net
+    labels:
+      - "traefik.enable=true"
+      # HTTP → HTTPS redirect
+      - "traefik.http.routers.web-http.rule=Host(`timeo.my`) || Host(`www.timeo.my`)"
+      - "traefik.http.routers.web-http.entrypoints=web"
+      - "traefik.http.routers.web-http.middlewares=redirect-to-https"
+      # HTTPS
+      - "traefik.http.routers.web.rule=Host(`timeo.my`) || Host(`www.timeo.my`)"
+      - "traefik.http.routers.web.entrypoints=websecure"
+      - "traefik.http.routers.web.tls=true"
+      - "traefik.http.routers.web.tls.certresolver=letsencrypt"
+      - "traefik.http.services.web.loadbalancer.server.port=3000"
+      # www → apex redirect
+      - "traefik.http.middlewares.www-redirect.redirectregex.regex=^https://www\\.timeo\\.my/(.*)"
+      - "traefik.http.middlewares.www-redirect.redirectregex.replacement=https://timeo.my/$${1}"
+      - "traefik.http.middlewares.www-redirect.redirectregex.permanent=true"
+      - "traefik.http.routers.web.middlewares=www-redirect"
+
+  # Run migrations: docker compose -f docker-compose.prod.yml run --rm migrate
+  migrate:
+    image: node:20-alpine
+    container_name: timeo-migrate
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm --filter @timeo/db exec drizzle-kit migrate"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-timeo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-timeo}
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - timeo-net
+    profiles:
+      - migrate
+
+  # Backup: docker compose -f docker-compose.prod.yml run --rm backup
+  backup:
+    image: postgres:16-alpine
+    container_name: timeo-backup
+    command: /scripts/backup.sh
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-timeo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-timeo}
+      PGHOST: postgres
+      S3_BACKUP_BUCKET: ${S3_BACKUP_BUCKET:-}
+    volumes:
+      - ./infra/scripts:/scripts:ro
+      - backupdata:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - timeo-net
+    profiles:
+      - backup
+
+volumes:
+  pgdata:
+    external: true
+  redisdata:
+    external: true
+  backupdata:
+
+networks:
+  timeo-net:
+    name: timeo-net

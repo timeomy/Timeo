@@ -1,4 +1,5 @@
 name: Deploy Web
+
 on:
   push:
     branches: [main]
@@ -7,24 +8,14 @@ on:
       - "packages/ui/**"
       - "packages/shared/**"
       - "packages/auth/**"
+      - "packages/api-client/**"
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 9
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm turbo build --filter=@timeo/web
-      - uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: apps/web
+      - name: Deploy web app via Dokploy
+        run: |
+          curl -X POST "${{ secrets.DOKPLOY_WEB_WEBHOOK_URL }}" \
+            -H "Authorization: Bearer ${{ secrets.DOKPLOY_TOKEN }}" \
+            --fail
