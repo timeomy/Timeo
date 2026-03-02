@@ -50,7 +50,7 @@ app.post("/", authMiddleware, tenantMiddleware, async (c) => {
   const body = await c.req.json();
 
   try {
-    const paymentId = await PaymentService.createPayment({
+    const result = await PaymentService.createPayment({
       tenantId,
       customerId: user.id,
       amount: body.amount,
@@ -58,8 +58,10 @@ app.post("/", authMiddleware, tenantMiddleware, async (c) => {
       orderId: body.orderId,
       bookingId: body.bookingId,
       gateway: body.gateway ?? "stripe",
+      description: body.description,
+      redirectUrl: body.redirectUrl,
     });
-    return c.json(success({ paymentId }), 201);
+    return c.json(success(result), 201);
   } catch (err) {
     return c.json(error("PAYMENT_ERROR", (err as Error).message), 422);
   }
