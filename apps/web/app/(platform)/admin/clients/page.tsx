@@ -96,7 +96,7 @@ export default function ClientsPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Slug</TableHead>
                   <TableHead>Members</TableHead>
-                  <TableHead>Revenue</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                 </TableRow>
               </TableHeader>
@@ -130,9 +130,7 @@ export default function ClientsPage() {
                     </TableCell>
                     <TableCell>
                       <p className="text-xs text-muted-foreground">
-                        {client.revenue > 0
-                          ? `RM ${(client.revenue / 100).toFixed(2)}`
-                          : "\u2014"}
+                        {client.status ?? "\u2014"}
                       </p>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">

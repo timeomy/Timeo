@@ -20,7 +20,14 @@ import {
   ChevronLeft,
   Shield,
 } from "lucide-react";
-import { SystemHealthBar } from "@/components/platform/system-health-bar";
+function SystemHealthBar() {
+  return (
+    <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-1.5">
+      <div className="h-2 w-2 rounded-full bg-emerald-400" />
+      <span className="text-xs text-emerald-400">All systems operational</span>
+    </div>
+  );
+}
 
 const platformLinks = [
   { href: "/platform/dashboard", label: "Dashboard", icon: LayoutDashboard },

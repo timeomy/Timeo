@@ -69,10 +69,11 @@ export async function createOrder(input: {
     id: generateId(),
     tenant_id: input.tenantId,
     actor_id: input.customerId,
+    actor_role: "customer",
     action: "order.created",
-    resource: "orders",
+    resource_type: "order",
     resource_id: orderId,
-    metadata: { itemCount: itemValues.length, totalAmount },
+    details: { itemCount: itemValues.length, totalAmount },
   });
 
   emitToTenant(input.tenantId, SocketEvents.ORDER_CREATED, {
@@ -104,8 +105,9 @@ export async function updateOrderStatus(
     id: generateId(),
     tenant_id: order.tenant_id,
     actor_id: actorId,
+    actor_role: "staff",
     action: `order.${status}`,
-    resource: "orders",
+    resource_type: "order",
     resource_id: orderId,
   });
 

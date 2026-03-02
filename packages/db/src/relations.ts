@@ -30,8 +30,13 @@ import {
   notificationPreferences,
   pushTokens,
   platformConfig,
+  plans,
   featureFlags,
+  featureFlagOverrides,
   auditLogs,
+  announcements,
+  emailTemplates,
+  apiKeys,
   files,
   eInvoiceRequests,
 } from "./schema/index";
@@ -74,8 +79,9 @@ export const tenantsRelations = relations(tenants, ({ one, many }) => ({
   businessHours: many(businessHours),
   staffAvailability: many(staffAvailability),
   blockedSlots: many(blockedSlots),
-  featureFlags: many(featureFlags),
+  featureFlagOverrides: many(featureFlagOverrides),
   auditLogs: many(auditLogs),
+  apiKeys: many(apiKeys),
   files: many(files),
   eInvoiceRequests: many(eInvoiceRequests),
 }));
@@ -493,10 +499,46 @@ export const pushTokensRelations = relations(pushTokens, ({ one }) => ({
   }),
 }));
 
+// ─── Plans ───────────────────────────────────────────────────────────────────
+// No FK relations — plans are standalone
+export const plansRelations = relations(plans, () => ({}));
+
 // ─── Feature Flags ───────────────────────────────────────────────────────────
-export const featureFlagsRelations = relations(featureFlags, ({ one }) => ({
+export const featureFlagsRelations = relations(featureFlags, ({ many }) => ({
+  overrides: many(featureFlagOverrides),
+}));
+
+// ─── Feature Flag Overrides ──────────────────────────────────────────────────
+export const featureFlagOverridesRelations = relations(
+  featureFlagOverrides,
+  ({ one }) => ({
+    flag: one(featureFlags, {
+      fields: [featureFlagOverrides.feature_flag_id],
+      references: [featureFlags.id],
+    }),
+    tenant: one(tenants, {
+      fields: [featureFlagOverrides.tenant_id],
+      references: [tenants.id],
+    }),
+  }),
+);
+
+// ─── Announcements ───────────────────────────────────────────────────────────
+export const announcementsRelations = relations(announcements, ({ one }) => ({
+  createdBy: one(users, {
+    fields: [announcements.created_by],
+    references: [users.id],
+  }),
+}));
+
+// ─── Email Templates ─────────────────────────────────────────────────────────
+// No FK relations
+export const emailTemplatesRelations = relations(emailTemplates, () => ({}));
+
+// ─── API Keys ─────────────────────────────────────────────────────────────────
+export const apiKeysRelations = relations(apiKeys, ({ one }) => ({
   tenant: one(tenants, {
-    fields: [featureFlags.tenant_id],
+    fields: [apiKeys.tenant_id],
     references: [tenants.id],
   }),
 }));

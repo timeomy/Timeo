@@ -47,10 +47,11 @@ export async function createGiftCard(input: {
     id: generateId(),
     tenant_id: input.tenantId,
     actor_id: input.createdBy,
+    actor_role: "staff",
     action: "gift_card.created",
-    resource: "gift_cards",
+    resource_type: "gift_card",
     resource_id: cardId,
-    metadata: { code, balance: input.initialBalance },
+    details: { code, balance: input.initialBalance },
   });
 
   return { cardId, code };
@@ -106,10 +107,11 @@ export async function redeemGiftCard(input: {
     id: generateId(),
     tenant_id: input.tenantId,
     actor_id: input.actorId,
+    actor_role: "staff",
     action: "gift_card.redeemed",
-    resource: "gift_cards",
+    resource_type: "gift_card",
     resource_id: card.id,
-    metadata: { amount: input.amount, balanceAfter: newBalance },
+    details: { amount: input.amount, balanceAfter: newBalance },
   });
 
   return { remainingBalance: newBalance };

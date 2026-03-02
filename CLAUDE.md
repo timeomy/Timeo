@@ -1,177 +1,363 @@
-# Timeo
+# CLAUDE.md — Timeo Project Instructions
 
-Multi-tenant SaaS platform for bookings and commerce operations. Malaysian market (MYR), domain: **Timeo.my**.
+> This file lives at the root of the Timeo monorepo. Claude Code reads it automatically.
+
+---
+
+## Project Overview
+
+You are helping me build **Timeo** (timeo.my), an all-in-one business operating system for service-based and retail businesses in Southeast Asia. It is a white-label, multi-tenant SaaS platform targeting gyms, cafes, salons, clinics, and retail stores — combining POS, ERP, CRM, SCM, appointment scheduling, and analytics capabilities (similar to China's Pospal).
+
+**Target market:** Malaysia first, then expand to Singapore, Thailand, Indonesia, Philippines.
+**Business model:** Subscription-based (tenants pay monthly), with transaction fees on payment processing.
+**Currency:** MYR at launch, multi-currency later.
+
+### Timeo C2 — Platform Control Center
+Timeo includes a **C2 (Command & Control) dashboard** — a unified admin UI at `apps/web/app/(platform)/` where Platform IT manages the entire ecosystem from one interface. Everything that exists in Timeo is viewable, configurable, and controllable from C2 — tenants, users, billing, features, config, health, analytics, emails, integrations, and data. No SSH, no manual DB edits, no .env changes for runtime config. See `specs/phase-1/c2-platform-control-center.md` for the full spec.
+
+**C2 Modules:** Command Dashboard, Tenant Management, User Management, Subscription & Billing, Feature Flags, Platform Configuration, Analytics & Reports, Activity & Audit Log, System Health, Communication Center, API & Integrations, Data Management.
+
+**Key pattern:** Runtime config is stored in `platform_config` table (not .env) so it can be changed from C2 UI. Only infrastructure secrets (DATABASE_URL, REDIS_URL, RM_PRIVATE_KEY) stay in .env.
+
+---
+
+## Development Methodology: Spec-Driven Development (SDD)
+
+Every feature follows this exact sequence:
+
+```
+1. SPEC → 2. REVIEW → 3. TEST → 4. IMPLEMENT → 5. VERIFY
+```
+
+### Rules:
+- **New feature?** → Write spec to `specs/phase-X/feature-name.md` first. Present for approval. No code until approved.
+- **"Just build it"?** → Still write a lightweight spec (Overview + Acceptance Criteria + API Contract + Test Plan). Confirm before implementing.
+- **Bug fix?** → No spec needed. Write a regression test that fails, then fix.
+- **Spec template** is at `specs/_template.md`. Copy it for new features.
+
+### Spec must include:
+- Status, Priority, Phase
+- User Stories
+- Acceptance Criteria (testable checkboxes)
+- API Contract (endpoints, request/response shapes, auth, tenant-scoped)
+- Database Changes (tables, columns, RLS policies, migration)
+- UI/UX (web pages, mobile screens, components)
+- Technical Approach
+- Edge Cases & Error Handling
+- Security Considerations
+- Test Plan (unit, integration, E2E)
+- Files to Create/Modify
+
+---
 
 ## Tech Stack
 
-- **Framework**: Next.js 14 (App Router) + React 18 + TypeScript (web)
-- **Mobile**: Expo SDK 55 + React Native 0.83 + React 19 + expo-router
-- **Database**: PostgreSQL 16 + Drizzle ORM — `packages/db/`
-- **API Server**: Hono (Node.js) — `packages/api/src/`
-- **Cache/PubSub**: Redis 7 + Socket.io (real-time) + BullMQ (jobs)
-- **Auth**: Better Auth with Drizzle adapter (`packages/auth/`)
-- **Data Fetching**: TanStack Query v5 (`packages/api-client/`)
-- **Styling**: Tailwind CSS + shadcn/ui + Radix UI (web) / NativeWind 4.2 (mobile)
-- **Animations**: Framer Motion (web) / Reanimated 4 (mobile)
-- **Payments**: Revenue Monster (FPX, eWallets, DuitNow QR) + Stripe (subscriptions fallback)
-- **Notifications**: Novu (`packages/notifications/`)
-- **CMS**: Payload CMS (`packages/cms/`) — tenant websites
-- **Analytics**: PostHog (`packages/analytics/`)
-- **e-Invoice**: MyInvois / LHDN (Malaysia) — `packages/db/src/schema/einvoice.ts`
-- **Icons**: Lucide React / lucide-react-native
-- **Package Manager**: pnpm 9 + Turborepo 2
+### Backend
+- **Runtime:** Node.js (or Bun)
+- **Database:** PostgreSQL with **Drizzle ORM**
+- **API Layer:** **Hono** (lightweight, ultrafast)
+- **Real-time:** Socket.io
+- **Caching / Queues / Sessions:** **Redis**
+- **File Storage:** Local VPS or S3-compatible (MinIO / Cloudflare R2)
+- **Testing:** Vitest (unit + integration), Playwright (E2E)
 
-## Monorepo Structure
+### Authentication
+- **Better Auth** (open source, self-hosted, database-backed)
+- Email/password + Google OAuth + extensible for phone OTP
+- Sessions in PostgreSQL (Redis-cached)
+- Multi-tenant aware — users belong to multiple tenants with different roles
+
+### Email
+- **Nodemailer** with SMTP (Brevo free tier: 300 emails/day at launch)
+- Plugged into Better Auth's `sendVerificationEmail` and `sendResetPassword` hooks
+- Upgrade path: Amazon SES or useSend when volume grows
+
+### Payment Gateway
+- **Revenue Monster** (Malaysian fintech, RESTful API + Node.js SDK `rm-api-sdk`)
+- FPX, Visa/Mastercard, eWallets (TNG, Boost, GrabPay, ShopeePay), DuitNow QR
+- Also provides: loyalty API, eVoucher system, smart POS terminal
+- Sandbox: `sb-oauth.revenuemonster.my` / `sb-open.revenuemonster.my`
+- **No recurring billing** — handle tenant subscriptions via manual FPX invoicing
+
+### Frontend — Web
+- **Next.js** (App Router) with TypeScript
+- **UI:** shadcn/ui + Tailwind CSS
+- **Data Fetching:** Tanstack Query (React Query)
+- **Forms:** React Hook Form + Zod resolver
+
+### Frontend — Mobile
+- **Expo** (managed workflow) with React Native
+- **Navigation:** Expo Router
+- **Data Fetching:** Tanstack Query → same Hono API
+- **Offline POS:** MMKV/SQLite local queue + sync
+
+### Deployment
+- **Dokploy** (self-hosted VPS)
+- Docker containers: PostgreSQL, Redis, Hono API, Next.js
+- Traefik reverse proxy, wildcard SSL (`*.timeo.my`)
+- **Minimum VPS:** 2 vCPU, 4 GB RAM, 80 GB SSD
+
+### DevOps
+- **Monorepo:** Turborepo + pnpm
+- **Validation:** Zod (shared across all apps)
+- **Migrations:** Drizzle Kit
+- **CI/CD:** GitHub Actions → Dokploy webhook
+- **Monitoring:** Uptime Kuma + Grafana (self-hosted)
+
+---
+
+## Architecture
+
+### Multi-Tenancy
+- Shared database, shared schema, `tenant_id` on all tenant-scoped tables
+- PostgreSQL **Row-Level Security (RLS)** policies enforce isolation
+- `tenant_id` propagated via `SET app.current_tenant` for RLS
+- `tenants` table stores metadata, branding, plan, custom domain
+
+### User Roles
+1. **Customer** — books appointments, makes purchases, earns loyalty
+2. **Staff** — cashier, therapist, trainer
+3. **Business Admin** — manages staff, inventory, settings
+4. **Platform IT** — manages entire Timeo platform, onboards tenants
+
+### Database Schema
 
 ```
-apps/
-  web/            # Next.js 14 — tenant dashboard, storefront, admin
-  mobile/         # Expo — consolidated app (customer + staff + admin + platform)
+-- Platform
+tenants, tenant_subscriptions
 
-packages/
-  db/             # PostgreSQL schema (Drizzle), migrations, RLS, seed
-  api/            # Hono API server — routes, services, middleware, jobs, realtime
-  auth/           # Better Auth (Drizzle adapter, web proxy, mobile JWT)
-  api-client/     # TanStack Query hooks, Socket.io client
-  ui/             # Shared UI components (web + mobile)
-  shared/         # Types, enums, constants, utilities
-  payments/       # Stripe helpers
-  notifications/  # Novu SDK integration
-  cms/            # Payload CMS
-  analytics/      # PostHog event tracking
+-- Auth (Better Auth)
+users, sessions, accounts, verifications
 
-infra/
-  api/            # Hono API Dockerfile (multi-stage Node 20 Alpine)
-  web/            # Next.js Dockerfile (standalone build)
-  postgres/       # init.sql (RLS helper functions)
-  migration/      # Convex → PostgreSQL data migration scripts
-  scripts/        # backup.sh, restore.sh, generate-secrets.sh
-  cron/           # backup.cron (daily 2 AM)
+-- Multi-tenant mapping
+tenant_members (tenant_id, user_id, role, status)
+
+-- Products & Services
+products, services, service_staff
+
+-- Appointments
+appointments
+
+-- Orders & POS
+orders, order_items, payments
+
+-- Inventory
+inventory, stock_movements
+
+-- CRM
+customers, customer_visits
+
+-- Staff
+staff_profiles
+
+-- Loyalty
+loyalty_rules, loyalty_transactions
+
+-- C2 Control Center
+platform_config (section, key, value JSONB — runtime config, replaces .env for non-secrets)
+feature_flags (key, name, default_enabled, phase)
+feature_flag_overrides (feature_flag_id, tenant_id, enabled)
+audit_log (actor_id, actor_role, tenant_id, action, resource_type, details JSONB, ip_address)
+announcements (title, body, type, target, active, expires_at)
+email_templates (key, subject, body_html, variables JSONB)
+api_keys (tenant_id nullable, name, key_hash, permissions JSONB, expires_at)
+plans (name, slug, price_cents, interval, features JSONB, limits JSONB)
 ```
 
-## Web App Routes (`apps/web/`)
+All tenant-scoped tables have `tenant_id` + RLS policies.
 
-- `app/(app)/` — Authenticated routes (tenant dashboard, onboarding)
-- `app/(marketing)/` — Public landing page
-- `app/(store)/` — Public storefront (booking, orders, membership)
-- `app/api/auth/[...all]/` — Auth proxy → Hono API (Better Auth)
-- `app/api/` — Webhooks (Stripe, Revenue Monster)
+### API Structure
 
-## Key Patterns
-
-- **Multi-tenancy**: Shared DB + `tenant_id` + PostgreSQL RLS via `SET app.current_tenant`. Helper: `withTenantContext(db, tenantId, fn)` in `packages/db/src/rls.ts`
-- **Auth**: Better Auth with Drizzle adapter → PostgreSQL. Web: cookie sessions proxied through Next.js `/api/auth/*` → Hono API. Mobile: JWT tokens
-- **RBAC**: Role hierarchy (`platform_admin > admin > staff > customer`) — enforced in Hono middleware
-- **API response envelope**: `{ success: true, data }` | `{ success: false, error: { code, message } }`
-- **Money**: Integer cents (RM50.00 = 5000). Currency: MYR
-- **IDs**: nanoid(21) as text primary keys
-- **Timestamps**: `timestamptz` (PostgreSQL), ISO strings in API responses
-- **Real-time**: Socket.io rooms (`tenant:<id>`, `user:<id>`) + Redis adapter. TanStack Query auto-invalidation via `useRealtimeInvalidation`
-- **Background jobs**: BullMQ — auto-cancel no-shows, send booking reminders
-- **Booking engine**: Services, bookings, staff availability, blocked slots, business hours
-- **Commerce**: Products, orders, POS transactions, vouchers, gift cards
-- **Fitness vertical**: Check-ins (QR/NFC/manual), session packages & credits, session logs
-- **Payments**: Revenue Monster (FPX/eWallets) for online, POS for in-person (cash/card/QR pay/bank transfer), Stripe for subscriptions
-- **Components**: shadcn/ui style with CVA variants (web) / NativeWind components (mobile)
-- **Audit logs**: All mutations tracked in `audit_logs` table
-
-## Database Schema (key tables)
-
-34 tables across 9 schema files in `packages/db/src/schema/`:
-
-`users`, `tenants`, `tenant_memberships`, `services`, `bookings`, `booking_events`, `products`, `orders`, `order_items`, `memberships`, `payments`, `subscriptions`, `stripe_accounts`, `pos_transactions`, `check_ins`, `member_qr_codes`, `session_packages`, `session_credits`, `session_logs`, `vouchers`, `voucher_redemptions`, `gift_cards`, `gift_card_transactions`, `notifications`, `notification_preferences`, `push_tokens`, `staff_availability`, `business_hours`, `blocked_slots`, `e_invoice_requests`, `files`, `feature_flags`, `audit_logs`, `platform_config`
-
-Better Auth tables (managed by Better Auth): `user`, `session`, `account`, `verification`
-
-## Commands
-
-```bash
-# Root (Turborepo)
-pnpm dev           # Start all apps in dev mode
-pnpm build         # Build all packages
-pnpm lint          # Lint all packages
-pnpm typecheck     # Type-check all packages
-pnpm test          # Run all tests
-pnpm clean         # Clean build artifacts + node_modules
-
-# Database
-pnpm --filter @timeo/db exec drizzle-kit generate  # Generate migration from schema changes
-pnpm --filter @timeo/db exec drizzle-kit migrate   # Run pending migrations
-pnpm --filter @timeo/db exec drizzle-kit studio    # Open Drizzle Studio GUI
-pnpm --filter @timeo/db seed                       # Seed dev data
-
-# API server
-pnpm --filter @timeo/api dev       # Start Hono dev server on :4000 (tsx watch)
-pnpm --filter @timeo/api build     # Build API (tsc → dist/)
-pnpm --filter @timeo/api test      # Run Vitest integration tests
-
-# Web app
-pnpm --filter @timeo/web dev       # Next.js dev server on :3000
-pnpm --filter @timeo/web build     # Build web app
-
-# Mobile (consolidated app)
-pnpm --filter @timeo/mobile ios     # Run on iOS simulator
-pnpm --filter @timeo/mobile android # Run on Android emulator
-
-# Docker (local dev)
-docker compose up -d                              # Start postgres + redis
-docker compose --profile migrate up migrate       # Run DB migrations
-docker compose --profile services up -d           # Start all services in containers
-
-# Docker (production)
-docker compose -f docker-compose.prod.yml up -d   # Start production stack
+```
+apps/api/src/
+├── routes/          (auth, tenants, members, products, services, appointments,
+│                     orders, payments, inventory, customers, staff, loyalty,
+│                     analytics, webhooks, platform)
+├── middleware/       (auth.ts, tenant.ts, rbac.ts, rate-limit.ts, error-handler.ts)
+├── db/schema/       (one file per domain)
+├── db/migrations/
+├── db/seed.ts
+├── lib/             (better-auth.ts, redis.ts, revenue-monster.ts, realtime.ts,
+│                     storage.ts, email.ts)
+├── types/
+└── index.ts
 ```
 
-## Deployment
+### Monorepo Structure
 
-- **Web** (`apps/web`): Dokploy on self-hosted VPS — `https://timeo.my`
-- **API** (`packages/api`): Dokploy on self-hosted VPS — `https://api.timeo.my`
-- **Mobile** (`apps/mobile`): EAS Build (Expo Application Services) — single consolidated app
-- **Auto-deploy**: `git push origin main` triggers GitHub Actions → Dokploy webhooks
+```
+timeo/
+├── CLAUDE.md           ← this file
+├── specs/              ← SDD feature specs (source of truth)
+│   ├── _template.md
+│   ├── phase-1/
+│   ├── phase-2/
+│   ├── phase-3/
+│   ├── phase-4/
+│   └── phase-5/
+├── apps/
+│   ├── web/            ← Next.js App Router
+│   │   ├── app/(auth)/
+│   │   ├── app/(dashboard)/
+│   │   ├── app/(platform)/   ← super admin panel
+│   │   └── e2e/
+│   ├── mobile/         ← Expo React Native
+│   │   └── app/
+│   └── api/            ← Hono backend
+│       └── tests/
+├── packages/
+│   ├── db/             ← Drizzle schema, migrations, RLS
+│   ├── auth/           ← Better Auth config
+│   ├── shared/         ← Zod schemas, types, API client
+│   ├── ui/             ← shadcn/ui components
+│   └── payments/       ← Revenue Monster wrapper
+├── turbo.json
+├── pnpm-workspace.yaml
+└── .github/workflows/
+```
 
-## Environment Variables
+### Test Structure
 
-Key vars (see `.env.example` at project root):
-- `DATABASE_URL` — PostgreSQL connection string
-- `REDIS_URL` — Redis connection string
-- `BETTER_AUTH_SECRET` — Auth secret (min 32 chars, must match API + web)
-- `JWT_SECRET` — JWT signing secret (min 32 chars)
-- `SITE_URL` — Web app URL (`https://timeo.my`)
-- `API_URL` — API URL (`https://api.timeo.my`)
-- `NEXT_PUBLIC_API_URL` / `EXPO_PUBLIC_API_URL` — Client-side API URL
-- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_WEBHOOK_SECRET`
-- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` / `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY`
-- `REVENUE_MONSTER_CLIENT_ID`, `REVENUE_MONSTER_CLIENT_SECRET`
-- `RESEND_API_KEY`, `EMAIL_FROM`
+```
+apps/web/e2e/           ← Playwright E2E tests (*.spec.ts)
+apps/api/tests/
+├── integration/        ← Vitest + test DB (*.test.ts)
+└── unit/               ← pure logic tests (*.test.ts)
+packages/shared/tests/  ← schema/utility tests
+```
 
-## Skills Reference
+---
 
-### Core Development
-- `/shadcn-ui` — Component discovery, installation, customization
-- `/review-react-best-practices` — React/Next.js performance & reliability review
-- `/workflow-feature-shipper` — Ship PR-sized features end-to-end
-- `/tool-systematic-debugging` — Structured debugging methodology
-- `/tool-better-auth` — Better Auth implementation patterns
+## Payment Flow (Revenue Monster)
 
-### Quality & Review
-- `/review-quality` — Unified quality review (code + docs + merge readiness)
-- `/review-merge-readiness` — Structured PR review before merges
-- `/review-clean-code` — Code smell detection and refactoring
-- `/review-doc-consistency` — Documentation vs code alignment
+1. Web/Mobile creates order → Hono API
+2. API creates RM payment transaction
+3. Customer redirected to RM payment page (or QR scan)
+4. RM webhook → `/api/webhooks/revenue-monster`
+5. API verifies signature, updates order/payment, emits Socket.io
+6. Web/Mobile shows receipt
 
-### Design & UX
-- `/tool-design-style-selector` — Define visual direction and design tokens
-- `/tool-ui-ux-pro-max` — UI/UX design intelligence
-- `/enhance-prompt` — Turn vague UI ideas into detailed prompts
+```typescript
+// lib/revenue-monster.ts usage pattern
+const payment = await rm.Payment.createWebPayment(accessToken, {
+  order: { id: orderId, title: 'Order #1234', amount: 5000, currencyType: 'MYR' },
+  storeId: tenantStoreId,
+  redirectUrl: `${baseUrl}/payment/callback`,
+  notifyUrl: `${baseUrl}/api/webhooks/revenue-monster`,
+});
+```
 
-### Workflow & Planning
-- `/workflow-ship-faster` — End-to-end ship workflow (idea to deploy)
-- `/workflow-brainstorm` — Idea to confirmed design spec
-- `/workflow-project-intake` — Requirements clarification and routing
+---
 
-### SEO (public store/marketing pages)
-- `/review-seo-audit` — Technical SEO audit
-- `/tool-schema-markup` — Structured data / JSON-LD
+## Coding Conventions
 
-### Payments
-- `/stripe` — Payment processing, subscriptions, Connect
+- **TypeScript strict mode** everywhere
+- **Zod** for all validation (shared via `@timeo/shared`)
+- **Drizzle ORM** — no raw SQL unless necessary (RLS setup, CTEs)
+- **Functional style** — pure functions, avoid classes
+- **Error handling** — typed responses, never expose stack traces
+- **Naming:**
+  - `camelCase` — variables, functions
+  - `PascalCase` — components, types, interfaces
+  - `snake_case` — database columns, table names
+  - `SCREAMING_SNAKE_CASE` — env vars, constants
+- **File naming:** `kebab-case` (e.g., `order-items.ts`)
+- **Imports:** path aliases (`@/`, `@timeo/shared`, `@timeo/db`, `@timeo/payments`)
+- **API envelope:**
+  ```typescript
+  type ApiResponse<T> = 
+    | { success: true; data: T }
+    | { success: false; error: { code: string; message: string } };
+  ```
+- **Dates:** `timestamptz` in DB, ISO 8601 in API, `dayjs` for manipulation
+- **Money:** store in **cents** (integer). RM50.00 = `5000`
+- **IDs:** `cuid2` or `nanoid` for public-facing, serial for internal PKs
+- **Tests:** `*.test.ts` for unit/integration, `*.spec.ts` for E2E
+
+---
+
+## Key Principles
+
+1. **Spec first, code second** — no feature without an approved spec
+2. **Tests before implementation** — write failing tests from acceptance criteria, then implement
+3. **Tenant isolation is non-negotiable** — every query scoped by `tenant_id` via RLS. Never trust client `tenant_id`
+4. **Mobile-first** — POS and appointments must work on phones/tablets
+5. **Offline-capable POS** — MMKV queue + background sync, server wins on conflict
+6. **Incremental rollout** — POS + appointments first, then CRM, inventory, analytics
+7. **White-label ready** — branding in `tenants.branding` JSONB
+8. **Cost-conscious** — self-hosted, open source, ~RM50-100/month infra
+9. **SEA-localized** — Malay + English, RM currency, local payment methods
+
+---
+
+## Current State
+
+### Completed (Migration from Convex)
+- [x] Monorepo (Turborepo + pnpm)
+- [x] Convex → Hono + PostgreSQL + Drizzle (14,188 lines removed)
+- [x] Better Auth (email/password + Google OAuth)
+- [x] 40+ mobile screens → Tanstack Query
+- [x] 55 web pages → Tanstack Query + @timeo/api-client
+- [x] CI/CD on every PR + push
+- [x] EAS build (dev/preview/production)
+- [x] Convex fully deleted, 0 Convex imports remaining
+
+### Phase 1 — Remaining
+- [ ] RLS policies for all tenant-scoped tables
+- [ ] Revenue Monster sandbox integration
+- [ ] E2E tests passing against Hono backend
+- [ ] Deploy to Dokploy (production)
+- [ ] **C2 Platform Control Center** (see `specs/phase-1/c2-platform-control-center.md`)
+  - [ ] New tables: platform_config, feature_flags, feature_flag_overrides, audit_log, announcements, email_templates, api_keys, plans
+  - [ ] C2 API routes: /api/platform/*
+  - [ ] C2 UI: 12 modules (dashboard, tenants, users, billing, features, config, analytics, activity, health, comms, integrations, data)
+
+### Phase 2 — Core POS
+- [ ] Product catalog CRUD
+- [ ] POS order flow
+- [ ] Revenue Monster payment integration
+- [ ] Receipt generation
+- [ ] POS mobile/tablet interface
+
+### Phase 3 — Appointments & Services
+### Phase 4 — CRM & Inventory
+### Phase 5 — Analytics & Polish
+
+---
+
+## Agent Instructions
+
+### When working on tasks:
+1. Read this file first
+2. Check `specs/` for existing specs related to the task
+3. Follow SDD: spec → review → test → implement → verify
+4. Run `pnpm typecheck` after changes
+5. Run relevant tests after implementation
+6. Commit with conventional commits: `feat:`, `fix:`, `chore:`, `test:`, `docs:`
+
+### Multi-agent workflow:
+When spawning sub-agents, assign clear roles:
+- **routes-agent** — API routes + middleware
+- **db-agent** — Drizzle schema + migrations + RLS
+- **web-agent** — Next.js pages + components
+- **mobile-agent** — Expo screens + components
+- **test-agent** — E2E + integration + unit tests
+- **ci-agent** — GitHub Actions, deploy config
+
+### Implementation order for any feature:
+1. Database schema (Drizzle) + migration + RLS
+2. Zod schemas in `@timeo/shared`
+3. API routes (Hono) + middleware
+4. Web UI (Next.js)
+5. Mobile UI (Expo)
+6. Real-time (Socket.io) if applicable
+7. Tests
+
+### Never:
+- Write code before spec is approved (unless bug fix)
+- Use `any` type
+- Use raw SQL when Drizzle works
+- Skip error handling or tests
+- Hardcode tenant-specific values
+- Expose internal IDs or stack traces
+- Skip RLS on tenant-scoped tables

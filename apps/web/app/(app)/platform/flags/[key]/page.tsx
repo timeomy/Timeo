@@ -29,6 +29,7 @@ import {
 import { ArrowLeft, Plus, Trash2, Flag } from "lucide-react";
 
 interface FlagDetail {
+  id: string;
   key: string;
   enabled: boolean;
   description: string;
@@ -105,7 +106,7 @@ export default function FlagDetailPage() {
     if (!flag) return;
     setTogglingGlobal(true);
     try {
-      await updateFlag({ key: flagKey, enabled: !flag.enabled });
+      await updateFlag({ id: flag.id, default_enabled: !flag.enabled });
       queryClient.invalidateQueries({ queryKey: ["platform", "flags", flagKey] });
     } finally {
       setTogglingGlobal(false);

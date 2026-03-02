@@ -23,10 +23,10 @@ export default function FeatureFlagsPage() {
   const { mutateAsync: updateFlag } = useUpdatePlatformFlag();
   const [togglingKey, setTogglingKey] = useState<string | null>(null);
 
-  const handleToggle = async (key: string, current: boolean) => {
-    setTogglingKey(key);
+  const handleToggle = async (flag: { id: string; key: string; defaultEnabled: boolean }) => {
+    setTogglingKey(flag.key);
     try {
-      await updateFlag({ key, enabled: !current });
+      await updateFlag({ id: flag.id, default_enabled: !flag.defaultEnabled });
     } finally {
       setTogglingKey(null);
     }
@@ -89,38 +89,38 @@ export default function FeatureFlagsPage() {
                     </TableCell>
                     <TableCell>
                       <button
-                        onClick={() => handleToggle(flag.key, flag.enabled)}
+                        onClick={() => handleToggle(flag)}
                         disabled={togglingKey === flag.key}
                         className="flex items-center gap-2"
                         aria-label={`Toggle ${flag.key}`}
                       >
                         <div
                           className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                            flag.enabled
+                            flag.defaultEnabled
                               ? "bg-emerald-500"
                               : "bg-white/20"
                           } ${togglingKey === flag.key ? "opacity-50" : ""}`}
                         >
                           <span
                             className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                              flag.enabled ? "translate-x-5" : "translate-x-1"
+                              flag.defaultEnabled ? "translate-x-5" : "translate-x-1"
                             }`}
                           />
                         </div>
                         <Badge
                           variant="outline"
                           className={
-                            flag.enabled
+                            flag.defaultEnabled
                               ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs"
                               : "bg-zinc-500/20 text-zinc-400 border-zinc-500/30 text-xs"
                           }
                         >
-                          {flag.enabled ? "On" : "Off"}
+                          {flag.defaultEnabled ? "On" : "Off"}
                         </Badge>
                       </button>
                     </TableCell>
                     <TableCell className="hidden text-sm text-muted-foreground sm:table-cell">
-                      {new Date(flag.updatedAt).toLocaleDateString("en-MY", {
+                      {new Date(flag.createdAt).toLocaleDateString("en-MY", {
                         month: "short",
                         day: "numeric",
                         year: "numeric",

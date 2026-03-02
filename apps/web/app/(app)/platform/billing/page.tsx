@@ -26,7 +26,23 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@timeo/ui/web";
-import { KpiCard } from "@/components/platform/kpi-card";
+function KpiCard({ label, value, icon: Icon, loading, index: _index }: { label: string; value: string | number; icon: React.ElementType; loading?: boolean; index?: number }) {
+  return (
+    <Card className="glass border-white/[0.08]">
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-muted-foreground">{label}</p>
+            {loading ? <Skeleton className="mt-1 h-8 w-24" /> : <p className="mt-1 text-2xl font-bold">{value}</p>}
+          </div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+            <Icon className="h-5 w-5 text-primary" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 import {
   DollarSign,
   TrendingDown,

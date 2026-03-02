@@ -54,10 +54,11 @@ export async function redeemVoucher(input: {
     id: generateId(),
     tenant_id: input.tenantId,
     actor_id: input.userId,
+    actor_role: "customer",
     action: "voucher.redeemed",
-    resource: "vouchers",
+    resource_type: "voucher",
     resource_id: input.voucherId,
-    metadata: { discountAmount, code: voucher.code },
+    details: { discountAmount, code: voucher.code },
   });
 
   return discountAmount;

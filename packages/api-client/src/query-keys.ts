@@ -97,18 +97,30 @@ export const queryKeys = {
   platform: {
     tenants: () => ["platform", "tenants"] as const,
     tenant: (id: string) => ["platform", "tenants", id] as const,
+    tenantMembers: (id: string) => ["platform", "tenants", id, "members"] as const,
     config: () => ["platform", "config"] as const,
-    flags: () => ["platform", "flags"] as const,
-    flag: (key: string) => ["platform", "flags", key] as const,
+    configSection: (section: string) => ["platform", "config", section] as const,
+    flags: () => ["platform", "feature-flags"] as const,
+    flag: (id: string) => ["platform", "feature-flags", id] as const,
+    plans: () => ["platform", "plans"] as const,
+    plan: (id: string) => ["platform", "plans", id] as const,
     logs: () => ["platform", "logs"] as const,
+    auditLogs: (params?: Record<string, string>) =>
+      ["platform", "audit-log", params ?? {}] as const,
     overview: () => ["platform", "overview"] as const,
     stats: () => ["platform", "stats"] as const,
     health: () => ["platform", "health"] as const,
     users: () => ["platform", "users"] as const,
     user: (id: string) => ["platform", "users", id] as const,
     subscriptions: () => ["platform", "subscriptions"] as const,
+    announcements: () => ["platform", "announcements"] as const,
+    announcement: (id: string) => ["platform", "announcements", id] as const,
+    emailTemplates: () => ["platform", "email-templates"] as const,
+    apiKeys: () => ["platform", "api-keys"] as const,
     analytics: (range: string) => ["platform", "analytics", range] as const,
-    auditLogs: () => ["platform", "audit-logs"] as const,
+    analyticsOverview: () => ["platform", "analytics", "overview"] as const,
+    analyticsTenants: (days?: number) =>
+      ["platform", "analytics", "tenants", days ?? 30] as const,
   },
 
   files: {

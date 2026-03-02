@@ -30,8 +30,9 @@ export async function createTenant(input: {
     id: generateId(),
     tenant_id: tenantId,
     actor_id: input.ownerId,
+    actor_role: "admin",
     action: "tenant.created",
-    resource: "tenants",
+    resource_type: "tenant",
     resource_id: tenantId,
   });
 
@@ -62,10 +63,11 @@ export async function updateTenantSettings(
     id: generateId(),
     tenant_id: tenantId,
     actor_id: actorId,
+    actor_role: "admin",
     action: "tenant.settings_updated",
-    resource: "tenants",
+    resource_type: "tenant",
     resource_id: tenantId,
-    metadata: { changes: Object.keys(settings) },
+    details: { changes: Object.keys(settings) },
   });
 }
 
@@ -93,8 +95,9 @@ export async function updateTenantBranding(
     id: generateId(),
     tenant_id: tenantId,
     actor_id: actorId,
+    actor_role: "admin",
     action: "tenant.branding_updated",
-    resource: "tenants",
+    resource_type: "tenant",
     resource_id: tenantId,
   });
 }
@@ -125,10 +128,11 @@ export async function inviteStaff(input: {
     id: generateId(),
     tenant_id: input.tenantId,
     actor_id: input.inviterId,
+    actor_role: "admin",
     action: "staff.invited",
-    resource: "tenant_memberships",
+    resource_type: "tenant_membership",
     resource_id: membershipId,
-    metadata: { email: input.email, role: input.role },
+    details: { email: input.email, role: input.role },
   });
 
   return membershipId;

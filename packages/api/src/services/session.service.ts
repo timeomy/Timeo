@@ -57,8 +57,9 @@ export async function createSessionLog(input: {
     id: generateId(),
     tenant_id: input.tenantId,
     actor_id: input.coachId,
+    actor_role: "staff",
     action: "session.logged",
-    resource: "session_logs",
+    resource_type: "session_log",
     resource_id: logId,
   });
 

@@ -10,109 +10,145 @@ export interface PlatformTenant {
   slug: string;
   plan: string;
   status: string;
-  isActive: boolean;
+  settings: Record<string, unknown>;
+  branding: Record<string, unknown>;
   createdAt: string;
-  memberCount: number;
-  mrr: number;
-  revenue: number;
-}
-
-export interface PlatformConfig {
-  maintenanceMode: boolean;
-  signupEnabled: boolean;
-  maxTenantsPerUser: number;
-  defaultCurrency: string;
-  defaultTimezone: string;
-}
-
-export interface FeatureFlag {
-  key: string;
-  enabled: boolean;
-  description?: string;
   updatedAt: string;
+  memberCount: number;
 }
 
-export interface AuditLog {
+export interface TenantMember {
   id: string;
-  action: string;
   userId: string;
-  actorEmail: string;
-  actorRole: string;
-  tenantId?: string;
-  targetName: string;
-  targetId: string;
-  ipAddress: string;
-  details: Record<string, unknown>;
-  createdAt: string;
-}
-
-export interface PlatformStats {
-  totalTenants: number;
-  activeTenants30d: number;
-  mrr: number;
-  arr: number;
-  newTenants30d: number;
-  churnRate30d: number;
-  avgRevenuePerTenant: number;
+  role: string;
+  status: string;
+  joinedAt: string;
+  userName: string;
+  userEmail: string;
 }
 
 export interface PlatformUser {
   id: string;
+  authId: string | null;
   name: string;
   email: string;
-  role: string;
-  status: string;
+  avatarUrl: string | null;
+  createdAt: string;
   tenantCount: number;
-  lastLoginAt: string | null;
+}
+
+export interface PlatformUserDetail extends PlatformUser {
+  memberships: Array<{
+    id: string;
+    tenantId: string;
+    role: string;
+    status: string;
+    joinedAt: string;
+  }>;
+}
+
+export interface Plan {
+  id: string;
+  name: string;
+  slug: string;
+  priceCents: number;
+  interval: string;
+  features: string[];
+  limits: Record<string, unknown>;
+  active: boolean;
+  sortOrder: number;
   createdAt: string;
 }
 
-export interface PlatformSubscription {
+export interface FeatureFlag {
   id: string;
-  tenantId: string;
-  tenantName: string;
-  plan: string;
-  amountCents: number;
-  status: string;
-  startDate: string;
-  nextRenewal: string;
+  key: string;
+  name: string;
+  description: string | null;
+  defaultEnabled: boolean;
+  phase: string | null;
+  createdAt: string;
+  overrides: Array<{ tenantId: string; enabled: boolean }>;
 }
 
-// ─── Query Keys ───────────────────────────────────────────────────────────────
-
-// Extends the shared queryKeys.platform for finer-grained keys
-const platformKeys = {
-  stats: () => ["platform", "stats"] as const,
-  health: () => ["platform", "health"] as const,
-  tenants: (params?: Record<string, string>) =>
-    params
-      ? (["platform", "tenants", "list", params] as const)
-      : (["platform", "tenants"] as const),
-  tenant: (id: string) => ["platform", "tenants", id] as const,
-  users: (params?: Record<string, string>) =>
-    params
-      ? (["platform", "users", "list", params] as const)
-      : (["platform", "users"] as const),
-  user: (id: string) => ["platform", "users", id] as const,
-  subscriptions: (params?: Record<string, string>) =>
-    ["platform", "subscriptions", params ?? {}] as const,
-  analytics: (range: string) => ["platform", "analytics", range] as const,
-  auditLogs: (params?: Record<string, string>) =>
-    ["platform", "audit-logs", params ?? {}] as const,
-  flags: () => queryKeys.platform.flags(),
-  flag: (key: string) => ["platform", "flags", key] as const,
-  config: () => queryKeys.platform.config(),
-};
-
-// ─── Hooks ────────────────────────────────────────────────────────────────────
-
-export function usePlatformStats() {
-  return useQuery({
-    queryKey: platformKeys.stats(),
-    queryFn: () => api.get<PlatformStats>("/api/platform/stats"),
-    staleTime: 30_000,
-  });
+export interface PlatformConfig {
+  [section: string]: Record<string, unknown>;
 }
+
+export interface AuditLogEntry {
+  id: string;
+  actorId: string;
+  actorRole: string;
+  tenantId: string | null;
+  action: string;
+  resourceType: string;
+  resourceId: string | null;
+  details: Record<string, unknown> | null;
+  ipAddress: string | null;
+  createdAt: string;
+}
+
+export interface AuditLogResponse {
+  items: AuditLogEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  type: "info" | "warning" | "critical";
+  target: "all" | "admins";
+  active: boolean;
+  createdBy: string;
+  createdAt: string;
+  expiresAt: string | null;
+}
+
+export interface EmailTemplate {
+  id: string;
+  key: string;
+  subject: string;
+  bodyHtml: string;
+  bodyText: string | null;
+  variables: Array<{ name: string; description: string }>;
+  updatedAt: string;
+}
+
+export interface ApiKey {
+  id: string;
+  tenantId: string | null;
+  name: string;
+  permissions: string[];
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export interface ApiKeyCreateResponse extends ApiKey {
+  key: string; // plaintext, shown once
+}
+
+export interface HealthStatus {
+  status: "healthy" | "degraded";
+  checks: Record<string, unknown>;
+}
+
+export interface AnalyticsOverview {
+  totalTenants: number;
+  totalUsers: number;
+  activeMembers24h: number;
+  todayStart: string;
+}
+
+export interface TenantGrowthPoint {
+  date: string;
+  count: number;
+}
+
+// ─── MODULE 1: Tenants ───────────────────────────────────────────────────────
 
 export function usePlatformTenants() {
   return useQuery({
@@ -122,153 +158,479 @@ export function usePlatformTenants() {
   });
 }
 
-export function usePlatformConfig() {
+export function usePlatformTenant(id: string) {
   return useQuery({
-    queryKey: platformKeys.config(),
-    queryFn: () => api.get<PlatformConfig>("/api/platform/config"),
-    staleTime: 60_000,
+    queryKey: queryKeys.platform.tenant(id),
+    queryFn: () =>
+      api.get<PlatformTenant & { memberCount: number }>(
+        `/api/platform/tenants/${id}`,
+      ),
+    enabled: !!id,
   });
 }
 
-export function usePlatformFlags() {
+export function usePlatformTenantMembers(tenantId: string) {
   return useQuery({
-    queryKey: platformKeys.flags(),
-    queryFn: () => api.get<FeatureFlag[]>("/api/platform/flags"),
-    staleTime: 30_000,
-  });
-}
-
-export function usePlatformLogs() {
-  return useQuery({
-    queryKey: queryKeys.platform.logs(),
-    queryFn: () => api.get<AuditLog[]>("/api/platform/logs"),
-    staleTime: 15_000,
-  });
-}
-
-export function useUpdatePlatformFlag() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: { key: string; enabled: boolean }) =>
-      api.patch(`/api/platform/flags/${encodeURIComponent(data.key)}`, {
-        enabled: data.enabled,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: platformKeys.flags() });
-    },
-  });
-}
-
-export function useUpdatePlatformConfig() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: Partial<PlatformConfig>) =>
-      api.put("/api/platform/config", data),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: platformKeys.config() }),
+    queryKey: queryKeys.platform.tenantMembers(tenantId),
+    queryFn: () =>
+      api.get<TenantMember[]>(`/api/platform/tenants/${tenantId}/members`),
+    enabled: !!tenantId,
   });
 }
 
 export function useCreatePlatformTenant() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: {
       name: string;
       slug: string;
       ownerEmail: string;
-      plan: string;
-      country?: string;
-      currency?: string;
+      plan?: string;
     }) => api.post<PlatformTenant>("/api/platform/tenants", data),
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: queryKeys.platform.tenants() }),
+      qc.invalidateQueries({ queryKey: queryKeys.platform.tenants() }),
   });
 }
 
-export function useUpdatePlatformTenant() {
-  const queryClient = useQueryClient();
+export function useSuspendPlatformTenant() {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      id,
-      ...data
-    }: { id: string } & Record<string, unknown>) =>
-      api.patch(`/api/platform/tenants/${id}`, data),
-    onSuccess: (_data, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ["platform", "tenants", id] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.platform.tenants() });
+    mutationFn: (id: string) =>
+      api.patch(`/api/platform/tenants/${id}/suspend`),
+    onSuccess: (_d, id) => {
+      qc.invalidateQueries({ queryKey: queryKeys.platform.tenant(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.platform.tenants() });
+    },
+  });
+}
+
+export function useActivatePlatformTenant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.patch(`/api/platform/tenants/${id}/activate`),
+    onSuccess: (_d, id) => {
+      qc.invalidateQueries({ queryKey: queryKeys.platform.tenant(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.platform.tenants() });
     },
   });
 }
 
 export function useDeletePlatformTenant() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.delete(`/api/platform/tenants/${id}`),
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: queryKeys.platform.tenants() }),
-  });
-}
-
-export function useSuspendPlatformTenant() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) =>
-      api.post(`/api/platform/tenants/${id}/suspend`),
-    onSuccess: (_data, id) => {
-      queryClient.invalidateQueries({ queryKey: ["platform", "tenants", id] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.platform.tenants() });
-    },
+      qc.invalidateQueries({ queryKey: queryKeys.platform.tenants() }),
   });
 }
 
 export function useImpersonateTenant() {
   return useMutation({
     mutationFn: (id: string) =>
-      api.post<{ token: string; url: string }>(
+      api.post<{ token: string; expiresIn: number; tenantId: string }>(
         `/api/platform/tenants/${id}/impersonate`,
       ),
   });
 }
 
+// ─── MODULE 2: Users ─────────────────────────────────────────────────────────
+
 export function usePlatformUsers() {
   return useQuery({
-    queryKey: platformKeys.users(),
+    queryKey: queryKeys.platform.users(),
     queryFn: () => api.get<PlatformUser[]>("/api/platform/users"),
     staleTime: 30_000,
   });
 }
 
-export function usePlatformSubscriptions() {
+export function usePlatformUser(id: string) {
   return useQuery({
-    queryKey: platformKeys.subscriptions(),
-    queryFn: () =>
-      api.get<{ items: PlatformSubscription[]; total: number }>(
-        "/api/platform/subscriptions",
-      ),
+    queryKey: queryKeys.platform.user(id),
+    queryFn: () => api.get<PlatformUserDetail>(`/api/platform/users/${id}`),
+    enabled: !!id,
+  });
+}
+
+export function useDeactivatePlatformUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.patch(`/api/platform/users/${id}/deactivate`),
+    onSuccess: (_d, id) => {
+      qc.invalidateQueries({ queryKey: queryKeys.platform.user(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.platform.users() });
+    },
+  });
+}
+
+export function useForceLogoutPlatformUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.delete(`/api/platform/users/${id}/sessions`),
+    onSuccess: (_d, id) => {
+      qc.invalidateQueries({ queryKey: queryKeys.platform.user(id) });
+    },
+  });
+}
+
+// ─── MODULE 3: Plans ─────────────────────────────────────────────────────────
+
+export function usePlatformPlans() {
+  return useQuery({
+    queryKey: queryKeys.platform.plans(),
+    queryFn: () => api.get<Plan[]>("/api/platform/plans"),
+    staleTime: 60_000,
+  });
+}
+
+export function useCreatePlatformPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      name: string;
+      slug: string;
+      price_cents: number;
+      interval?: string;
+      features?: string[];
+      limits?: Record<string, unknown>;
+      active?: boolean;
+      sort_order?: number;
+    }) => api.post<Plan>("/api/platform/plans", data),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.platform.plans() }),
+  });
+}
+
+export function useUpdatePlatformPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string } & Record<string, unknown>) =>
+      api.put<Plan>(`/api/platform/plans/${id}`, data),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.platform.plans() }),
+  });
+}
+
+export function useDeletePlatformPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/api/platform/plans/${id}`),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.platform.plans() }),
+  });
+}
+
+// ─── MODULE 4: Feature Flags ─────────────────────────────────────────────────
+
+export function usePlatformFlags() {
+  return useQuery({
+    queryKey: queryKeys.platform.flags(),
+    queryFn: () => api.get<FeatureFlag[]>("/api/platform/feature-flags"),
     staleTime: 30_000,
   });
 }
 
-export function useUpdatePlatformSubscription() {
-  const queryClient = useQueryClient();
+export function useCreatePlatformFlag() {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, plan }: { id: string; plan: string }) =>
-      api.patch(`/api/platform/subscriptions/${id}`, { plan }),
+    mutationFn: (data: {
+      key: string;
+      name: string;
+      description?: string;
+      default_enabled?: boolean;
+      phase?: string;
+    }) => api.post<FeatureFlag>("/api/platform/feature-flags", data),
     onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: platformKeys.subscriptions(),
-      }),
+      qc.invalidateQueries({ queryKey: queryKeys.platform.flags() }),
   });
 }
 
-export function useCancelPlatformSubscription() {
-  const queryClient = useQueryClient();
+export function useUpdatePlatformFlag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...data
+    }: {
+      id: string;
+      name?: string;
+      description?: string;
+      default_enabled?: boolean;
+      phase?: string;
+    }) => api.put(`/api/platform/feature-flags/${id}`, data),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.platform.flags() }),
+  });
+}
+
+export function useSetFlagOverride() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      flagId,
+      tenantId,
+      enabled,
+    }: {
+      flagId: string;
+      tenantId: string;
+      enabled: boolean;
+    }) =>
+      api.put(`/api/platform/feature-flags/${flagId}/override`, {
+        tenantId,
+        enabled,
+      }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.platform.flags() }),
+  });
+}
+
+export function useRemoveFlagOverride() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      flagId,
+      tenantId,
+    }: {
+      flagId: string;
+      tenantId: string;
+    }) =>
+      api.delete(
+        `/api/platform/feature-flags/${flagId}/override/${tenantId}`,
+      ),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.platform.flags() }),
+  });
+}
+
+// ─── MODULE 5: Platform Config ───────────────────────────────────────────────
+
+export function usePlatformConfig() {
+  return useQuery({
+    queryKey: queryKeys.platform.config(),
+    queryFn: () => api.get<PlatformConfig>("/api/platform/config"),
+    staleTime: 60_000,
+  });
+}
+
+export function usePlatformConfigSection(section: string) {
+  return useQuery({
+    queryKey: queryKeys.platform.configSection(section),
+    queryFn: () =>
+      api.get<Record<string, unknown>>(`/api/platform/config/${section}`),
+    enabled: !!section,
+    staleTime: 60_000,
+  });
+}
+
+export function useUpdatePlatformConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      section,
+      key,
+      value,
+    }: {
+      section: string;
+      key: string;
+      value: unknown;
+    }) => api.put(`/api/platform/config/${section}/${key}`, { value }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.platform.config() }),
+  });
+}
+
+// ─── MODULE 6: Audit Log ─────────────────────────────────────────────────────
+
+export function usePlatformAuditLog(params?: {
+  tenantId?: string;
+  actorId?: string;
+  action?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params?.tenantId) searchParams.set("tenantId", params.tenantId);
+  if (params?.actorId) searchParams.set("actorId", params.actorId);
+  if (params?.action) searchParams.set("action", params.action);
+  if (params?.from) searchParams.set("from", params.from);
+  if (params?.to) searchParams.set("to", params.to);
+  if (params?.limit) searchParams.set("limit", String(params.limit));
+  if (params?.offset) searchParams.set("offset", String(params.offset));
+
+  const qs = searchParams.toString();
+  return useQuery({
+    queryKey: queryKeys.platform.auditLogs(
+      params as Record<string, string> | undefined,
+    ),
+    queryFn: () =>
+      api.get<AuditLogResponse>(
+        `/api/platform/audit-log${qs ? `?${qs}` : ""}`,
+      ),
+    staleTime: 15_000,
+  });
+}
+
+// ─── MODULE 7: Announcements ─────────────────────────────────────────────────
+
+export function usePlatformAnnouncements() {
+  return useQuery({
+    queryKey: queryKeys.platform.announcements(),
+    queryFn: () => api.get<Announcement[]>("/api/platform/announcements"),
+    staleTime: 30_000,
+  });
+}
+
+export function useCreatePlatformAnnouncement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      title: string;
+      body: string;
+      type?: "info" | "warning" | "critical";
+      target?: "all" | "admins";
+      active?: boolean;
+      expires_at?: string;
+    }) => api.post<Announcement>("/api/platform/announcements", data),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.platform.announcements() }),
+  });
+}
+
+export function useUpdatePlatformAnnouncement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...data
+    }: {
+      id: string;
+      title?: string;
+      body?: string;
+      type?: "info" | "warning" | "critical";
+      target?: "all" | "admins";
+      active?: boolean;
+      expires_at?: string | null;
+    }) => api.patch<Announcement>(`/api/platform/announcements/${id}`, data),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.platform.announcements() }),
+  });
+}
+
+export function useDeletePlatformAnnouncement() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      api.delete(`/api/platform/subscriptions/${id}`),
+      api.delete(`/api/platform/announcements/${id}`),
     onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: platformKeys.subscriptions(),
-      }),
+      qc.invalidateQueries({ queryKey: queryKeys.platform.announcements() }),
+  });
+}
+
+// ─── MODULE 8: Email Templates ───────────────────────────────────────────────
+
+export function usePlatformEmailTemplates() {
+  return useQuery({
+    queryKey: queryKeys.platform.emailTemplates(),
+    queryFn: () => api.get<EmailTemplate[]>("/api/platform/email-templates"),
+    staleTime: 60_000,
+  });
+}
+
+export function useUpsertPlatformEmailTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      key,
+      ...data
+    }: {
+      key: string;
+      subject: string;
+      body_html: string;
+      body_text?: string;
+      variables?: Array<{ name: string; description: string }>;
+    }) => api.put(`/api/platform/email-templates/${key}`, data),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.platform.emailTemplates() }),
+  });
+}
+
+// ─── MODULE 9: API Keys ─────────────────────────────────────────────────────
+
+export function usePlatformApiKeys() {
+  return useQuery({
+    queryKey: queryKeys.platform.apiKeys(),
+    queryFn: () => api.get<ApiKey[]>("/api/platform/api-keys"),
+    staleTime: 30_000,
+  });
+}
+
+export function useCreatePlatformApiKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      name: string;
+      tenant_id?: string;
+      permissions?: string[];
+      expires_at?: string;
+    }) => api.post<ApiKeyCreateResponse>("/api/platform/api-keys", data),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.platform.apiKeys() }),
+  });
+}
+
+export function useRevokePlatformApiKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/api/platform/api-keys/${id}`),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.platform.apiKeys() }),
+  });
+}
+
+// ─── MODULE 10: Health ───────────────────────────────────────────────────────
+
+export function usePlatformHealth() {
+  return useQuery({
+    queryKey: queryKeys.platform.health(),
+    queryFn: () => api.get<HealthStatus>("/api/platform/health"),
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+  });
+}
+
+// ─── MODULE 11: Analytics ────────────────────────────────────────────────────
+
+export function usePlatformAnalyticsOverview() {
+  return useQuery({
+    queryKey: queryKeys.platform.analyticsOverview(),
+    queryFn: () =>
+      api.get<AnalyticsOverview>("/api/platform/analytics/overview"),
+    staleTime: 30_000,
+  });
+}
+
+export function usePlatformTenantGrowth(days = 30) {
+  return useQuery({
+    queryKey: queryKeys.platform.analyticsTenants(days),
+    queryFn: () =>
+      api.get<TenantGrowthPoint[]>(
+        `/api/platform/analytics/tenants?days=${days}`,
+      ),
+    staleTime: 60_000,
+  });
+}
+
+// ─── MODULE 12: Data ─────────────────────────────────────────────────────────
+
+export function useSeedFeatureFlags() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post("/api/platform/data/seed-flags"),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: queryKeys.platform.flags() }),
   });
 }

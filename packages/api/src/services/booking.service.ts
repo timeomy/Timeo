@@ -437,9 +437,10 @@ async function insertAuditLog(input: {
     id: generateId(),
     tenant_id: input.tenantId,
     actor_id: input.actorId,
+    actor_role: "staff",
     action: input.action,
-    resource: input.resource,
+    resource_type: input.resource,
     resource_id: input.resourceId,
-    metadata: input.metadata ?? null,
+    details: input.metadata ?? null,
   });
 }

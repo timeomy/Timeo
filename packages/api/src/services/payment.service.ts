@@ -43,10 +43,11 @@ export async function createPayment(input: {
     id: generateId(),
     tenant_id: input.tenantId,
     actor_id: input.customerId,
+    actor_role: "customer",
     action: "payment.created",
-    resource: "payments",
+    resource_type: "payment",
     resource_id: paymentId,
-    metadata: { amount: input.amount, gateway: input.gateway },
+    details: { amount: input.amount, gateway: input.gateway },
   });
 
   return paymentId;
@@ -73,8 +74,9 @@ export async function updatePaymentStatus(
     id: generateId(),
     tenant_id: payment.tenant_id,
     actor_id: actorId,
+    actor_role: "staff",
     action: `payment.${status}`,
-    resource: "payments",
+    resource_type: "payment",
     resource_id: paymentId,
   });
 }

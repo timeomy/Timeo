@@ -146,22 +146,56 @@ export {
 } from "./analytics";
 
 export {
-  usePlatformStats,
+  // Module 1: Tenants
   usePlatformTenants,
-  usePlatformConfig,
-  usePlatformFlags,
-  usePlatformLogs,
-  useUpdatePlatformFlag,
-  useUpdatePlatformConfig,
+  usePlatformTenant,
+  usePlatformTenantMembers,
   useCreatePlatformTenant,
-  useUpdatePlatformTenant,
-  useDeletePlatformTenant,
   useSuspendPlatformTenant,
+  useActivatePlatformTenant,
+  useDeletePlatformTenant,
   useImpersonateTenant,
+  // Module 2: Users
   usePlatformUsers,
-  usePlatformSubscriptions,
-  useUpdatePlatformSubscription,
-  useCancelPlatformSubscription,
+  usePlatformUser,
+  useDeactivatePlatformUser,
+  useForceLogoutPlatformUser,
+  // Module 3: Plans
+  usePlatformPlans,
+  useCreatePlatformPlan,
+  useUpdatePlatformPlan,
+  useDeletePlatformPlan,
+  // Module 4: Feature Flags
+  usePlatformFlags,
+  useCreatePlatformFlag,
+  useUpdatePlatformFlag,
+  useSetFlagOverride,
+  useRemoveFlagOverride,
+  // Module 5: Config
+  usePlatformConfig,
+  usePlatformConfigSection,
+  useUpdatePlatformConfig,
+  // Module 6: Audit Log
+  usePlatformAuditLog,
+  // Module 7: Announcements
+  usePlatformAnnouncements,
+  useCreatePlatformAnnouncement,
+  useUpdatePlatformAnnouncement,
+  useDeletePlatformAnnouncement,
+  // Module 8: Email Templates
+  usePlatformEmailTemplates,
+  useUpsertPlatformEmailTemplate,
+  // Module 9: API Keys
+  usePlatformApiKeys,
+  useCreatePlatformApiKey,
+  useRevokePlatformApiKey,
+  // Module 10: Health
+  usePlatformHealth,
+  // Module 11: Analytics
+  usePlatformAnalyticsOverview,
+  usePlatformTenantGrowth,
+  // Module 12: Data
+  useSeedFeatureFlags,
 } from "./platform";
 
 export {

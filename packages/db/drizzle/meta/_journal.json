@@ -15,6 +15,13 @@
       "when": 1772367604245,
       "tag": "0001_lumpy_bruce_banner",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772500000000,
+      "tag": "0002_c2_platform_control_center",
+      "breakpoints": true
     }
   ]
 }

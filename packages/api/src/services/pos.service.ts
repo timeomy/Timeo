@@ -52,10 +52,11 @@ export async function createPosTransaction(input: {
     id: generateId(),
     tenant_id: input.tenantId,
     actor_id: input.staffId,
+    actor_role: "staff",
     action: "pos.transaction_created",
-    resource: "pos_transactions",
+    resource_type: "pos_transaction",
     resource_id: txId,
-    metadata: { total, paymentMethod: input.paymentMethod },
+    details: { total, paymentMethod: input.paymentMethod },
   });
 
   emitToTenant(input.tenantId, SocketEvents.POS_TRANSACTION_CREATED, {
@@ -85,8 +86,9 @@ export async function voidTransaction(txId: string, actorId: string) {
     id: generateId(),
     tenant_id: tx.tenant_id,
     actor_id: actorId,
+    actor_role: "staff",
     action: "pos.transaction_voided",
-    resource: "pos_transactions",
+    resource_type: "pos_transaction",
     resource_id: txId,
   });
 }

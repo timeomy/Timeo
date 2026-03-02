@@ -24,10 +24,11 @@ export async function createCheckIn(input: {
     id: generateId(),
     tenant_id: input.tenantId,
     actor_id: input.checkedInBy ?? input.userId,
+    actor_role: "staff",
     action: "check_in.created",
-    resource: "check_ins",
+    resource_type: "check_in",
     resource_id: checkInId,
-    metadata: { method: input.method },
+    details: { method: input.method },
   });
 
   emitToTenant(input.tenantId, SocketEvents.CHECKIN_CREATED, {

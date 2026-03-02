@@ -1,141 +1,53 @@
 import { Hono } from "hono";
-import { db } from "@timeo/db";
-import {
-  tenants,
-  platformConfig,
-  featureFlags,
-  auditLogs,
-} from "@timeo/db/schema";
-import { eq, desc } from "drizzle-orm";
-import { generateId } from "@timeo/db";
-import { authMiddleware } from "../middleware/auth.js";
-import { requirePlatformAdmin } from "../middleware/rbac.js";
-import { success, error } from "../lib/response.js";
+import { tenantsRouter } from "./platform/tenants.js";
+import { usersRouter } from "./platform/users.js";
+import { plansRouter } from "./platform/plans.js";
+import { featureFlagsRouter } from "./platform/feature-flags.js";
+import { configRouter } from "./platform/config.js";
+import { auditLogRouter } from "./platform/audit-log.js";
+import { announcementsRouter } from "./platform/announcements.js";
+import { emailTemplatesRouter } from "./platform/email-templates.js";
+import { apiKeysRouter } from "./platform/api-keys.js";
+import { healthRouter } from "./platform/health.js";
+import { analyticsRouter } from "./platform/analytics.js";
+import { dataRouter } from "./platform/data.js";
 
 const app = new Hono();
 
-// GET /platform/tenants - list all tenants (platform admin)
-app.get(
-  "/tenants",
-  authMiddleware,
-  requirePlatformAdmin,
-  async (c) => {
-    const rows = await db
-      .select()
-      .from(tenants)
-      .orderBy(desc(tenants.created_at));
-    return c.json(success(rows));
-  },
-);
+// Module 1 — Tenants
+app.route("/tenants", tenantsRouter);
 
-// GET /platform/config - get platform config
-app.get(
-  "/config",
-  authMiddleware,
-  requirePlatformAdmin,
-  async (c) => {
-    const rows = await db.select().from(platformConfig);
-    return c.json(success(rows));
-  },
-);
+// Module 2 — Users
+app.route("/users", usersRouter);
 
-// PUT /platform/config/:key
-app.put(
-  "/config/:key",
-  authMiddleware,
-  requirePlatformAdmin,
-  async (c) => {
-    const user = c.get("user");
-    const key = c.req.param("key");
-    const body = await c.req.json();
+// Module 3 — Billing / Plans
+app.route("/plans", plansRouter);
 
-    const [existing] = await db
-      .select()
-      .from(platformConfig)
-      .where(eq(platformConfig.key, key))
-      .limit(1);
+// Module 4 — Feature Flags
+app.route("/feature-flags", featureFlagsRouter);
 
-    if (existing) {
-      await db
-        .update(platformConfig)
-        .set({ value: body.value, updated_at: new Date() })
-        .where(eq(platformConfig.key, key));
-    } else {
-      await db.insert(platformConfig).values({
-        id: generateId(),
-        key,
-        value: body.value,
-      });
-    }
+// Module 5 — Platform Config
+app.route("/config", configRouter);
 
-    await db.insert(auditLogs).values({
-      id: generateId(),
-      actor_id: user.id,
-      action: "platform.config_updated",
-      resource: "platform_config",
-      resource_id: key,
-    });
+// Module 6 — Audit Log
+app.route("/audit-log", auditLogRouter);
 
-    return c.json(success({ message: "Config updated" }));
-  },
-);
+// Module 7 — Announcements
+app.route("/announcements", announcementsRouter);
 
-// GET /platform/feature-flags
-app.get(
-  "/feature-flags",
-  authMiddleware,
-  requirePlatformAdmin,
-  async (c) => {
-    const rows = await db.select().from(featureFlags);
-    return c.json(success(rows));
-  },
-);
+// Module 8 — Email Templates
+app.route("/email-templates", emailTemplatesRouter);
 
-// PUT /platform/feature-flags/:key
-app.put(
-  "/feature-flags/:key",
-  authMiddleware,
-  requirePlatformAdmin,
-  async (c) => {
-    const user = c.get("user");
-    const key = c.req.param("key");
-    const body = await c.req.json();
+// Module 9 — API Keys
+app.route("/api-keys", apiKeysRouter);
 
-    const [existing] = await db
-      .select()
-      .from(featureFlags)
-      .where(eq(featureFlags.key, key))
-      .limit(1);
+// Module 10 — Health
+app.route("/health", healthRouter);
 
-    if (existing) {
-      await db
-        .update(featureFlags)
-        .set({
-          enabled: body.enabled,
-          tenant_id: body.tenantId ?? null,
-          metadata: body.metadata ?? null,
-        })
-        .where(eq(featureFlags.id, existing.id));
-    } else {
-      await db.insert(featureFlags).values({
-        id: generateId(),
-        key,
-        enabled: body.enabled ?? false,
-        tenant_id: body.tenantId ?? null,
-        metadata: body.metadata ?? null,
-      });
-    }
+// Module 11 — Analytics
+app.route("/analytics", analyticsRouter);
 
-    await db.insert(auditLogs).values({
-      id: generateId(),
-      actor_id: user.id,
-      action: "platform.feature_flag_updated",
-      resource: "feature_flags",
-      resource_id: key,
-    });
-
-    return c.json(success({ message: "Feature flag updated" }));
-  },
-);
+// Module 12 — Data
+app.route("/data", dataRouter);
 
 export { app as platformRouter };

@@ -98,7 +98,7 @@ export default function TenantsPage() {
                   <TableHead>Slug</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Members</TableHead>
-                  <TableHead>Revenue</TableHead>
+                  <TableHead>Plan</TableHead>
                   <TableHead>Created</TableHead>
                 </TableRow>
               </TableHeader>
@@ -126,12 +126,12 @@ export default function TenantsPage() {
                       <Badge
                         variant="outline"
                         className={
-                          tenant.isActive
+                          tenant.status === "active"
                             ? STATUS_BADGE_VARIANTS.active
                             : STATUS_BADGE_VARIANTS.inactive
                         }
                       >
-                        {tenant.isActive ? "active" : "inactive"}
+                        {tenant.status === "active" ? "active" : "inactive"}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -139,9 +139,7 @@ export default function TenantsPage() {
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-muted-foreground">
-                        {tenant.revenue > 0
-                          ? `RM ${(tenant.revenue / 100).toFixed(2)}`
-                          : "\u2014"}
+                        {tenant.plan ?? "\u2014"}
                       </span>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">

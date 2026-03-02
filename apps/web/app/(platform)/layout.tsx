@@ -7,23 +7,28 @@ import { useTimeoWebAuthContext } from "@timeo/auth/web";
 import { getInitials } from "@timeo/shared";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
 import {
-  Button,
   Avatar,
   AvatarImage,
   AvatarFallback,
   Separator,
-  Skeleton,
   cn,
 } from "@timeo/ui/web";
 import {
   LayoutDashboard,
   Building2,
-  ScrollText,
+  Users,
+  CreditCard,
   Zap,
+  Settings,
+  BarChart3,
+  ScrollText,
+  Activity,
+  Megaphone,
+  Key,
+  Database,
   Menu,
   LogOut,
   Shield,
-  Users,
 } from "lucide-react";
 
 type SidebarLink = {
@@ -33,10 +38,18 @@ type SidebarLink = {
 };
 
 const sidebarLinks: SidebarLink[] = [
-  { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin", label: "Command", icon: LayoutDashboard },
   { href: "/admin/tenants", label: "Tenants", icon: Building2 },
-  { href: "/admin/clients", label: "Clients", icon: Users },
-  { href: "/admin/audit-logs", label: "Audit Logs", icon: ScrollText },
+  { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/billing", label: "Billing", icon: CreditCard },
+  { href: "/admin/features", label: "Feature Flags", icon: Zap },
+  { href: "/admin/config", label: "Config", icon: Settings },
+  { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/admin/activity", label: "Activity", icon: ScrollText },
+  { href: "/admin/health", label: "Health", icon: Activity },
+  { href: "/admin/communications", label: "Comms", icon: Megaphone },
+  { href: "/admin/integrations", label: "API Keys", icon: Key },
+  { href: "/admin/data", label: "Data", icon: Database },
 ];
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
@@ -56,7 +69,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <div>
             <span className="text-xl font-bold">Timeo</span>
             <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Platform Admin
+              C2 Control Center
             </p>
           </div>
         </Link>
@@ -82,7 +95,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <Separator className="bg-white/[0.06]" />
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
         {sidebarLinks.map((link) => {
           const isActive =
             pathname === link.href ||
@@ -93,7 +106,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               href={link.href}
               onClick={onNavigate}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
                 isActive
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
@@ -124,11 +137,6 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* User Section */}
       <div className="p-3">
-        <div className="mb-3 rounded-lg bg-primary/5 px-3 py-2 text-center">
-          <span className="text-xs font-medium text-primary">
-            Platform Admin
-          </span>
-        </div>
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9">
             <AvatarImage src={user?.imageUrl ?? undefined} alt={displayName} />
@@ -163,7 +171,6 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
   useEnsureUser(!!isSignedIn);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Loading state
   if (!isLoaded) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -179,13 +186,11 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
     );
   }
 
-  // Not signed in
   if (!isSignedIn) {
     router.push("/sign-in");
     return null;
   }
 
-  // Not a platform admin — redirect to dashboard
   if (activeRole !== "platform_admin") {
     router.push("/dashboard");
     return null;
@@ -226,7 +231,7 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
               <Zap className="h-4 w-4 text-primary-foreground" />
             </div>
             <span className="font-semibold">Timeo</span>
-            <span className="text-xs text-muted-foreground">Admin</span>
+            <span className="text-xs text-muted-foreground">C2</span>
           </div>
         </header>
 

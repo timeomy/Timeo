@@ -161,9 +161,9 @@ export default function TenantDetailPage() {
     }
   }
 
-  async function handleToggleFlag(key: string, enabled: boolean) {
+  async function handleToggleFlag(id: string, currentEnabled: boolean) {
     try {
-      await updateFlagMutation.mutateAsync({ key, enabled });
+      await updateFlagMutation.mutateAsync({ id, default_enabled: !currentEnabled });
     } catch (err: any) {
       alert(err.message || "Failed to toggle feature flag.");
     }
@@ -174,8 +174,8 @@ export default function TenantDetailPage() {
     setSavingFlag(true);
     try {
       await updateFlagMutation.mutateAsync({
-        key: newFlagKey.trim(),
-        enabled: newFlagEnabled,
+        id: newFlagKey.trim(),
+        default_enabled: newFlagEnabled,
       });
       setNewFlagKey("");
       setNewFlagEnabled(true);
@@ -435,9 +435,9 @@ export default function TenantDetailPage() {
                       {flag.key}
                     </span>
                     <Toggle
-                      checked={flag.enabled}
-                      onCheckedChange={(val) =>
-                        handleToggleFlag(flag.key, val)
+                      checked={flag.defaultEnabled}
+                      onCheckedChange={() =>
+                        handleToggleFlag(flag.id, flag.defaultEnabled)
                       }
                     />
                   </div>

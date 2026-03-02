@@ -391,8 +391,8 @@ async function seed() {
   // ── 9. Platform Config ──────────────────────────────────────────────────
 
   await db.insert(platformConfig).values([
-    { id: generateId(), key: "maintenance_mode", value: false },
-    { id: generateId(), key: "supported_currencies", value: ["MYR"] },
+    { id: generateId(), section: "general", key: "maintenance_mode", value: false },
+    { id: generateId(), section: "general", key: "supported_currencies", value: ["MYR"] },
   ]);
   counts.platformConfig = 2;
 
@@ -401,17 +401,22 @@ async function seed() {
   // ── 10. Feature Flags ───────────────────────────────────────────────────
 
   const flagDefs = [
-    { key: "enable_revenue_monster", enabled: false },
-    { key: "enable_eInvoice", enabled: false },
-    { key: "enable_loyalty", enabled: false },
+    { key: "pos_enabled", name: "POS", description: "Point-of-sale order taking and payment processing", default_enabled: true, phase: "2" },
+    { key: "appointments_enabled", name: "Appointments", description: "Service booking and scheduling", default_enabled: true, phase: "3" },
+    { key: "loyalty_enabled", name: "Loyalty", description: "Points and rewards programme", default_enabled: false, phase: "4" },
+    { key: "einvoice_enabled", name: "e-Invoice", description: "LHDN MyInvois e-invoice submission", default_enabled: false, phase: "3" },
+    { key: "revenue_monster_enabled", name: "Revenue Monster", description: "FPX and eWallet payments via Revenue Monster", default_enabled: false, phase: "2" },
+    { key: "offline_sync_enabled", name: "Offline POS Sync", description: "MMKV/SQLite local queue for offline POS", default_enabled: false, phase: "5" },
   ];
 
   for (const f of flagDefs) {
     await db.insert(featureFlags).values({
       id: generateId(),
       key: f.key,
-      tenant_id: null,
-      enabled: f.enabled,
+      name: f.name,
+      description: f.description,
+      default_enabled: f.default_enabled,
+      phase: f.phase,
     });
     counts.featureFlags++;
   }

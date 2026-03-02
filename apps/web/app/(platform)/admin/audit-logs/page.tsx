@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { usePlatformLogs } from "@timeo/api-client";
+import { useState } from "react";
+import { usePlatformAuditLog } from "@timeo/api-client";
 import {
   Card,
   CardContent,
@@ -40,43 +40,41 @@ const ACTION_BADGE_VARIANTS: Record<string, string> = {
 
 function getActionVariant(action: string): string {
   const lower = action.toLowerCase();
-  if (lower.includes("created")) return ACTION_BADGE_VARIANTS.created;
-  if (lower.includes("updated") || lower.includes("branding"))
-    return ACTION_BADGE_VARIANTS.updated;
-  if (lower.includes("deleted") || lower.includes("suspended"))
+  if (lower.includes("create")) return ACTION_BADGE_VARIANTS.created;
+  if (lower.includes("update")) return ACTION_BADGE_VARIANTS.updated;
+  if (lower.includes("delete") || lower.includes("suspend"))
     return ACTION_BADGE_VARIANTS.deleted;
   if (lower.includes("set") || lower.includes("flag"))
     return ACTION_BADGE_VARIANTS.set;
   return "bg-zinc-500/20 text-zinc-400 border-zinc-500/30";
 }
 
+const ACTION_FILTER_OPTIONS = [
+  { label: "All Actions", value: "" },
+  { label: "tenant.create", value: "tenant.create" },
+  { label: "tenant.update", value: "tenant.update" },
+  { label: "config.update", value: "config.update" },
+];
+
 export default function AuditLogsPage() {
-  const { data: logsData, isLoading } = usePlatformLogs();
-  const logs = logsData ?? [];
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState("");
 
-  // Derive unique action types for filter dropdown
-  const actionOptions = useMemo(() => {
-    if (!logsData) return [];
-    const unique = [...new Set(logsData.map((l) => l.action))].sort();
-    return [
-      { label: "All Actions", value: "" },
-      ...unique.map((a) => ({ label: a, value: a })),
-    ];
-  }, [logsData]);
+  const { data: logsData, isLoading } = usePlatformAuditLog({
+    action: actionFilter || undefined,
+    limit: 50,
+  });
+  const logs = logsData?.items ?? [];
 
-  const filtered = logsData?.filter((log) => {
-    const matchesSearch =
-      !search ||
-      (log as any).actorName?.toLowerCase().includes(search.toLowerCase()) ||
-      log.action.toLowerCase().includes(search.toLowerCase()) ||
-      JSON.stringify(log.details).toLowerCase().includes(search.toLowerCase()) ||
-      (log as any).tenantId?.toLowerCase().includes(search.toLowerCase());
-
-    const matchesAction = !actionFilter || log.action === actionFilter;
-
-    return matchesSearch && matchesAction;
+  const filtered = logs.filter((log) => {
+    if (!search) return true;
+    const lower = search.toLowerCase();
+    return (
+      log.action.toLowerCase().includes(lower) ||
+      log.actorId.toLowerCase().includes(lower) ||
+      log.resourceType.toLowerCase().includes(lower) ||
+      (log.resourceId ?? "").toLowerCase().includes(lower)
+    );
   });
 
   return (
@@ -87,7 +85,7 @@ export default function AuditLogsPage() {
         <p className="mt-1 text-muted-foreground">
           {isLoading
             ? "Loading audit logs..."
-            : `${logs.length} log entr${logs.length !== 1 ? "ies" : "y"}`}
+            : `${logsData?.total ?? 0} log entr${(logsData?.total ?? 0) !== 1 ? "ies" : "y"}`}
         </p>
       </div>
 
@@ -96,7 +94,7 @@ export default function AuditLogsPage() {
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search by actor, action, resource, tenant..."
+            placeholder="Search by actor, action, resource..."
             value={search}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
               setSearch(e.target.value)
@@ -104,15 +102,13 @@ export default function AuditLogsPage() {
             className="pl-9"
           />
         </div>
-        {actionOptions.length > 1 && (
-          <Select
-            options={actionOptions}
-            value={actionFilter}
-            onChange={(value: string) => setActionFilter(value)}
-            placeholder="Filter by action"
-            className="w-full sm:w-56"
-          />
-        )}
+        <Select
+          options={ACTION_FILTER_OPTIONS}
+          value={actionFilter}
+          onChange={(value: string) => setActionFilter(value)}
+          placeholder="Filter by action"
+          className="w-full sm:w-56"
+        />
       </div>
 
       {/* Table */}
@@ -130,7 +126,7 @@ export default function AuditLogsPage() {
                 </div>
               ))}
             </div>
-          ) : !filtered || filtered.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
                 <ScrollText className="h-8 w-8 text-primary" />
@@ -170,7 +166,8 @@ export default function AuditLogsPage() {
                     </TableCell>
                     <TableCell>
                       <div>
-                        <p className="text-sm font-medium">{log.userId}</p>
+                        <p className="font-mono text-xs">{log.actorId}</p>
+                        <p className="text-xs text-muted-foreground">{log.actorRole}</p>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -182,8 +179,13 @@ export default function AuditLogsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm font-mono text-xs text-muted-foreground">
-                        {JSON.stringify(log.details)}
+                      <span className="text-sm">
+                        {log.resourceType}
+                        {log.resourceId && (
+                          <span className="font-mono text-xs text-muted-foreground">
+                            {" "}{log.resourceId}
+                          </span>
+                        )}
                       </span>
                     </TableCell>
                     <TableCell>

@@ -61,8 +61,9 @@ app.post(
       id: generateId(),
       tenant_id: tenantId,
       actor_id: user.id,
+      actor_role: "admin",
       action: "einvoice.created",
-      resource: "e_invoice_requests",
+      resource_type: "e_invoice_request",
       resource_id: id,
     });
 
@@ -101,8 +102,9 @@ app.post(
       id: generateId(),
       tenant_id: tenantId,
       actor_id: user.id,
+      actor_role: "admin",
       action: "einvoice.submitted",
-      resource: "e_invoice_requests",
+      resource_type: "e_invoice_request",
       resource_id: requestId,
     });
 
