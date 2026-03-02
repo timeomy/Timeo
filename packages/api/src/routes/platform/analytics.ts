@@ -1,7 +1,13 @@
 import { Hono } from "hono";
 import { db } from "@timeo/db";
-import { tenants, users, tenantMemberships } from "@timeo/db/schema";
-import { sql, gte } from "drizzle-orm";
+import {
+  tenants,
+  users,
+  tenantMemberships,
+  payments,
+  orders,
+} from "@timeo/db/schema";
+import { sql, gte, and, eq, count } from "drizzle-orm";
 import { authMiddleware } from "../../middleware/auth.js";
 import { requirePlatformAdmin } from "../../middleware/rbac.js";
 import { success } from "../../lib/response.js";
@@ -14,22 +20,43 @@ app.get("/overview", authMiddleware, requirePlatformAdmin, async (c) => {
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  const [[tenantCount], [userCount], [activeMembers]] = await Promise.all([
+  const [
+    [tenantCount],
+    [userCount],
+    [activeMembers],
+    [revenueResult],
+    [ordersResult],
+  ] = await Promise.all([
     db.select({ count: sql<number>`count(*)::int` }).from(tenants),
     db.select({ count: sql<number>`count(*)::int` }).from(users),
     db
       .select({ count: sql<number>`count(DISTINCT user_id)::int` })
       .from(tenantMemberships)
       .where(gte(tenantMemberships.joined_at, twentyFourHoursAgo)),
+    db
+      .select({
+        total: sql<number>`coalesce(sum(${payments.amount}), 0)::int`,
+      })
+      .from(payments)
+      .where(
+        and(
+          eq(payments.status, "succeeded"),
+          gte(payments.created_at, todayStart),
+        ),
+      ),
+    db
+      .select({ count: count() })
+      .from(orders)
+      .where(gte(orders.created_at, todayStart)),
   ]);
 
-  // Orders and revenue require the orders/payments tables which may vary.
-  // Return stub values that the UI can fill in once those tables are queried.
   return c.json(
     success({
       total_tenants: tenantCount?.count ?? 0,
       total_users: userCount?.count ?? 0,
       active_members_24h: activeMembers?.count ?? 0,
+      today_revenue: revenueResult?.total ?? 0,
+      orders_today: ordersResult?.count ?? 0,
       today_start: todayStart.toISOString(),
     }),
   );

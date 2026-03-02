@@ -12,6 +12,7 @@ export {
   useCreateTenant,
   useUpdateTenantSettings,
   useUpdateTenantBranding,
+  useTenantFeatureFlags,
   useInviteStaff,
 } from "./tenants";
 

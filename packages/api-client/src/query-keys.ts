@@ -4,6 +4,7 @@ export const queryKeys = {
     mine: () => ["tenants", "mine"] as const,
     byId: (id: string) => ["tenants", id] as const,
     bySlug: (slug: string) => ["tenants", "slug", slug] as const,
+    featureFlags: (id: string) => ["tenants", id, "feature-flags"] as const,
   },
 
   bookings: {

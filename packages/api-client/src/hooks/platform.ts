@@ -140,6 +140,8 @@ export interface AnalyticsOverview {
   totalTenants: number;
   totalUsers: number;
   activeMembers24h: number;
+  todayRevenue: number;
+  ordersToday: number;
   todayStart: string;
 }
 

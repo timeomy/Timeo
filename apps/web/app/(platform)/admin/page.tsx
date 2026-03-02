@@ -93,7 +93,19 @@ export default function CommandDashboardPage() {
   const loading = overviewLoading || tenantsLoading;
   const recentLogs = logsData?.items ?? [];
 
-  const healthStatus = health?.status === "healthy" ? "healthy" as const : "warning" as const;
+  const checks = health?.checks as {
+    database?: { status: string };
+    redis?: { status: string };
+  } | undefined;
+
+  function serviceStatus(check?: { status: string }): "healthy" | "warning" | "critical" {
+    if (!health) return "warning";
+    if (!check) return "critical";
+    return check.status === "healthy" ? "healthy" : "critical";
+  }
+
+  // API is healthy if the health endpoint responded at all
+  const apiStatus: "healthy" | "critical" = health ? "healthy" : "critical";
 
   return (
     <div className="space-y-8">
@@ -109,10 +121,9 @@ export default function CommandDashboardPage() {
       <Card className="glass border-white/[0.08]">
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-6">
-            <HealthIndicator label="API" status={healthStatus} />
-            <HealthIndicator label="PostgreSQL" status={healthStatus} />
-            <HealthIndicator label="Redis" status={healthStatus} />
-            <HealthIndicator label="Queue" status={healthStatus} />
+            <HealthIndicator label="API" status={apiStatus} />
+            <HealthIndicator label="PostgreSQL" status={serviceStatus(checks?.database)} />
+            <HealthIndicator label="Redis" status={serviceStatus(checks?.redis)} />
           </div>
         </CardContent>
       </Card>

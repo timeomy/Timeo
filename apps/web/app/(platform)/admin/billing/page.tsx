@@ -5,6 +5,7 @@ import {
   usePlatformPlans,
   usePlatformAnalyticsOverview,
   usePlatformTenants,
+  useCreatePlatformPlan,
 } from "@timeo/api-client";
 import {
   Card,
@@ -26,6 +27,7 @@ import {
   DialogTitle,
   DialogFooter,
   Input,
+  Select,
 } from "@timeo/ui/web";
 import { CreditCard, DollarSign, Building2, Plus } from "lucide-react";
 
@@ -61,11 +63,24 @@ function MetricCard({
   );
 }
 
+function toSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export default function BillingPage() {
   const { data: overview, isLoading: overviewLoading } = usePlatformAnalyticsOverview();
   const { data: plans, isLoading: plansLoading } = usePlatformPlans();
   const { data: tenants, isLoading: tenantsLoading } = usePlatformTenants();
+  const createPlan = useCreatePlatformPlan();
+
   const [showCreate, setShowCreate] = useState(false);
+  const [planName, setPlanName] = useState("");
+  const [planPrice, setPlanPrice] = useState("");
+  const [planInterval, setPlanInterval] = useState("monthly");
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const activePlans = plans?.filter((p) => p.active) ?? [];
   const totalTenants = overview?.totalTenants ?? tenants?.length ?? 0;
@@ -189,21 +204,101 @@ export default function BillingPage() {
         </CardContent>
       </Card>
 
-      {/* Create Plan Dialog (placeholder) */}
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      {/* Create Plan Dialog */}
+      <Dialog
+        open={showCreate}
+        onOpenChange={(open) => {
+          setShowCreate(open);
+          if (!open) {
+            setPlanName("");
+            setPlanPrice("");
+            setPlanInterval("monthly");
+            setCreateError(null);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create Plan</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">
-              Plan creation form will be available once the API is connected.
-            </p>
-            <Input placeholder="Plan name" disabled />
+            {createError && (
+              <p className="text-sm text-red-400">{createError}</p>
+            )}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Plan Name</label>
+              <Input
+                value={planName}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setPlanName(e.target.value)
+                }
+                placeholder="e.g. Starter, Professional, Enterprise"
+              />
+              {planName && (
+                <p className="text-xs text-muted-foreground">
+                  Slug: <span className="font-mono">{toSlug(planName)}</span>
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Price (RM)</label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={planPrice}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setPlanPrice(e.target.value)
+                }
+                placeholder="e.g. 49.90"
+              />
+            </div>
+            <Select
+              label="Billing Interval"
+              value={planInterval}
+              onChange={setPlanInterval}
+              options={[
+                { label: "Monthly", value: "monthly" },
+                { label: "Yearly", value: "yearly" },
+              ]}
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)}>
-              Close
+              Cancel
+            </Button>
+            <Button
+              disabled={createPlan.isPending || !planName.trim() || !planPrice}
+              onClick={async () => {
+                setCreateError(null);
+                const priceCents = Math.round(parseFloat(planPrice) * 100);
+                if (isNaN(priceCents) || priceCents < 0) {
+                  setCreateError("Invalid price. Enter a valid amount.");
+                  return;
+                }
+                try {
+                  await createPlan.mutateAsync({
+                    name: planName.trim(),
+                    slug: toSlug(planName),
+                    price_cents: priceCents,
+                    interval: planInterval,
+                    features: [],
+                    limits: {},
+                    active: true,
+                    sort_order: 0,
+                  });
+                  setShowCreate(false);
+                  setPlanName("");
+                  setPlanPrice("");
+                  setPlanInterval("monthly");
+                } catch (err: unknown) {
+                  setCreateError(
+                    err instanceof Error ? err.message : "Failed to create plan.",
+                  );
+                }
+              }}
+            >
+              {createPlan.isPending ? "Creating..." : "Create Plan"}
             </Button>
           </DialogFooter>
         </DialogContent>

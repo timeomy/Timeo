@@ -1,9 +1,15 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { db } from "@timeo/db";
-import { tenants, tenantMemberships } from "@timeo/db/schema";
+import {
+  tenants,
+  tenantMemberships,
+  featureFlags,
+  featureFlagOverrides,
+} from "@timeo/db/schema";
 import { and, eq } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
+import { tenantMiddleware } from "../middleware/tenant.js";
 import { success, error } from "../lib/response.js";
 import {
   CreateTenantSchema,
@@ -275,5 +281,33 @@ app.patch("/:tenantId/branding", authMiddleware, async (c) => {
     return c.json(error("TENANT_ERROR", (err as Error).message), 422);
   }
 });
+
+// GET /tenants/:tenantId/feature-flags — merged flags for tenant
+app.get(
+  "/:tenantId/feature-flags",
+  authMiddleware,
+  tenantMiddleware,
+  async (c) => {
+    const tenantId = c.req.param("tenantId");
+
+    const [allFlags, overrides] = await Promise.all([
+      db.select().from(featureFlags),
+      db
+        .select()
+        .from(featureFlagOverrides)
+        .where(eq(featureFlagOverrides.tenant_id, tenantId)),
+    ]);
+
+    const overrideMap = new Map(
+      overrides.map((o) => [o.feature_flag_id, o.enabled]),
+    );
+
+    const result = Object.fromEntries(
+      allFlags.map((f) => [f.key, overrideMap.get(f.id) ?? f.default_enabled]),
+    );
+
+    return c.json(success(result));
+  },
+);
 
 export { app as tenantsRouter };

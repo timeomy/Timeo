@@ -7,6 +7,9 @@ import {
   useUpdateTenantSettings,
   usePlatformFlags,
   useUpdatePlatformFlag,
+  useSuspendPlatformTenant,
+  useActivatePlatformTenant,
+  usePlatformTenantMembers,
 } from "@timeo/api-client";
 import {
   Card,
@@ -16,7 +19,6 @@ import {
   Button,
   Input,
   Badge,
-  Select,
   Skeleton,
   Separator,
   Dialog,
@@ -24,6 +26,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@timeo/ui/web";
 import {
   ArrowLeft,
@@ -33,7 +41,6 @@ import {
   Package,
   Save,
   Settings,
-  Camera,
   Flag,
   Plus,
 } from "lucide-react";
@@ -105,6 +112,9 @@ export default function TenantDetailPage() {
   const updateTenantSettingsMutation = useUpdateTenantSettings(tenantId);
   const { data: featureFlags, isLoading: flagsLoading } = usePlatformFlags();
   const updateFlagMutation = useUpdatePlatformFlag();
+  const suspendMutation = useSuspendPlatformTenant();
+  const activateMutation = useActivatePlatformTenant();
+  const { data: members, isLoading: membersLoading } = usePlatformTenantMembers(tenantId);
 
   const [editName, setEditName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -231,6 +241,38 @@ export default function TenantDetailPage() {
               <Button onClick={handleSave} disabled={saving} className="gap-2">
                 <Save className="h-4 w-4" />
                 {saving ? "Saving..." : "Save Changes"}
+              </Button>
+            )}
+            {!loading && tenant?.isActive && (
+              <Button
+                variant="outline"
+                className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                disabled={suspendMutation.isPending}
+                onClick={async () => {
+                  try {
+                    await suspendMutation.mutateAsync(tenantId);
+                  } catch (err: unknown) {
+                    alert(err instanceof Error ? err.message : "Failed to suspend tenant.");
+                  }
+                }}
+              >
+                {suspendMutation.isPending ? "Suspending..." : "Suspend"}
+              </Button>
+            )}
+            {!loading && tenant && !tenant.isActive && (
+              <Button
+                variant="outline"
+                className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                disabled={activateMutation.isPending}
+                onClick={async () => {
+                  try {
+                    await activateMutation.mutateAsync(tenantId);
+                  } catch (err: unknown) {
+                    alert(err instanceof Error ? err.message : "Failed to activate tenant.");
+                  }
+                }}
+              >
+                {activateMutation.isPending ? "Activating..." : "Activate"}
               </Button>
             )}
           </div>
@@ -392,6 +434,83 @@ export default function TenantDetailPage() {
               <Save className="h-4 w-4" />
               {savingSettings ? "Saving..." : "Save Settings"}
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Members */}
+      {!loading && (
+        <Card className="glass border-white/[0.08]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Users className="h-5 w-5" />
+              Members
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {membersLoading ? (
+              <div className="space-y-3 p-6">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                ))}
+              </div>
+            ) : !members || members.length === 0 ? (
+              <div className="py-8 text-center">
+                <p className="text-sm text-muted-foreground">No members found.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-white/[0.06]">
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Joined</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {members.map((member) => (
+                    <TableRow key={member.id} className="border-white/[0.06]">
+                      <TableCell className="text-sm font-medium">
+                        {member.userName}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {member.userEmail}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">
+                          {member.role}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={
+                            member.status === "active"
+                              ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                              : "bg-zinc-500/20 text-zinc-400 border-zinc-500/30"
+                          }
+                        >
+                          {member.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {new Date(member.joinedAt).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       )}

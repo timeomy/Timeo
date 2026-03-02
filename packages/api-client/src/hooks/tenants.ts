@@ -106,6 +106,16 @@ export function useUpdateTenantBranding(tenantId: string) {
   });
 }
 
+export function useTenantFeatureFlags(tenantId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.tenants.featureFlags(tenantId ?? ""),
+    queryFn: () =>
+      api.get<Record<string, boolean>>(`/api/tenants/${tenantId}/feature-flags`),
+    enabled: !!tenantId,
+    staleTime: 60_000,
+  });
+}
+
 export function useInviteStaff(tenantId: string) {
   const queryClient = useQueryClient();
   return useMutation({

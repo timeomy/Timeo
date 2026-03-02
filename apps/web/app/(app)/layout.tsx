@@ -8,6 +8,9 @@ import { useTimeoWebAuthContext, useTimeoWebTenantContext, isRoleAtLeast } from 
 import type { TimeoRole } from "@timeo/auth/web";
 import { getInitials } from "@timeo/shared";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
+import { FeatureFlagsProvider, useFeatureFlags } from "@/hooks/use-feature-flags";
+import { AnnouncementBanner } from "@/announcement-banner";
+import { MaintenanceGate } from "@/maintenance-gate";
 import {
   Avatar,
   AvatarImage,
@@ -46,31 +49,26 @@ type SidebarLink = {
   label: string;
   icon: React.ElementType;
   minRole?: TimeoRole;
+  flagKey?: string;
 };
 
 const sidebarLinks: SidebarLink[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/services", label: "Services", icon: Calendar, minRole: "admin" },
+  { href: "/dashboard/services", label: "Services", icon: Calendar, minRole: "admin", flagKey: "appointments_enabled" },
   { href: "/dashboard/products", label: "Products", icon: ShoppingBag, minRole: "admin" },
-  { href: "/dashboard/bookings", label: "Bookings", icon: ClipboardList, minRole: "staff" },
+  { href: "/dashboard/bookings", label: "Bookings", icon: ClipboardList, minRole: "staff", flagKey: "appointments_enabled" },
   { href: "/dashboard/orders", label: "Orders", icon: Package, minRole: "admin" },
   { href: "/dashboard/team", label: "Team", icon: Users, minRole: "admin" },
-  { href: "/dashboard/scheduling", label: "Scheduling", icon: Clock, minRole: "staff" },
-  { href: "/dashboard/check-ins", label: "Check-ins", icon: ScanLine, minRole: "staff" },
+  { href: "/dashboard/scheduling", label: "Scheduling", icon: Clock, minRole: "staff", flagKey: "appointments_enabled" },
+  { href: "/dashboard/check-ins", label: "Check-ins", icon: ScanLine, minRole: "staff", flagKey: "pos_enabled" },
   { href: "/dashboard/session-logs", label: "Session Logs", icon: NotebookPen, minRole: "staff" },
   { href: "/dashboard/packages", label: "Packages", icon: CreditCard, minRole: "admin" },
   { href: "/dashboard/vouchers", label: "Gift Cards & Vouchers", icon: Ticket, minRole: "admin" },
   { href: "/dashboard/members", label: "Members", icon: UserCheck, minRole: "staff" },
-  { href: "/dashboard/pos", label: "POS", icon: Store, minRole: "staff" },
+  { href: "/dashboard/pos", label: "POS", icon: Store, minRole: "staff", flagKey: "pos_enabled" },
   { href: "/dashboard/e-invoice", label: "e-Invoice", icon: FileText, minRole: "admin" },
   { href: "/dashboard/settings", label: "Settings", icon: Settings, minRole: "admin" },
 ];
-
-function getVisibleLinks(role: TimeoRole) {
-  return sidebarLinks.filter(
-    (link) => !link.minRole || isRoleAtLeast(role, link.minRole)
-  );
-}
 
 function TenantSwitcher() {
   const { tenants, activeTenant, switchTenant, isLoading } =
@@ -142,8 +140,17 @@ function TenantSwitcher() {
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user, signOut, activeRole } = useTimeoWebAuthContext();
+  const flags = useFeatureFlags();
 
   const displayName = user?.name || user?.email || "User";
+
+  function getVisibleLinks(role: TimeoRole) {
+    return sidebarLinks.filter(
+      (link) =>
+        (!link.minRole || isRoleAtLeast(role, link.minRole)) &&
+        (!link.flagKey || flags[link.flagKey] !== false),
+    );
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -284,60 +291,67 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Desktop Sidebar */}
-      <aside className="hidden w-64 flex-shrink-0 border-r border-white/[0.06] bg-card/50 lg:block">
-        <SidebarContent />
-      </aside>
-
-      {/* Mobile Sidebar Overlay */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setMobileOpen(false)}
-          />
-          <aside className="absolute left-0 top-0 h-full w-72 border-r border-white/[0.06] bg-card shadow-2xl">
-            <SidebarContent onNavigate={() => setMobileOpen(false)} />
+    <MaintenanceGate>
+      <FeatureFlagsProvider>
+        <div className="flex h-screen bg-background">
+          {/* Desktop Sidebar */}
+          <aside className="hidden w-64 flex-shrink-0 border-r border-white/[0.06] bg-card/50 lg:block">
+            <SidebarContent />
           </aside>
-        </div>
-      )}
 
-      {/* Main Content */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Mobile Header */}
-        <header className="glass-nav flex h-14 items-center gap-3 px-4 lg:hidden">
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-white/[0.06]"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-              <Zap className="h-4 w-4 text-primary-foreground" />
+          {/* Mobile Sidebar Overlay */}
+          {mobileOpen && (
+            <div className="fixed inset-0 z-50 lg:hidden">
+              <div
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={() => setMobileOpen(false)}
+              />
+              <aside className="absolute left-0 top-0 h-full w-72 border-r border-white/[0.06] bg-card shadow-2xl">
+                <SidebarContent onNavigate={() => setMobileOpen(false)} />
+              </aside>
             </div>
-            <span className="font-semibold">Timeo</span>
-          </div>
-        </header>
+          )}
 
-        {/* Page Content */}
-        <main className="flex-1 overflow-y-auto">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={pathname}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-            >
-              <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-                {children}
+          {/* Main Content */}
+          <div className="flex flex-1 flex-col overflow-hidden">
+            {/* Mobile Header */}
+            <header className="glass-nav flex h-14 items-center gap-3 px-4 lg:hidden">
+              <button
+                onClick={() => setMobileOpen(true)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-white/[0.06]"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
+                  <Zap className="h-4 w-4 text-primary-foreground" />
+                </div>
+                <span className="font-semibold">Timeo</span>
               </div>
-            </motion.div>
-          </AnimatePresence>
-        </main>
-      </div>
-    </div>
+            </header>
+
+            {/* Announcements */}
+            <AnnouncementBanner />
+
+            {/* Page Content */}
+            <main className="flex-1 overflow-y-auto">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={pathname}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                >
+                  <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+                    {children}
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </main>
+          </div>
+        </div>
+      </FeatureFlagsProvider>
+    </MaintenanceGate>
   );
 }
