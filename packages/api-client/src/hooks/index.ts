@@ -63,6 +63,7 @@ export {
   useCreatePosTransaction,
   useVoidPosTransaction,
   useDeletePosTransaction,
+  useCreateDuitNowQR,
   useDailySummary,
   useMonthlyStatement,
   useValidateVoucher,

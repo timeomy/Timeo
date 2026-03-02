@@ -8,7 +8,7 @@ import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
 import { requireRole } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
-import { CreateProductSchema } from "../lib/validation.js";
+import { CreateProductSchema, UpdateProductSchema } from "../lib/validation.js";
 
 const app = new Hono();
 
@@ -65,11 +65,21 @@ app.patch(
   authMiddleware,
   tenantMiddleware,
   requireRole("admin"),
+  zValidator("json", UpdateProductSchema),
   async (c) => {
-    const body = await c.req.json();
+    const body = c.req.valid("json");
+    const updates: Record<string, unknown> = { updated_at: new Date() };
+
+    if (body.name !== undefined) updates.name = body.name;
+    if (body.description !== undefined) updates.description = body.description;
+    if (body.price !== undefined) updates.price = body.price;
+    if (body.currency !== undefined) updates.currency = body.currency;
+    if (body.isActive !== undefined) updates.is_active = body.isActive;
+    if (body.imageUrl !== undefined) updates.image_url = body.imageUrl;
+
     await db
       .update(products)
-      .set({ ...body, updated_at: new Date() })
+      .set(updates)
       .where(eq(products.id, c.req.param("productId")));
     return c.json(success({ message: "Updated" }));
   },

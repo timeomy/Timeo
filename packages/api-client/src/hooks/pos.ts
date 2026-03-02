@@ -175,6 +175,16 @@ export function useValidateVoucher(
   });
 }
 
+export function useCreateDuitNowQR(tenantId: string) {
+  return useMutation({
+    mutationFn: (data: { amount: number; orderId: string; description?: string }) =>
+      api.post<{ qrCodeUrl: string; rmOrderId: string }>(
+        `/api/tenants/${tenantId}/pos/duitnow-qr`,
+        data,
+      ),
+  });
+}
+
 export function useVoidPosTransaction(tenantId: string) {
   const queryClient = useQueryClient();
   return useMutation({

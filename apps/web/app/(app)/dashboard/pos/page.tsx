@@ -6,6 +6,7 @@ import {
   useCreatePosTransaction,
   useVoidPosTransaction,
   useDeletePosTransaction,
+  useCreateDuitNowQR,
   useDailySummary,
   useMonthlyStatement,
   useSessionPackages,
@@ -60,9 +61,12 @@ import {
   ChevronRight,
   Download,
   Printer,
+  Smartphone,
+  X,
+  Loader2,
 } from "lucide-react";
 
-type PaymentMethod = "cash" | "card" | "qr_pay" | "bank_transfer";
+type PaymentMethod = "cash" | "card" | "qr_pay" | "bank_transfer" | "revenue_monster";
 type ItemType = "membership" | "session_package" | "service" | "product";
 
 const PAYMENT_METHOD_OPTIONS = [
@@ -70,6 +74,7 @@ const PAYMENT_METHOD_OPTIONS = [
   { label: "Card", value: "card" },
   { label: "QR Pay", value: "qr_pay" },
   { label: "Bank Transfer", value: "bank_transfer" },
+  { label: "FPX / eWallet (RM)", value: "revenue_monster" },
 ];
 
 const PAYMENT_ICON: Record<PaymentMethod, typeof DollarSign> = {
@@ -77,6 +82,7 @@ const PAYMENT_ICON: Record<PaymentMethod, typeof DollarSign> = {
   card: CreditCard,
   qr_pay: QrCode,
   bank_transfer: Building2,
+  revenue_monster: Smartphone,
 };
 
 const PAYMENT_LABEL: Record<PaymentMethod, string> = {
@@ -84,6 +90,7 @@ const PAYMENT_LABEL: Record<PaymentMethod, string> = {
   card: "Card",
   qr_pay: "QR Pay",
   bank_transfer: "Bank Transfer",
+  revenue_monster: "FPX / eWallet (RM)",
 };
 
 const STATUS_CONFIG = {
@@ -141,6 +148,9 @@ export default function PosPage() {
   const [processing, setProcessing] = useState(false);
   const [lastReceipt, setLastReceipt] = useState<string | null>(null);
 
+  // DuitNow QR modal
+  const [duitNowQr, setDuitNowQr] = useState<{ qrCodeUrl: string; receiptNumber: string } | null>(null);
+
   // Detail dialog
   const [selectedTx, setSelectedTx] = useState<any | null>(null);
 
@@ -174,6 +184,7 @@ export default function PosPage() {
   const { mutateAsync: createTransaction } = useCreatePosTransaction(tenantId ?? "");
   const { mutateAsync: voidTransaction } = useVoidPosTransaction(tenantId ?? "");
   const { mutateAsync: deleteTransaction } = useDeletePosTransaction(tenantId ?? "");
+  const { mutateAsync: createDuitNowQR } = useCreateDuitNowQR(tenantId ?? "");
 
   function addToCart(item: CartItem) {
     const existing = cart.find(
@@ -228,9 +239,31 @@ export default function PosPage() {
             : undefined,
         notes: notes || undefined,
       });
-      setLastReceipt(result.receiptNumber ?? null);
+      const receiptNumber = result.receiptNumber ?? "";
       setCheckoutOpen(false);
       resetCheckout();
+
+      if (paymentMethod === "revenue_monster" && receiptNumber) {
+        try {
+          const qrResult = await createDuitNowQR({
+            amount: total,
+            orderId: receiptNumber,
+            description: `POS Transaction ${receiptNumber}`,
+          });
+          setDuitNowQr({ qrCodeUrl: qrResult.qrCodeUrl, receiptNumber });
+        } catch (qrErr: unknown) {
+          const errMsg = qrErr instanceof Error ? qrErr.message : "";
+          if (errMsg.includes("422") || errMsg.toLowerCase().includes("not configured")) {
+            alert("Revenue Monster not configured. Contact platform admin.");
+          } else {
+            console.error("Failed to create DuitNow QR:", qrErr);
+            alert("Failed to generate DuitNow QR code.");
+          }
+          setLastReceipt(receiptNumber);
+        }
+      } else {
+        setLastReceipt(receiptNumber || null);
+      }
     } catch (err) {
       console.error("Failed to process transaction:", err);
     } finally {
@@ -931,6 +964,66 @@ export default function PosPage() {
               onClick={handleVoid}
             >
               Confirm Void
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DuitNow QR Modal */}
+      <Dialog
+        open={!!duitNowQr}
+        onOpenChange={(open) => {
+          if (!open) {
+            setLastReceipt(duitNowQr?.receiptNumber ?? null);
+            setDuitNowQr(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="h-5 w-5" />
+              DuitNow QR Payment
+            </DialogTitle>
+            <DialogDescription>
+              Customer scans to pay via DuitNow QR
+            </DialogDescription>
+          </DialogHeader>
+          {duitNowQr && (
+            <div className="flex flex-col items-center gap-4 py-4">
+              <div className="rounded-lg bg-white p-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={duitNowQr.qrCodeUrl}
+                  alt="DuitNow QR Code"
+                  width={240}
+                  height={240}
+                  className="block"
+                />
+              </div>
+              <p className="text-sm text-white/50 text-center">
+                Receipt: <strong className="text-white">{duitNowQr.receiptNumber}</strong>
+              </p>
+            </div>
+          )}
+          <DialogFooter className="flex gap-2 sm:justify-center">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setLastReceipt(duitNowQr?.receiptNumber ?? null);
+                setDuitNowQr(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                const receipt = duitNowQr?.receiptNumber ?? null;
+                setDuitNowQr(null);
+                setLastReceipt(receipt);
+              }}
+            >
+              Payment Received
             </Button>
           </DialogFooter>
         </DialogContent>

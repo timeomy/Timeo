@@ -86,7 +86,7 @@ export function useUpdateOrderStatus(tenantId: string) {
     }: {
       orderId: string;
       status: string;
-    }) => api.patch(`/api/tenants/${tenantId}/orders/${orderId}`, { status }),
+    }) => api.patch(`/api/tenants/${tenantId}/orders/${orderId}/status`, { status }),
     onSuccess: () =>
       queryClient.invalidateQueries({
         queryKey: queryKeys.orders.all(tenantId),

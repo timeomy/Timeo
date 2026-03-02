@@ -32,6 +32,15 @@ export const CreateProductSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
+export const UpdateProductSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().max(1000).optional(),
+  price: z.number().int().min(0).optional(),
+  currency: z.string().length(3).optional(),
+  isActive: z.boolean().optional(),
+  imageUrl: z.string().url().nullable().optional(),
+});
+
 // ─── Orders ───────────────────────────────────────────────────────────────────
 
 export const CreateOrderSchema = z.object({
@@ -49,7 +58,8 @@ export const CreateOrderSchema = z.object({
 // ─── POS ──────────────────────────────────────────────────────────────────────
 
 export const CreatePosTransactionSchema = z.object({
-  customerId: z.string().min(1),
+  customerId: z.string().min(1).optional(),
+  customerEmail: z.string().email().optional(),
   items: z
     .array(
       z.object({
