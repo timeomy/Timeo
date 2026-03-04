@@ -1,9 +1,10 @@
 import { db } from "@timeo/db";
-import { orders, orderItems, products, auditLogs } from "@timeo/db/schema";
+import { orders, orderItems, products, stockMovements, auditLogs } from "@timeo/db/schema";
 import { and, eq } from "drizzle-orm";
 import { generateId } from "@timeo/db";
 import { emitToTenant } from "../realtime/socket.js";
 import { SocketEvents } from "../realtime/events.js";
+import * as LoyaltyService from "./loyalty.service.js";
 
 interface OrderItemInput {
   productId: string;
@@ -76,6 +77,35 @@ export async function createOrder(input: {
     details: { itemCount: itemValues.length, totalAmount },
   });
 
+  // Decrement stock for product items
+  for (const item of itemValues) {
+    const [product] = await db
+      .select()
+      .from(products)
+      .where(eq(products.id, item.product_id))
+      .limit(1);
+
+    if (product && product.stock_quantity !== null) {
+      const newStock = product.stock_quantity - item.quantity;
+      await db
+        .update(products)
+        .set({ stock_quantity: Math.max(0, newStock), updated_at: new Date() })
+        .where(eq(products.id, item.product_id));
+
+      await db.insert(stockMovements).values({
+        id: generateId(),
+        tenant_id: input.tenantId,
+        product_id: item.product_id,
+        delta: -item.quantity,
+        stock_before: product.stock_quantity,
+        stock_after: Math.max(0, newStock),
+        reason: "order",
+        reference_id: orderId,
+        actor_id: input.customerId,
+      });
+    }
+  }
+
   emitToTenant(input.tenantId, SocketEvents.ORDER_CREATED, {
     orderId,
     tenantId: input.tenantId,
@@ -110,6 +140,21 @@ export async function updateOrderStatus(
     resource_type: "order",
     resource_id: orderId,
   });
+
+  // Earn loyalty points on confirmation
+  if (status === "confirmed") {
+    try {
+      await LoyaltyService.earnPoints({
+        tenantId: order.tenant_id,
+        userId: order.customer_id,
+        amount: order.total_amount,
+        referenceType: "order",
+        referenceId: orderId,
+      });
+    } catch {
+      // Don't fail order status update if loyalty fails
+    }
+  }
 
   emitToTenant(order.tenant_id, SocketEvents.ORDER_UPDATED, {
     orderId,

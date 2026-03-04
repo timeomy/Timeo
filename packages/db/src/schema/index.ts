@@ -17,3 +17,4 @@ export * from "./notifications";
 export * from "./platform";
 export * from "./files";
 export * from "./einvoice";
+export * from "./loyalty";

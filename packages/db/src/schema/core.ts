@@ -79,6 +79,8 @@ export const tenantMemberships = pgTable(
       .references(() => tenants.id),
     role: memberRoleEnum("role").notNull(),
     status: membershipStatusEnum("status").notNull().default("active"),
+    notes: text("notes"),
+    tags: jsonb("tags").notNull().default([]),
     joined_at: timestamp("joined_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

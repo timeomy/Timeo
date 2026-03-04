@@ -22,6 +22,8 @@ import { platformRouter } from "./routes/platform.routes.js";
 import { filesRouter } from "./routes/files.routes.js";
 import { einvoiceRouter } from "./routes/einvoice.routes.js";
 import { paymentsRouter } from "./routes/payments.routes.js";
+import { customersRouter } from "./routes/customers.routes.js";
+import { loyaltyRouter } from "./routes/loyalty.routes.js";
 import { stripeWebhookRouter } from "./routes/webhooks/stripe.js";
 import { revenueMonsterWebhookRouter } from "./routes/webhooks/revenue-monster.js";
 import { doorWebhookRouter } from "./routes/webhooks/door.js";
@@ -60,6 +62,8 @@ export function createApp() {
   app.route("/api/tenants/:tenantId/analytics", analyticsRouter);
   app.route("/api/tenants/:tenantId/files", filesRouter);
   app.route("/api/tenants/:tenantId/einvoice", einvoiceRouter);
+  app.route("/api/tenants/:tenantId/customers", customersRouter);
+  app.route("/api/tenants/:tenantId/loyalty", loyaltyRouter);
 
   // Platform admin routes
   app.route("/api/platform", platformRouter);

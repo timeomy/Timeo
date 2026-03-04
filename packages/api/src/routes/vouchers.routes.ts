@@ -8,7 +8,7 @@ import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
 import { requireRole } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
-import { CreateVoucherSchema } from "../lib/validation.js";
+import { CreateVoucherSchema, UpdateVoucherSchema } from "../lib/validation.js";
 import * as VoucherService from "../services/voucher.service.js";
 
 const app = new Hono();
@@ -83,6 +83,61 @@ app.post(
     } catch (err) {
       return c.json(error("VOUCHER_ERROR", (err as Error).message), 422);
     }
+  },
+);
+
+// PATCH /tenants/:tenantId/vouchers/:voucherId/toggle
+app.patch(
+  "/:voucherId/toggle",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  async (c) => {
+    const voucherId = c.req.param("voucherId");
+    const [voucher] = await db
+      .select()
+      .from(vouchers)
+      .where(eq(vouchers.id, voucherId))
+      .limit(1);
+    if (!voucher) return c.json(error("NOT_FOUND", "Voucher not found"), 404);
+
+    const updated = !voucher.is_active;
+    await db
+      .update(vouchers)
+      .set({ is_active: updated })
+      .where(eq(vouchers.id, voucherId));
+    return c.json(success({ ...voucher, is_active: updated }));
+  },
+);
+
+// PATCH /tenants/:tenantId/vouchers/:voucherId
+app.patch(
+  "/:voucherId",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  zValidator("json", UpdateVoucherSchema),
+  async (c) => {
+    const voucherId = c.req.param("voucherId");
+    const body = c.req.valid("json");
+    const updates: Record<string, unknown> = {};
+
+    if (body.name !== undefined) updates.description = body.name;
+    if (body.description !== undefined) updates.description = body.description;
+    if (body.value !== undefined) updates.value = body.value;
+    if (body.maxUses !== undefined) updates.max_uses = body.maxUses;
+    if (body.expiresAt !== undefined) updates.expires_at = new Date(body.expiresAt);
+    if (body.isActive !== undefined) updates.is_active = body.isActive;
+
+    if (Object.keys(updates).length === 0) {
+      return c.json(success({ message: "No changes" }));
+    }
+
+    await db
+      .update(vouchers)
+      .set(updates)
+      .where(eq(vouchers.id, voucherId));
+    return c.json(success({ message: "Updated" }));
   },
 );
 

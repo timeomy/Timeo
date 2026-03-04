@@ -39,6 +39,9 @@ import {
   apiKeys,
   files,
   eInvoiceRequests,
+  stockMovements,
+  loyaltyPoints,
+  loyaltyTransactions,
 } from "./schema/index";
 
 // ─── Users ───────────────────────────────────────────────────────────────────
@@ -578,6 +581,49 @@ export const eInvoiceRequestsRelations = relations(
     transaction: one(posTransactions, {
       fields: [eInvoiceRequests.transaction_id],
       references: [posTransactions.id],
+    }),
+  }),
+);
+
+// ─── Stock Movements ────────────────────────────────────────────────────
+export const stockMovementsRelations = relations(stockMovements, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [stockMovements.tenant_id],
+    references: [tenants.id],
+  }),
+  product: one(products, {
+    fields: [stockMovements.product_id],
+    references: [products.id],
+  }),
+  actor: one(users, {
+    fields: [stockMovements.actor_id],
+    references: [users.id],
+  }),
+}));
+
+// ─── Loyalty Points ─────────────────────────────────────────────────────
+export const loyaltyPointsRelations = relations(loyaltyPoints, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [loyaltyPoints.tenant_id],
+    references: [tenants.id],
+  }),
+  user: one(users, {
+    fields: [loyaltyPoints.user_id],
+    references: [users.id],
+  }),
+}));
+
+// ─── Loyalty Transactions ───────────────────────────────────────────────
+export const loyaltyTransactionsRelations = relations(
+  loyaltyTransactions,
+  ({ one }) => ({
+    tenant: one(tenants, {
+      fields: [loyaltyTransactions.tenant_id],
+      references: [tenants.id],
+    }),
+    user: one(users, {
+      fields: [loyaltyTransactions.user_id],
+      references: [users.id],
     }),
   }),
 );

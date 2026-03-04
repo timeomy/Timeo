@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Image from "next/image";
 import {
   useProducts,
   useCreateProduct,
   useUpdateProduct,
   useDeleteProduct,
+  useAdjustStock,
+  useLowStockProducts,
 } from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import { formatPrice } from "@timeo/shared";
@@ -42,6 +44,9 @@ import {
   LayoutGrid,
   List,
   ImageIcon,
+  AlertTriangle,
+  PackageMinus,
+  Loader2,
 } from "lucide-react";
 
 const CURRENCY_OPTIONS = [
@@ -50,11 +55,15 @@ const CURRENCY_OPTIONS = [
   { label: "SGD (S$)", value: "SGD" },
 ];
 
+const LOW_STOCK_THRESHOLD = 10;
+
 interface ProductForm {
   name: string;
   description: string;
   price: string;
   currency: string;
+  sku: string;
+  stockQuantity: string;
 }
 
 const EMPTY_FORM: ProductForm = {
@@ -62,9 +71,23 @@ const EMPTY_FORM: ProductForm = {
   description: "",
   price: "",
   currency: "MYR",
+  sku: "",
+  stockQuantity: "",
 };
 
 type ViewMode = "grid" | "table";
+
+function getStockColor(qty: number | null | undefined): string {
+  if (qty == null) return "text-white/40";
+  if (qty <= LOW_STOCK_THRESHOLD) return "text-red-400";
+  if (qty <= LOW_STOCK_THRESHOLD * 2) return "text-yellow-400";
+  return "text-emerald-400";
+}
+
+function getStockDisplay(qty: number | null | undefined): string {
+  if (qty == null) return "\u221E";
+  return String(qty);
+}
 
 export default function ProductsPage() {
   const { tenantId } = useTenantId();
@@ -76,11 +99,33 @@ export default function ProductsPage() {
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
+  // Adjust stock dialog state
+  const [adjustStockOpen, setAdjustStockOpen] = useState(false);
+  const [adjustTarget, setAdjustTarget] = useState<any>(null);
+  const [adjustDelta, setAdjustDelta] = useState("");
+  const [adjustReason, setAdjustReason] = useState("");
+  const [adjusting, setAdjusting] = useState(false);
+
   const { data: products, isLoading } = useProducts(tenantId ?? "");
+  const { data: lowStockProducts } = useLowStockProducts(tenantId ?? "");
 
   const { mutateAsync: createProduct } = useCreateProduct(tenantId ?? "");
   const { mutateAsync: updateProduct } = useUpdateProduct(tenantId ?? "");
   const { mutateAsync: deleteProduct } = useDeleteProduct(tenantId ?? "");
+  const { mutateAsync: adjustStock } = useAdjustStock(tenantId ?? "");
+
+  const lowStockCount = useMemo(() => {
+    if (lowStockProducts) return lowStockProducts.length;
+    // Fallback: count from products data
+    return (
+      products?.filter(
+        (p) =>
+          p.stockQuantity != null &&
+          p.stockQuantity <= LOW_STOCK_THRESHOLD &&
+          p.isActive,
+      ).length ?? 0
+    );
+  }, [lowStockProducts, products]);
 
   const filtered =
     products?.filter((p) =>
@@ -100,8 +145,17 @@ export default function ProductsPage() {
       description: product.description ?? "",
       price: String(product.price),
       currency: product.currency ?? "MYR",
+      sku: product.sku ?? "",
+      stockQuantity: product.stockQuantity != null ? String(product.stockQuantity) : "",
     });
     setDialogOpen(true);
+  }
+
+  function openAdjustStock(product: any) {
+    setAdjustTarget(product);
+    setAdjustDelta("");
+    setAdjustReason("");
+    setAdjustStockOpen(true);
   }
 
   async function handleSave() {
@@ -114,6 +168,8 @@ export default function ProductsPage() {
         description: form.description.trim(),
         price: Number(form.price),
         currency: form.currency,
+        sku: form.sku.trim() || undefined,
+        stockQuantity: form.stockQuantity !== "" ? Number(form.stockQuantity) : undefined,
       };
       if (editingId) {
         await updateProduct({ id: editingId, ...data });
@@ -127,6 +183,24 @@ export default function ProductsPage() {
       console.error("Failed to save product:", err);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleAdjustStock() {
+    if (!adjustTarget || !adjustDelta || !tenantId) return;
+    setAdjusting(true);
+    try {
+      await adjustStock({
+        productId: adjustTarget.id,
+        delta: Number(adjustDelta),
+        reason: adjustReason.trim() || "Manual adjustment",
+      });
+      setAdjustStockOpen(false);
+      setAdjustTarget(null);
+    } catch (err) {
+      console.error("Failed to adjust stock:", err);
+    } finally {
+      setAdjusting(false);
     }
   }
 
@@ -161,6 +235,20 @@ export default function ProductsPage() {
           Add Product
         </Button>
       </div>
+
+      {/* Low Stock Banner */}
+      {lowStockCount > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3">
+          <AlertTriangle className="h-5 w-5 text-yellow-400 shrink-0" />
+          <p className="text-sm text-yellow-200">
+            <span className="font-semibold">{lowStockCount} product{lowStockCount !== 1 ? "s" : ""}</span>{" "}
+            {lowStockCount !== 1 ? "are" : "is"} running low on stock
+          </p>
+          <Badge variant="outline" className="ml-auto text-yellow-400 border-yellow-500/30 bg-yellow-500/15">
+            {lowStockCount}
+          </Badge>
+        </div>
+      )}
 
       {/* Search + View Toggle */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -209,6 +297,7 @@ export default function ProductsPage() {
           products={filtered}
           onEdit={openEdit}
           onToggle={handleToggle}
+          onAdjustStock={openAdjustStock}
           togglingId={togglingId}
         />
       ) : (
@@ -216,6 +305,7 @@ export default function ProductsPage() {
           products={filtered}
           onEdit={openEdit}
           onToggle={handleToggle}
+          onAdjustStock={openAdjustStock}
           togglingId={togglingId}
         />
       )}
@@ -272,6 +362,29 @@ export default function ProductsPage() {
                 onChange={(value) => setForm({ ...form, currency: value })}
               />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="SKU (optional)"
+                placeholder="e.g., PROD-001"
+                value={form.sku}
+                onChange={(e) => setForm({ ...form, sku: e.target.value })}
+              />
+              <Input
+                label="Stock Quantity"
+                type="number"
+                placeholder="Leave empty for unlimited"
+                min={0}
+                value={form.stockQuantity}
+                onChange={(e) =>
+                  setForm({ ...form, stockQuantity: e.target.value })
+                }
+              />
+            </div>
+            {editingId && form.stockQuantity !== "" && (
+              <p className="text-xs text-white/30">
+                Current stock: {form.stockQuantity}. Use "Adjust Stock" for tracked changes with reason.
+              </p>
+            )}
           </div>
 
           <DialogFooter>
@@ -291,6 +404,78 @@ export default function ProductsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Adjust Stock Dialog */}
+      <Dialog open={adjustStockOpen} onOpenChange={(open) => {
+        setAdjustStockOpen(open);
+        if (!open) setAdjustTarget(null);
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PackageMinus className="h-5 w-5" />
+              Adjust Stock
+            </DialogTitle>
+            <DialogDescription>
+              Adjust stock for {adjustTarget?.name ?? "product"}.
+              Current stock: {getStockDisplay(adjustTarget?.stockQuantity)}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <Input
+              label="Quantity Change"
+              type="number"
+              placeholder="e.g., 10 to add, -5 to remove"
+              value={adjustDelta}
+              onChange={(e) => setAdjustDelta(e.target.value)}
+            />
+            {adjustDelta && adjustTarget?.stockQuantity != null && (
+              <div className="rounded-md bg-white/[0.02] border border-white/[0.06] px-3 py-2 text-sm">
+                New stock:{" "}
+                <span className={cn(
+                  "font-semibold",
+                  getStockColor(adjustTarget.stockQuantity + Number(adjustDelta))
+                )}>
+                  {Math.max(0, adjustTarget.stockQuantity + Number(adjustDelta))}
+                </span>
+              </div>
+            )}
+            <Input
+              label="Reason (optional)"
+              placeholder="e.g., Restocked from supplier, Damaged goods"
+              value={adjustReason}
+              onChange={(e) => setAdjustReason(e.target.value)}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAdjustStockOpen(false);
+                setAdjustTarget(null);
+              }}
+              disabled={adjusting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAdjustStock}
+              disabled={adjusting || !adjustDelta || Number(adjustDelta) === 0}
+            >
+              {adjusting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adjusting...
+                </>
+              ) : (
+                "Save Adjustment"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -301,11 +486,13 @@ function GridView({
   products,
   onEdit,
   onToggle,
+  onAdjustStock,
   togglingId,
 }: {
-  products: Array<{ id: string; name: string; description?: string; price: number; currency?: string; isActive: boolean; imageUrl?: string; createdAt?: string | number }>;
+  products: Array<{ id: string; name: string; description?: string; price: number; currency?: string; sku?: string; stockQuantity?: number; isActive: boolean; imageUrl?: string; createdAt?: string | number }>;
   onEdit: (p: any) => void;
   onToggle: (id: string) => void;
+  onAdjustStock: (p: any) => void;
   togglingId: string | null;
 }) {
   return (
@@ -343,6 +530,11 @@ function GridView({
             <div className="p-4 space-y-3">
               <div>
                 <h3 className="font-medium text-white">{product.name}</h3>
+                {product.sku && (
+                  <p className="text-xs text-white/30 font-mono">
+                    SKU: {product.sku}
+                  </p>
+                )}
                 {product.description && (
                   <p className="mt-0.5 text-xs text-white/40 line-clamp-2">
                     {product.description}
@@ -350,9 +542,17 @@ function GridView({
                 )}
               </div>
 
-              <p className="text-lg font-bold text-white">
-                {formatPrice(product.price, product.currency ?? "MYR")}
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-lg font-bold text-white">
+                  {formatPrice(product.price, product.currency ?? "MYR")}
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <Package className="h-3.5 w-3.5 text-white/30" />
+                  <span className={cn("text-sm font-medium", getStockColor(product.stockQuantity))}>
+                    {getStockDisplay(product.stockQuantity)}
+                  </span>
+                </div>
+              </div>
 
               {/* Actions */}
               <div className="flex items-center gap-2 pt-1">
@@ -365,6 +565,16 @@ function GridView({
                   <Pencil className="h-3.5 w-3.5" />
                   Edit
                 </Button>
+                {product.stockQuantity != null && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 gap-1 text-white/60 hover:bg-white/[0.06] hover:text-white"
+                    onClick={() => onAdjustStock(product)}
+                  >
+                    <PackageMinus className="h-3.5 w-3.5" />
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -404,11 +614,13 @@ function TableView({
   products,
   onEdit,
   onToggle,
+  onAdjustStock,
   togglingId,
 }: {
-  products: Array<{ id: string; name: string; description?: string; price: number; currency?: string; isActive: boolean; imageUrl?: string; createdAt?: string | number }>;
+  products: Array<{ id: string; name: string; description?: string; price: number; currency?: string; sku?: string; stockQuantity?: number; isActive: boolean; imageUrl?: string; createdAt?: string | number }>;
   onEdit: (p: any) => void;
   onToggle: (id: string) => void;
+  onAdjustStock: (p: any) => void;
   togglingId: string | null;
 }) {
   return (
@@ -418,7 +630,9 @@ function TableView({
           <TableHeader>
             <TableRow className="border-white/[0.06] hover:bg-transparent">
               <TableHead className="text-white/50">Product</TableHead>
+              <TableHead className="text-white/50">SKU</TableHead>
               <TableHead className="text-white/50">Price</TableHead>
+              <TableHead className="text-white/50">Stock</TableHead>
               <TableHead className="text-white/50">Status</TableHead>
               <TableHead className="text-right text-white/50">
                 Actions
@@ -456,8 +670,16 @@ function TableView({
                     </div>
                   </div>
                 </TableCell>
+                <TableCell className="text-white/50 font-mono text-xs">
+                  {product.sku ?? "\u2014"}
+                </TableCell>
                 <TableCell className="font-medium text-white">
                   {formatPrice(product.price, product.currency ?? "MYR")}
+                </TableCell>
+                <TableCell>
+                  <span className={cn("text-sm font-medium", getStockColor(product.stockQuantity))}>
+                    {getStockDisplay(product.stockQuantity)}
+                  </span>
                 </TableCell>
                 <TableCell>
                   <Badge
@@ -483,6 +705,17 @@ function TableView({
                       <Pencil className="h-3.5 w-3.5" />
                       Edit
                     </Button>
+                    {product.stockQuantity != null && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 gap-1 text-white/60 hover:bg-white/[0.06] hover:text-white"
+                        onClick={() => onAdjustStock(product)}
+                      >
+                        <PackageMinus className="h-3.5 w-3.5" />
+                        Stock
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="ghost"

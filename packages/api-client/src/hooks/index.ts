@@ -44,6 +44,8 @@ export {
   useCreateProduct,
   useUpdateProduct,
   useDeleteProduct,
+  useAdjustStock,
+  useLowStockProducts,
 } from "./products";
 
 export {
@@ -230,3 +232,16 @@ export {
   useMemberQrCode,
   useGenerateQrCode,
 } from "./qr-code";
+
+export {
+  useCustomers,
+  useCustomer,
+  useUpdateCustomer,
+} from "./customers";
+
+export {
+  useLoyaltyBalance,
+  useLoyaltyHistory,
+  useEarnPoints,
+  useRedeemPoints,
+} from "./loyalty";

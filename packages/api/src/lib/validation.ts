@@ -30,6 +30,9 @@ export const CreateProductSchema = z.object({
   currency: z.string().length(3).default("MYR"),
   imageUrl: z.string().url().optional(),
   isActive: z.boolean().default(true),
+  sku: z.string().max(100).optional(),
+  stockQuantity: z.number().int().min(0).optional(),
+  lowStockThreshold: z.number().int().min(0).optional(),
 });
 
 export const UpdateProductSchema = z.object({
@@ -39,6 +42,9 @@ export const UpdateProductSchema = z.object({
   currency: z.string().length(3).optional(),
   isActive: z.boolean().optional(),
   imageUrl: z.string().url().nullable().optional(),
+  sku: z.string().max(100).nullable().optional(),
+  stockQuantity: z.number().int().min(0).nullable().optional(),
+  lowStockThreshold: z.number().int().min(0).optional(),
 });
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
@@ -99,6 +105,44 @@ export const CreateVoucherSchema = z.object({
   source: z.enum(["internal", "partner", "public"]).default("internal"),
   partnerName: z.string().optional(),
   description: z.string().optional(),
+});
+
+// ─── Update Voucher ──────────────────────────────────────────────────────
+
+export const UpdateVoucherSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().max(1000).optional(),
+  value: z.number().min(0).optional(),
+  maxUses: z.number().int().min(1).optional(),
+  expiresAt: z.string().datetime().optional(),
+  isActive: z.boolean().optional(),
+});
+
+// ─── Stock Adjustment ────────────────────────────────────────────────────
+
+export const AdjustStockSchema = z.object({
+  delta: z.number().int(),
+  reason: z.string().min(1).max(500),
+});
+
+// ─── Customer CRM ────────────────────────────────────────────────────────
+
+export const UpdateCustomerSchema = z.object({
+  notes: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+});
+
+// ─── Loyalty ─────────────────────────────────────────────────────────────
+
+export const EarnPointsSchema = z.object({
+  userId: z.string().min(1),
+  points: z.number().int().min(1),
+  note: z.string().optional(),
+});
+
+export const RedeemPointsSchema = z.object({
+  points: z.number().int().min(1),
+  orderId: z.string().optional(),
 });
 
 // ─── Gift Cards ───────────────────────────────────────────────────────────────

@@ -1,9 +1,10 @@
 import { db } from "@timeo/db";
-import { posTransactions, auditLogs } from "@timeo/db/schema";
+import { posTransactions, products, stockMovements, auditLogs } from "@timeo/db/schema";
 import { eq } from "drizzle-orm";
 import { generateId } from "@timeo/db";
 import { emitToTenant } from "../realtime/socket.js";
 import { SocketEvents } from "../realtime/events.js";
+import * as LoyaltyService from "./loyalty.service.js";
 
 interface PosItem {
   type: "membership" | "session_package" | "service" | "product";
@@ -58,6 +59,50 @@ export async function createPosTransaction(input: {
     resource_id: txId,
     details: { total, paymentMethod: input.paymentMethod },
   });
+
+  // Decrement stock for product items
+  for (const item of input.items) {
+    if (item.type === "product") {
+      const [product] = await db
+        .select()
+        .from(products)
+        .where(eq(products.id, item.referenceId))
+        .limit(1);
+
+      if (product && product.stock_quantity !== null) {
+        const newStock = product.stock_quantity - item.quantity;
+        await db
+          .update(products)
+          .set({ stock_quantity: Math.max(0, newStock), updated_at: new Date() })
+          .where(eq(products.id, item.referenceId));
+
+        await db.insert(stockMovements).values({
+          id: generateId(),
+          tenant_id: input.tenantId,
+          product_id: item.referenceId,
+          delta: -item.quantity,
+          stock_before: product.stock_quantity,
+          stock_after: Math.max(0, newStock),
+          reason: "pos_transaction",
+          reference_id: txId,
+          actor_id: input.staffId,
+        });
+      }
+    }
+  }
+
+  // Earn loyalty points
+  try {
+    await LoyaltyService.earnPoints({
+      tenantId: input.tenantId,
+      userId: input.customerId,
+      amount: total,
+      referenceType: "pos_transaction",
+      referenceId: txId,
+    });
+  } catch {
+    // Don't fail POS transaction if loyalty fails
+  }
 
   emitToTenant(input.tenantId, SocketEvents.POS_TRANSACTION_CREATED, {
     transactionId: txId,

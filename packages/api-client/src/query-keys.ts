@@ -141,4 +141,17 @@ export const queryKeys = {
   staff: {
     all: (tenantId: string) => ["staff", tenantId] as const,
   },
+
+  customers: {
+    all: (tenantId: string) => ["customers", tenantId] as const,
+    byId: (tenantId: string, id: string) => ["customers", tenantId, id] as const,
+  },
+
+  loyalty: {
+    all: (tenantId: string) => ["loyalty", tenantId] as const,
+    balance: (tenantId: string, userId: string) =>
+      ["loyalty", tenantId, "balance", userId] as const,
+    history: (tenantId: string, userId: string) =>
+      ["loyalty", tenantId, "history", userId] as const,
+  },
 };

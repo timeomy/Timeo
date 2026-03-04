@@ -55,4 +55,39 @@ app.patch(
   },
 );
 
+// PATCH /tenants/:tenantId/notifications/:notificationId/read
+app.patch(
+  "/:notificationId/read",
+  authMiddleware,
+  tenantMiddleware,
+  async (c) => {
+    const user = c.get("user");
+    const notificationId = c.req.param("notificationId");
+
+    const [notif] = await db
+      .select()
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.id, notificationId),
+          eq(notifications.user_id, user.id),
+        ),
+      )
+      .limit(1);
+
+    if (!notif) {
+      return c.json(
+        { success: false, error: { code: "NOT_FOUND", message: "Notification not found" } },
+        404,
+      );
+    }
+
+    await db
+      .update(notifications)
+      .set({ read: true })
+      .where(eq(notifications.id, notificationId));
+    return c.json(success({ message: "Marked as read" }));
+  },
+);
+
 export { app as notificationsRouter };

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useLoyaltyBalance, useLoyaltyHistory } from "@timeo/api-client";
 import { useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
 import { getInitials } from "@timeo/shared";
 import {
@@ -27,6 +28,7 @@ import {
   ShoppingBag,
   Settings,
   Shield,
+  Star,
 } from "lucide-react";
 
 export default function ProfilePage() {
@@ -169,6 +171,11 @@ export default function ProfilePage() {
         </Card>
       )}
 
+      {/* Loyalty Points */}
+      {activeTenant && (
+        <LoyaltySection tenantId={activeTenant.id} userId={user.id} />
+      )}
+
       {/* Quick Links */}
       <Card>
         <CardHeader>
@@ -242,5 +249,105 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+const TIER_COLORS: Record<string, { bg: string; text: string; hex: string }> = {
+  bronze: { bg: "bg-[#cd7f32]/15", text: "text-[#cd7f32]", hex: "#cd7f32" },
+  silver: { bg: "bg-[#c0c0c0]/15", text: "text-[#c0c0c0]", hex: "#c0c0c0" },
+  gold: { bg: "bg-[#ffd700]/15", text: "text-[#ffd700]", hex: "#ffd700" },
+  platinum: { bg: "bg-[#e5e4e2]/15", text: "text-[#e5e4e2]", hex: "#e5e4e2" },
+};
+
+function LoyaltySection({ tenantId, userId }: { tenantId: string; userId: string }) {
+  const { data: loyaltyData, isLoading: balanceLoading } = useLoyaltyBalance(tenantId, userId);
+  const { data: history } = useLoyaltyHistory(tenantId, userId);
+
+  if (balanceLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Star className="h-5 w-5 text-yellow-400" />
+            Loyalty Points
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-20 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const balance = loyaltyData?.balance ?? 0;
+  const tier = loyaltyData?.tier?.toLowerCase() ?? "bronze";
+  const tierColor = TIER_COLORS[tier] ?? TIER_COLORS.bronze;
+  const transactions = history?.slice(0, 10) ?? [];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Star className="h-5 w-5 text-yellow-400" />
+          Loyalty Points
+        </CardTitle>
+        <CardDescription>
+          Earn points with every purchase. 1 point = RM0.01 redemption value.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Balance + Tier */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-3xl font-bold">{balance.toLocaleString()}</p>
+            <p className="text-sm text-muted-foreground">points available</p>
+          </div>
+          <Badge
+            className={`${tierColor.bg} ${tierColor.text} border text-sm px-3 py-1`}
+            style={{ borderColor: `${tierColor.hex}40` }}
+          >
+            {tier.charAt(0).toUpperCase() + tier.slice(1)}
+          </Badge>
+        </div>
+
+        {/* History */}
+        {transactions.length > 0 && (
+          <div>
+            <p className="text-sm font-medium mb-2">Recent Activity</p>
+            <div className="space-y-2">
+              {transactions.map((tx: any, i: number) => (
+                <div
+                  key={tx.id ?? i}
+                  className="flex items-center justify-between rounded-lg border p-2.5 text-sm"
+                >
+                  <div>
+                    <p className="font-medium">{tx.description ?? tx.type ?? "Transaction"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {tx.createdAt
+                        ? new Date(tx.createdAt).toLocaleDateString("en-MY", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })
+                        : "\u2014"}
+                    </p>
+                  </div>
+                  <span
+                    className={`font-semibold ${
+                      (tx.points ?? tx.amount ?? 0) >= 0
+                        ? "text-emerald-500"
+                        : "text-red-500"
+                    }`}
+                  >
+                    {(tx.points ?? tx.amount ?? 0) >= 0 ? "+" : ""}
+                    {tx.points ?? tx.amount ?? 0}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

@@ -95,3 +95,36 @@ export function useDeleteProduct(tenantId: string) {
       }),
   });
 }
+
+export function useAdjustStock(tenantId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      productId,
+      delta,
+      reason,
+    }: {
+      productId: string;
+      delta: number;
+      reason: string;
+    }) =>
+      api.patch<{ stockQuantity: number }>(
+        `/api/tenants/${tenantId}/products/${productId}/stock`,
+        { delta, reason },
+      ),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.products.all(tenantId),
+      }),
+  });
+}
+
+export function useLowStockProducts(tenantId: string | null | undefined) {
+  return useQuery({
+    queryKey: [...queryKeys.products.all(tenantId ?? ""), "low-stock"],
+    queryFn: () =>
+      api.get<Product[]>(`/api/tenants/${tenantId}/products/low-stock`),
+    enabled: !!tenantId,
+    staleTime: 30_000,
+  });
+}

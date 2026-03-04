@@ -113,4 +113,128 @@ app.post(
   },
 );
 
+// POST /tenants/:tenantId/gift-cards/:id/topup
+app.post(
+  "/:id/topup",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  async (c) => {
+    const user = c.get("user");
+    const tenantId = c.get("tenantId");
+    const cardId = c.req.param("id");
+    const body = await c.req.json();
+    const amount = body.amount;
+
+    if (!amount || typeof amount !== "number" || amount <= 0) {
+      return c.json(error("VALIDATION_ERROR", "amount must be a positive number"), 400);
+    }
+
+    const [card] = await db
+      .select()
+      .from(giftCards)
+      .where(and(eq(giftCards.id, cardId), eq(giftCards.tenant_id, tenantId)))
+      .limit(1);
+    if (!card) return c.json(error("NOT_FOUND", "Gift card not found"), 404);
+
+    const newBalance = card.current_balance + amount;
+    await db
+      .update(giftCards)
+      .set({ current_balance: newBalance, status: "active" })
+      .where(eq(giftCards.id, cardId));
+
+    const { generateId } = await import("@timeo/db");
+    await db.insert(giftCardTransactions).values({
+      id: generateId(),
+      gift_card_id: cardId,
+      tenant_id: tenantId,
+      type: "topup",
+      amount,
+      balance_after: newBalance,
+      created_by: user.id,
+    });
+
+    return c.json(success({ newBalance }));
+  },
+);
+
+// PATCH /tenants/:tenantId/gift-cards/:id/cancel
+app.patch(
+  "/:id/cancel",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+    const cardId = c.req.param("id");
+
+    const [card] = await db
+      .select()
+      .from(giftCards)
+      .where(and(eq(giftCards.id, cardId), eq(giftCards.tenant_id, tenantId)))
+      .limit(1);
+    if (!card) return c.json(error("NOT_FOUND", "Gift card not found"), 404);
+
+    await db
+      .update(giftCards)
+      .set({ status: "cancelled" })
+      .where(eq(giftCards.id, cardId));
+    return c.json(success({ message: "Gift card cancelled" }));
+  },
+);
+
+// PATCH /tenants/:tenantId/gift-cards/:id/reactivate
+app.patch(
+  "/:id/reactivate",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+    const cardId = c.req.param("id");
+
+    const [card] = await db
+      .select()
+      .from(giftCards)
+      .where(and(eq(giftCards.id, cardId), eq(giftCards.tenant_id, tenantId)))
+      .limit(1);
+    if (!card) return c.json(error("NOT_FOUND", "Gift card not found"), 404);
+
+    await db
+      .update(giftCards)
+      .set({ status: "active" })
+      .where(eq(giftCards.id, cardId));
+    return c.json(success({ message: "Gift card reactivated" }));
+  },
+);
+
+// DELETE /tenants/:tenantId/gift-cards/:id
+app.delete(
+  "/:id",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+    const cardId = c.req.param("id");
+
+    const [card] = await db
+      .select()
+      .from(giftCards)
+      .where(and(eq(giftCards.id, cardId), eq(giftCards.tenant_id, tenantId)))
+      .limit(1);
+    if (!card) return c.json(error("NOT_FOUND", "Gift card not found"), 404);
+
+    if (card.current_balance > 0) {
+      return c.json(
+        error("CANNOT_DELETE", "Cannot delete a gift card with remaining balance"),
+        422,
+      );
+    }
+
+    await db.delete(giftCards).where(eq(giftCards.id, cardId));
+    return c.json(success({ message: "Gift card deleted" }));
+  },
+);
+
 export { app as giftCardsRouter };

@@ -74,4 +74,61 @@ app.get(
   },
 );
 
+// GET /tenants/:tenantId/analytics/orders
+app.get(
+  "/orders",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+    const { from, to } = parseDateRange(c);
+
+    try {
+      const data = await AnalyticsService.getOrderAnalytics(tenantId, from, to);
+      return c.json(success(data));
+    } catch (err) {
+      return c.json(error("ANALYTICS_ERROR", (err as Error).message), 500);
+    }
+  },
+);
+
+// GET /tenants/:tenantId/analytics/top-products
+app.get(
+  "/top-products",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+    const { from, to } = parseDateRange(c);
+
+    try {
+      const data = await AnalyticsService.getTopProducts(tenantId, from, to);
+      return c.json(success(data));
+    } catch (err) {
+      return c.json(error("ANALYTICS_ERROR", (err as Error).message), 500);
+    }
+  },
+);
+
+// GET /tenants/:tenantId/analytics/staff
+app.get(
+  "/staff",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+    const { from, to } = parseDateRange(c);
+
+    try {
+      const data = await AnalyticsService.getStaffPerformance(tenantId, from, to);
+      return c.json(success(data));
+    } catch (err) {
+      return c.json(error("ANALYTICS_ERROR", (err as Error).message), 500);
+    }
+  },
+);
+
 export { app as analyticsRouter };

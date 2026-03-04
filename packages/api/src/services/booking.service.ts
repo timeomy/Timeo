@@ -14,6 +14,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { generateId } from "@timeo/db";
 import { emitToTenant } from "../realtime/socket.js";
 import { SocketEvents } from "../realtime/events.js";
+import * as LoyaltyService from "./loyalty.service.js";
 
 /**
  * Compute the UTC offset (in ms) for a given timezone at a specific instant.
@@ -398,6 +399,27 @@ export async function completeBooking(bookingId: string, actorId: string, actorR
     resource: "bookings",
     resourceId: bookingId,
   });
+
+  // Earn loyalty points on booking completion
+  try {
+    const [service] = await db
+      .select()
+      .from(services)
+      .where(eq(services.id, booking.service_id))
+      .limit(1);
+
+    if (service) {
+      await LoyaltyService.earnPoints({
+        tenantId: booking.tenant_id,
+        userId: booking.customer_id,
+        amount: service.price,
+        referenceType: "booking",
+        referenceId: bookingId,
+      });
+    }
+  } catch {
+    // Don't fail booking completion if loyalty fails
+  }
 
   emitToTenant(booking.tenant_id, SocketEvents.BOOKING_UPDATED, {
     bookingId,

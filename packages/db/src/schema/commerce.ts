@@ -23,6 +23,9 @@ export const products = pgTable(
     currency: text("currency").notNull().default("MYR"),
     image_url: text("image_url"),
     is_active: boolean("is_active").notNull().default(true),
+    sku: text("sku"),
+    stock_quantity: integer("stock_quantity"),
+    low_stock_threshold: integer("low_stock_threshold").notNull().default(5),
     created_by: text("created_by")
       .notNull()
       .references(() => users.id),
@@ -84,6 +87,33 @@ export const orderItems = pgTable(
     snapshot_name: text("snapshot_name").notNull(),
   },
   (t) => [index("order_items_order_id_idx").on(t.order_id)],
+);
+
+// ─── Stock Movements ────────────────────────────────────────────────────
+export const stockMovements = pgTable(
+  "stock_movements",
+  {
+    id: text("id").primaryKey(),
+    tenant_id: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    product_id: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    delta: integer("delta").notNull(),
+    stock_before: integer("stock_before").notNull(),
+    stock_after: integer("stock_after").notNull(),
+    reason: text("reason").notNull(),
+    reference_id: text("reference_id"),
+    actor_id: text("actor_id").references(() => users.id),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("stock_movements_tenant_id_idx").on(t.tenant_id),
+    index("stock_movements_product_id_idx").on(t.product_id),
+  ],
 );
 
 // ─── Memberships (Plans) ────────────────────────────────────────────────────
