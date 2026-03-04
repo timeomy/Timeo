@@ -131,4 +131,60 @@ app.get(
   },
 );
 
+// GET /tenants/:tenantId/analytics/revenue/trend
+app.get(
+  "/revenue/trend",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+    const { from, to } = parseDateRange(c);
+
+    try {
+      const data = await AnalyticsService.getRevenueTrend(tenantId, from, to);
+      return c.json(success(data));
+    } catch (err) {
+      return c.json(error("ANALYTICS_ERROR", (err as Error).message), 500);
+    }
+  },
+);
+
+// GET /tenants/:tenantId/analytics/bookings/trend
+app.get(
+  "/bookings/trend",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+    const { from, to } = parseDateRange(c);
+
+    try {
+      const data = await AnalyticsService.getBookingTrend(tenantId, from, to);
+      return c.json(success(data));
+    } catch (err) {
+      return c.json(error("ANALYTICS_ERROR", (err as Error).message), 500);
+    }
+  },
+);
+
+// GET /tenants/:tenantId/analytics/customers
+app.get(
+  "/customers",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+
+    try {
+      const data = await AnalyticsService.getCustomerAnalytics(tenantId);
+      return c.json(success(data));
+    } catch (err) {
+      return c.json(error("ANALYTICS_ERROR", (err as Error).message), 500);
+    }
+  },
+);
+
 export { app as analyticsRouter };

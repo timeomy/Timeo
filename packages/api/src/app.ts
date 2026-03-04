@@ -18,6 +18,7 @@ import { giftCardsRouter } from "./routes/gift-cards.routes.js";
 import { schedulingRouter } from "./routes/scheduling.routes.js";
 import { notificationsRouter } from "./routes/notifications.routes.js";
 import { analyticsRouter } from "./routes/analytics.routes.js";
+import { exportsRouter } from "./routes/exports.routes.js";
 import { platformRouter } from "./routes/platform.routes.js";
 import { filesRouter } from "./routes/files.routes.js";
 import { einvoiceRouter } from "./routes/einvoice.routes.js";
@@ -60,6 +61,7 @@ export function createApp() {
   app.route("/api/tenants/:tenantId/scheduling", schedulingRouter);
   app.route("/api/tenants/:tenantId/notifications", notificationsRouter);
   app.route("/api/tenants/:tenantId/analytics", analyticsRouter);
+  app.route("/api/tenants/:tenantId/exports", exportsRouter);
   app.route("/api/tenants/:tenantId/files", filesRouter);
   app.route("/api/tenants/:tenantId/einvoice", einvoiceRouter);
   app.route("/api/tenants/:tenantId/customers", customersRouter);

@@ -49,10 +49,25 @@ interface TopItem {
 }
 
 interface CustomerAnalytics {
-  totalCustomers: number;
-  newCustomers: number;
-  returningCustomers: number;
-  retentionRate: number;
+  total: number;
+  newThisMonth: number;
+  returning: number;
+  topSpenders: Array<{
+    userId: string;
+    name: string;
+    totalSpend: number;
+    bookingCount: number;
+  }>;
+}
+
+interface TrendPoint {
+  date: string;
+  revenue: number;
+}
+
+interface BookingTrendPoint {
+  date: string;
+  count: number;
 }
 
 interface StaffPerformance {
@@ -153,6 +168,40 @@ export function useStaffPerformance(tenantId: string | null | undefined) {
       api.get<StaffPerformance[]>(
         `/api/tenants/${tenantId}/analytics/staff`,
       ),
+    enabled: !!tenantId,
+    staleTime: 60_000,
+  });
+}
+
+export function useRevenueTrend(
+  tenantId: string | null | undefined,
+  period?: string,
+) {
+  return useQuery({
+    queryKey: queryKeys.analytics.revenueTrend(tenantId ?? "", period),
+    queryFn: () => {
+      const params = period ? `?period=${period}` : "";
+      return api.get<TrendPoint[]>(
+        `/api/tenants/${tenantId}/analytics/revenue/trend${params}`,
+      );
+    },
+    enabled: !!tenantId,
+    staleTime: 60_000,
+  });
+}
+
+export function useBookingTrend(
+  tenantId: string | null | undefined,
+  period?: string,
+) {
+  return useQuery({
+    queryKey: queryKeys.analytics.bookingTrend(tenantId ?? "", period),
+    queryFn: () => {
+      const params = period ? `?period=${period}` : "";
+      return api.get<BookingTrendPoint[]>(
+        `/api/tenants/${tenantId}/analytics/bookings/trend${params}`,
+      );
+    },
     enabled: !!tenantId,
     staleTime: 60_000,
   });

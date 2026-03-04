@@ -150,7 +150,11 @@ export {
   useTopProducts,
   useCustomerAnalytics,
   useStaffPerformance,
+  useRevenueTrend,
+  useBookingTrend,
 } from "./analytics";
+
+export { useDownloadReport } from "./exports";
 
 export {
   // Module 1: Tenants

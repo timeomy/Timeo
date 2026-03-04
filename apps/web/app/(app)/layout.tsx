@@ -19,6 +19,7 @@ import {
   Skeleton,
   cn,
 } from "@timeo/ui/web";
+import { NotificationsBell } from "@/notifications-bell";
 import {
   LayoutDashboard,
   Calendar,
@@ -43,6 +44,7 @@ import {
   UserCheck,
   Store,
   FileText,
+  BarChart3,
 } from "lucide-react";
 
 type SidebarLink = {
@@ -68,6 +70,7 @@ const sidebarLinks: SidebarLink[] = [
   { href: "/dashboard/members", label: "Members", icon: UserCheck, minRole: "staff" },
   { href: "/dashboard/customers", label: "Customers", icon: Users2, minRole: "admin" },
   { href: "/dashboard/pos", label: "POS", icon: Store, minRole: "staff", flagKey: "pos_enabled" },
+  { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3, minRole: "admin" },
   { href: "/dashboard/e-invoice", label: "e-Invoice", icon: FileText, minRole: "admin" },
   { href: "/dashboard/settings", label: "Settings", icon: Settings, minRole: "admin" },
 ];
@@ -324,12 +327,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               >
                 <Menu className="h-5 w-5" />
               </button>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-1 items-center gap-2">
                 <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
                   <Zap className="h-4 w-4 text-primary-foreground" />
                 </div>
                 <span className="font-semibold">Timeo</span>
               </div>
+              <NotificationsBell />
+            </header>
+
+            {/* Desktop Top Bar */}
+            <header className="hidden h-12 items-center justify-end border-b border-white/[0.06] px-6 lg:flex">
+              <NotificationsBell />
             </header>
 
             {/* Announcements */}

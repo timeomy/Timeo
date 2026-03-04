@@ -296,6 +296,13 @@ export const CreateEInvoiceSchema = z.object({
   buyerSstRegNo: z.string().optional(),
 });
 
+// ─── Exports ─────────────────────────────────────────────────────────────────
+
+export const ExportQuerySchema = z.object({
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+});
+
 // ─── Files ────────────────────────────────────────────────────────────────────
 
 export const CreateFileMetadataSchema = z.object({
