@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import { db } from "@timeo/db";
 import {
   staffAvailability,
@@ -17,6 +18,17 @@ import {
   SetBusinessHoursSchema,
   CreateBlockedSlotSchema,
 } from "../lib/validation.js";
+
+const BatchBusinessHoursSchema = z.object({
+  hours: z.array(
+    z.object({
+      dayOfWeek: z.number().int().min(0).max(6),
+      openTime: z.string().regex(/^\d{2}:\d{2}$/),
+      closeTime: z.string().regex(/^\d{2}:\d{2}$/),
+      isOpen: z.boolean(),
+    }),
+  ).min(1),
+});
 
 const app = new Hono();
 
@@ -123,6 +135,47 @@ app.put(
     });
 
     return c.json(success({ id }));
+  },
+);
+
+// PUT /tenants/:tenantId/scheduling/business-hours/batch
+app.put(
+  "/business-hours/batch",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  zValidator("json", BatchBusinessHoursSchema),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+    const { hours } = c.req.valid("json");
+
+    const results: Array<{ dayOfWeek: number; id: string }> = [];
+
+    for (const h of hours) {
+      // Delete existing for this day, then insert (upsert pattern)
+      await db
+        .delete(businessHours)
+        .where(
+          and(
+            eq(businessHours.tenant_id, tenantId),
+            eq(businessHours.day_of_week, h.dayOfWeek),
+          ),
+        );
+
+      const id = generateId();
+      await db.insert(businessHours).values({
+        id,
+        tenant_id: tenantId,
+        day_of_week: h.dayOfWeek,
+        open_time: h.openTime,
+        close_time: h.closeTime,
+        is_open: h.isOpen,
+      });
+
+      results.push({ dayOfWeek: h.dayOfWeek, id });
+    }
+
+    return c.json(success(results));
   },
 );
 

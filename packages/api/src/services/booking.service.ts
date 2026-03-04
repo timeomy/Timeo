@@ -15,6 +15,17 @@ import { generateId } from "@timeo/db";
 import { emitToTenant } from "../realtime/socket.js";
 import { SocketEvents } from "../realtime/events.js";
 
+/**
+ * Compute the UTC offset (in ms) for a given timezone at a specific instant.
+ * Positive means the timezone is behind UTC (e.g. UTC-5 → +18_000_000).
+ * For Asia/Kuala_Lumpur (UTC+8) this returns -28_800_000.
+ */
+function getTzOffsetMs(date: Date, tz: string): number {
+  const utcDate = new Date(date.toLocaleString("en-US", { timeZone: "UTC" }));
+  const tzDate = new Date(date.toLocaleString("en-US", { timeZone: tz }));
+  return utcDate.getTime() - tzDate.getTime();
+}
+
 interface CreateBookingInput {
   tenantId: string;
   serviceId: string;
@@ -70,10 +81,13 @@ export async function createBooking(input: CreateBookingInput) {
 
     const [openH, openM] = bh.open_time.split(":").map(Number);
     const [closeH, closeM] = bh.close_time.split(":").map(Number);
-    const dayStart = new Date(startTime);
-    dayStart.setHours(0, 0, 0, 0);
-    const openMs = dayStart.getTime() + (openH * 60 + openM) * 60 * 1000;
-    const closeMs = dayStart.getTime() + (closeH * 60 + closeM) * 60 * 1000;
+
+    // Compute day boundary in tenant timezone (not UTC midnight)
+    const bookingDateStr = startTime.toLocaleDateString("en-CA", { timeZone: timezone }); // "YYYY-MM-DD"
+    const [year, month, day] = bookingDateStr.split("-").map(Number);
+    const tzOffsetMs = getTzOffsetMs(startTime, timezone);
+    const openMs = Date.UTC(year, month - 1, day) - tzOffsetMs + (openH * 60 + openM) * 60_000;
+    const closeMs = Date.UTC(year, month - 1, day) - tzOffsetMs + (closeH * 60 + closeM) * 60_000;
 
     if (startTime.getTime() < openMs || endTime.getTime() > closeMs) {
       throw new Error("Requested time is outside business hours");
@@ -264,7 +278,7 @@ async function autoAssignStaff(
   return undefined;
 }
 
-export async function confirmBooking(bookingId: string, actorId: string) {
+export async function confirmBooking(bookingId: string, actorId: string, actorRole = "staff") {
   const [booking] = await db
     .select()
     .from(bookings)
@@ -290,6 +304,7 @@ export async function confirmBooking(bookingId: string, actorId: string) {
   await insertAuditLog({
     tenantId: booking.tenant_id,
     actorId,
+    actorRole,
     action: "booking.confirmed",
     resource: "bookings",
     resourceId: bookingId,
@@ -304,7 +319,7 @@ export async function confirmBooking(bookingId: string, actorId: string) {
 export async function cancelBooking(
   bookingId: string,
   actorId: string,
-  actorRole: string,
+  actorRole = "staff",
   reason?: string,
 ) {
   const [booking] = await db
@@ -340,6 +355,7 @@ export async function cancelBooking(
   await insertAuditLog({
     tenantId: booking.tenant_id,
     actorId,
+    actorRole,
     action: "booking.cancelled",
     resource: "bookings",
     resourceId: bookingId,
@@ -351,7 +367,7 @@ export async function cancelBooking(
   });
 }
 
-export async function completeBooking(bookingId: string, actorId: string) {
+export async function completeBooking(bookingId: string, actorId: string, actorRole = "staff") {
   const [booking] = await db
     .select()
     .from(bookings)
@@ -377,6 +393,7 @@ export async function completeBooking(bookingId: string, actorId: string) {
   await insertAuditLog({
     tenantId: booking.tenant_id,
     actorId,
+    actorRole,
     action: "booking.completed",
     resource: "bookings",
     resourceId: bookingId,
@@ -388,7 +405,7 @@ export async function completeBooking(bookingId: string, actorId: string) {
   });
 }
 
-export async function markNoShow(bookingId: string, actorId: string) {
+export async function markNoShow(bookingId: string, actorId: string, actorRole = "staff") {
   const [booking] = await db
     .select()
     .from(bookings)
@@ -414,6 +431,7 @@ export async function markNoShow(bookingId: string, actorId: string) {
   await insertAuditLog({
     tenantId: booking.tenant_id,
     actorId,
+    actorRole,
     action: "booking.no_show",
     resource: "bookings",
     resourceId: bookingId,
@@ -428,6 +446,7 @@ export async function markNoShow(bookingId: string, actorId: string) {
 async function insertAuditLog(input: {
   tenantId: string;
   actorId: string;
+  actorRole?: string;
   action: string;
   resource: string;
   resourceId: string;
@@ -437,7 +456,7 @@ async function insertAuditLog(input: {
     id: generateId(),
     tenant_id: input.tenantId,
     actor_id: input.actorId,
-    actor_role: "staff",
+    actor_role: input.actorRole ?? "staff",
     action: input.action,
     resource_type: input.resource,
     resource_id: input.resourceId,

@@ -3,14 +3,13 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useMyBookings } from "@timeo/api-client";
+import { useMyBookings, useCancelBooking, useBookingEvents } from "@timeo/api-client";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
-import { formatDate, formatTime, formatPrice, formatRelativeTime } from "@timeo/shared";
+import { formatTime, formatPrice } from "@timeo/shared";
 import {
   Card,
   CardHeader,
   CardTitle,
-  CardDescription,
   CardContent,
   CardFooter,
   Badge,
@@ -69,14 +68,19 @@ function getStatusLabel(status: string): string {
 
 function getEventIcon(type: string) {
   switch (type) {
+    case "booking.created":
     case "created":
       return <Circle className="h-4 w-4 text-primary" />;
+    case "booking.confirmed":
     case "confirmed":
       return <CheckCircle2 className="h-4 w-4 text-secondary" />;
+    case "booking.completed":
     case "completed":
       return <CheckCircle2 className="h-4 w-4 text-primary" />;
+    case "booking.cancelled":
     case "cancelled":
       return <XCircle className="h-4 w-4 text-destructive" />;
+    case "booking.no_show":
     case "no_show":
       return <Ban className="h-4 w-4 text-destructive" />;
     case "rescheduled":
@@ -90,20 +94,25 @@ function getEventIcon(type: string) {
 
 function getEventLabel(type: string): string {
   switch (type) {
+    case "booking.created":
     case "created":
-      return "Booking created";
+      return "Booking Created";
+    case "booking.confirmed":
     case "confirmed":
-      return "Booking confirmed";
+      return "Confirmed";
+    case "booking.completed":
     case "completed":
-      return "Booking completed";
+      return "Completed";
+    case "booking.cancelled":
     case "cancelled":
-      return "Booking cancelled";
+      return "Cancelled";
+    case "booking.no_show":
     case "no_show":
-      return "Marked as no-show";
+      return "Marked No-Show";
     case "rescheduled":
-      return "Booking rescheduled";
+      return "Rescheduled";
     case "note_added":
-      return "Note added";
+      return "Note Added";
     default:
       return type;
   }
@@ -118,8 +127,14 @@ export default function BookingDetailPage() {
 
   const [isCancelling, setIsCancelling] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   const { data: bookings, isLoading } = useMyBookings(activeTenantId ?? "");
+  const cancelMutation = useCancelBooking(activeTenantId ?? "");
+  const { data: bookingEvents, isLoading: eventsLoading } = useBookingEvents(
+    activeTenantId,
+    bookingId,
+  );
 
   const booking = bookings?.find((b) => b.id === bookingId);
 
@@ -130,8 +145,13 @@ export default function BookingDetailPage() {
     if (!booking) return;
     setIsCancelling(true);
     try {
-      // Cancel mutation would be called here when available in api-client
+      await cancelMutation.mutateAsync({
+        bookingId: booking.id,
+        reason: cancelReason.trim() || undefined,
+      });
       setShowCancelConfirm(false);
+      setCancelReason("");
+      router.push("/bookings");
     } catch (err) {
       console.error("Failed to cancel booking:", err);
     } finally {
@@ -300,6 +320,12 @@ export default function BookingDetailPage() {
                         </p>
                       </div>
                     </div>
+                    <textarea
+                      className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      placeholder="Reason for cancellation (optional)..."
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                    />
                     <div className="flex gap-2">
                       <Button
                         variant="destructive"
@@ -320,7 +346,10 @@ export default function BookingDetailPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setShowCancelConfirm(false)}
+                        onClick={() => {
+                          setShowCancelConfirm(false);
+                          setCancelReason("");
+                        }}
                         disabled={isCancelling}
                       >
                         Keep Booking
@@ -349,9 +378,54 @@ export default function BookingDetailPage() {
               <CardTitle className="text-base">Activity Timeline</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                No activity recorded yet.
-              </p>
+              {eventsLoading ? (
+                <div className="space-y-4">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <Skeleton className="h-4 w-4 rounded-full" />
+                      <div className="space-y-1.5">
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : !bookingEvents || bookingEvents.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No activity recorded yet.
+                </p>
+              ) : (
+                <div className="relative space-y-4">
+                  {/* Vertical line */}
+                  <div className="absolute left-[7px] top-2 bottom-2 w-px bg-border" />
+                  {bookingEvents.map((event) => (
+                    <div key={event.id} className="relative flex items-start gap-3">
+                      <div className="z-10 mt-0.5 flex-shrink-0 rounded-full bg-background">
+                        {getEventIcon(event.type)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">
+                          {getEventLabel(event.type)}
+                        </p>
+                        {event.metadata && typeof event.metadata === "object" && (event.metadata as any).reason && (
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {(event.metadata as any).reason}
+                          </p>
+                        )}
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {new Date(event.timestamp).toLocaleString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                            hour12: true,
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

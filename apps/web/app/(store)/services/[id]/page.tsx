@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useService, useCreateBooking } from "@timeo/api-client";
+import { useService, useCreateBooking, useAvailableSlots } from "@timeo/api-client";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
 import { formatPrice } from "@timeo/shared";
 import {
@@ -28,6 +28,15 @@ import {
   Loader2,
 } from "lucide-react";
 
+function formatSlotTime(isoString: string): string {
+  const date = new Date(isoString);
+  return date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 export default function ServiceDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -40,15 +49,30 @@ export default function ServiceDetailPage() {
   const { mutateAsync: createBooking } = useCreateBooking(activeTenantId ?? "");
 
   const [selectedDate, setSelectedDate] = useState("");
-  const [selectedTime, setSelectedTime] = useState("");
+  const [selectedSlot, setSelectedSlot] = useState<{
+    startTime: string;
+    endTime: string;
+  } | null>(null);
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { data: availableSlots, isLoading: slotsLoading } = useAvailableSlots(
+    activeTenantId,
+    serviceId,
+    selectedDate || null,
+  );
+
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedDate(e.target.value);
+    setSelectedSlot(null);
+    setError(null);
+  };
+
   const handleBooking = async () => {
-    if (!selectedDate || !selectedTime) {
-      setError("Please select a date and time.");
+    if (!selectedDate || !selectedSlot) {
+      setError("Please select a date and time slot.");
       return;
     }
     if (!activeTenantId) {
@@ -60,25 +84,9 @@ export default function ServiceDetailPage() {
     setIsSubmitting(true);
 
     try {
-      const dateTimeStr = `${selectedDate}T${selectedTime}:00`;
-      const startTimeMs = new Date(dateTimeStr).getTime();
-      const startTime = new Date(dateTimeStr).toISOString();
-
-      if (isNaN(startTimeMs)) {
-        setError("Invalid date or time selected.");
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (startTimeMs < Date.now()) {
-        setError("Please select a future date and time.");
-        setIsSubmitting(false);
-        return;
-      }
-
       await createBooking({
         serviceId,
-        startTime,
+        startTime: selectedSlot.startTime,
         notes: notes.trim() || undefined,
       });
 
@@ -158,10 +166,15 @@ export default function ServiceDetailPage() {
                   })}
                 </span>
               </div>
-              <div className="mt-2 flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span>{selectedTime}</span>
-              </div>
+              {selectedSlot && (
+                <div className="mt-2 flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span>
+                    {formatSlotTime(selectedSlot.startTime)} -{" "}
+                    {formatSlotTime(selectedSlot.endTime)}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="mt-8 flex gap-3">
               <Link href="/bookings">
@@ -248,38 +261,82 @@ export default function ServiceDetailPage() {
                 </div>
               )}
 
+              {/* Step 1: Date */}
               <div className="space-y-2">
                 <label
                   htmlFor="booking-date"
                   className="text-sm font-medium leading-none"
                 >
-                  Date
+                  1. Select a date
                 </label>
                 <Input
                   id="booking-date"
                   type="date"
                   min={today}
                   value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
+                  onChange={handleDateChange}
                   disabled={!isSignedIn}
                 />
               </div>
 
-              <div className="space-y-2">
-                <label
-                  htmlFor="booking-time"
-                  className="text-sm font-medium leading-none"
-                >
-                  Time
-                </label>
-                <Input
-                  id="booking-time"
-                  type="time"
-                  value={selectedTime}
-                  onChange={(e) => setSelectedTime(e.target.value)}
-                  disabled={!isSignedIn}
-                />
-              </div>
+              {/* Step 2: Time slot selection */}
+              {selectedDate && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">
+                    2. Pick a time
+                  </label>
+                  {slotsLoading ? (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-3 gap-2">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                          <Skeleton key={i} className="h-10 rounded-md" />
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Loading available times...
+                      </p>
+                    </div>
+                  ) : !availableSlots?.slots || availableSlots.slots.length === 0 ? (
+                    <div className="rounded-lg border border-muted bg-muted/30 p-4 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        No available times on this date. Please try another date.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2">
+                      {availableSlots.slots.map((slot) => {
+                        const isSelected =
+                          selectedSlot?.startTime === slot.startTime;
+                        const isDisabled = slot.availableStaffCount === 0;
+                        return (
+                          <Button
+                            key={slot.startTime}
+                            type="button"
+                            variant={isSelected ? "default" : "outline"}
+                            size="sm"
+                            disabled={isDisabled}
+                            className={
+                              isDisabled
+                                ? "opacity-40 cursor-not-allowed"
+                                : isSelected
+                                  ? ""
+                                  : "hover:border-primary/50"
+                            }
+                            onClick={() =>
+                              setSelectedSlot({
+                                startTime: slot.startTime,
+                                endTime: slot.endTime,
+                              })
+                            }
+                          >
+                            {formatSlotTime(slot.startTime)}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label
@@ -311,7 +368,7 @@ export default function ServiceDetailPage() {
               <Button
                 className="w-full gap-2"
                 onClick={handleBooking}
-                disabled={!isSignedIn || isSubmitting || !selectedDate || !selectedTime}
+                disabled={!isSignedIn || isSubmitting || !selectedDate || !selectedSlot}
               >
                 {isSubmitting ? (
                   <>
@@ -329,7 +386,7 @@ export default function ServiceDetailPage() {
           </Card>
 
           {/* Booking Summary */}
-          {selectedDate && selectedTime && (
+          {selectedDate && selectedSlot && (
             <Card className="mt-4">
               <CardContent className="py-4">
                 <h3 className="text-sm font-semibold text-muted-foreground">
@@ -352,7 +409,10 @@ export default function ServiceDetailPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Time</span>
-                    <span className="font-medium">{selectedTime}</span>
+                    <span className="font-medium">
+                      {formatSlotTime(selectedSlot.startTime)} -{" "}
+                      {formatSlotTime(selectedSlot.endTime)}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Duration</span>

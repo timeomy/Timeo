@@ -43,8 +43,8 @@ export function useStaffAvailability(
       staffId ?? "",
     ),
     queryFn: () =>
-      api.get<StaffAvailability>(
-        `/api/tenants/${tenantId}/scheduling/availability/${staffId}`,
+      api.get<StaffAvailability[]>(
+        `/api/tenants/${tenantId}/scheduling/staff-availability`,
       ),
     enabled: !!tenantId && !!staffId,
   });
@@ -58,8 +58,8 @@ export function useUpdateStaffAvailability(
   return useMutation({
     mutationFn: (data: { schedule: DaySchedule[] }) =>
       api.put(
-        `/api/tenants/${tenantId}/scheduling/availability/${staffId}`,
-        data,
+        `/api/tenants/${tenantId}/scheduling/staff-availability`,
+        { ...data, staffId },
       ),
     onSuccess: () =>
       queryClient.invalidateQueries({
@@ -82,9 +82,9 @@ export function useBusinessHours(tenantId: string | null | undefined) {
 export function useUpdateBusinessHours(tenantId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { schedule?: DaySchedule[]; hours?: DaySchedule[] }) =>
+    mutationFn: (data: { hours: DaySchedule[] }) =>
       api.put(
-        `/api/tenants/${tenantId}/scheduling/business-hours`,
+        `/api/tenants/${tenantId}/scheduling/business-hours/batch`,
         data,
       ),
     onSuccess: () =>

@@ -128,11 +128,15 @@ export default function ServicesPage() {
     }
   }
 
-  async function handleToggle(serviceId: string) {
+  async function handleToggle(service: NonNullable<typeof services>[number]) {
     if (!tenantId) return;
-    setTogglingId(serviceId);
+    setTogglingId(service.id);
     try {
-      await deleteService(serviceId);
+      if (service.isActive) {
+        await deleteService(service.id);
+      } else {
+        await updateService({ id: service.id, isActive: true });
+      }
     } catch (err) {
       console.error("Failed to toggle service:", err);
     } finally {
@@ -257,7 +261,7 @@ export default function ServicesPage() {
                               : "text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300",
                           )}
                           disabled={togglingId === service.id}
-                          onClick={() => handleToggle(service.id)}
+                          onClick={() => handleToggle(service)}
                         >
                           {service.isActive ? (
                             <>

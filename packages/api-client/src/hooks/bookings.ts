@@ -139,3 +139,55 @@ export function useMarkNoShow(tenantId: string) {
       }),
   });
 }
+
+interface AvailableSlot {
+  startTime: string;
+  endTime: string;
+  availableStaffCount: number;
+}
+
+export function useAvailableSlots(
+  tenantId: string | null | undefined,
+  serviceId: string | null | undefined,
+  date: string | null | undefined,
+) {
+  return useQuery({
+    queryKey: queryKeys.bookings.available(
+      tenantId ?? "",
+      serviceId ?? "",
+      date ?? "",
+    ),
+    queryFn: () =>
+      api.get<{ slots: AvailableSlot[] }>(
+        `/api/tenants/${tenantId}/bookings/available-slots?serviceId=${serviceId}&date=${date}`,
+      ),
+    enabled: !!tenantId && !!serviceId && !!date,
+    staleTime: 60_000,
+  });
+}
+
+export interface BookingEvent {
+  id: string;
+  bookingId: string;
+  type: string;
+  actorId: string;
+  metadata: unknown;
+  timestamp: string;
+}
+
+export function useBookingEvents(
+  tenantId: string | null | undefined,
+  bookingId: string | null | undefined,
+) {
+  return useQuery({
+    queryKey: [
+      ...queryKeys.bookings.byId(tenantId ?? "", bookingId ?? ""),
+      "events",
+    ],
+    queryFn: () =>
+      api.get<BookingEvent[]>(
+        `/api/tenants/${tenantId}/bookings/${bookingId}/events`,
+      ),
+    enabled: !!tenantId && !!bookingId,
+  });
+}

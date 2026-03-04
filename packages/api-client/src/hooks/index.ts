@@ -25,7 +25,10 @@ export {
   useCancelBooking,
   useCompleteBooking,
   useMarkNoShow,
+  useAvailableSlots,
+  useBookingEvents,
 } from "./bookings";
+export type { BookingEvent } from "./bookings";
 
 export {
   useServices,

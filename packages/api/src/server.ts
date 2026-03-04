@@ -3,6 +3,8 @@ import { createApp } from "./app.js";
 import { initSocketIO } from "./realtime/socket.js";
 import { redis, redisSubscriber } from "./lib/redis.js";
 import { isConfigured as isRMConfigured } from "./services/revenue-monster.service.js";
+import { runSendBookingReminders } from "./jobs/send-booking-reminders.js";
+import { runAutoCancelNoShows } from "./jobs/auto-cancel-no-shows.js";
 
 const PORT = parseInt(process.env.PORT ?? "4000", 10);
 
@@ -69,6 +71,20 @@ async function main() {
   );
 
   initSocketIO(httpServer);
+
+  // Schedule periodic jobs (interval-based — avoids BullMQ worker complexity)
+  const ONE_HOUR = 60 * 60 * 1000;
+  setInterval(() => {
+    runSendBookingReminders().catch((err) =>
+      console.error("booking-reminders job failed:", err),
+    );
+  }, ONE_HOUR);
+  setInterval(() => {
+    runAutoCancelNoShows().catch((err) =>
+      console.error("auto-cancel-no-shows job failed:", err),
+    );
+  }, ONE_HOUR);
+  console.log("Scheduled jobs: booking-reminders (hourly), auto-cancel-no-shows (hourly)");
 }
 
 main().catch(console.error);
