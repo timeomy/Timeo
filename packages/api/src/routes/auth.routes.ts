@@ -12,11 +12,14 @@ const app = new Hono();
 // Buffering into an ArrayBuffer gives better-call a clean, seekable body.
 app.on(["GET", "POST"], "/*", async (c) => {
   const { auth } = await import("@timeo/auth/server");
-  const rawBody = await c.req.arrayBuffer();
+  const body =
+    c.req.method !== "GET" && c.req.method !== "HEAD"
+      ? await c.req.text()
+      : undefined;
   const req = new Request(c.req.raw.url, {
     method: c.req.method,
     headers: c.req.raw.headers,
-    body: rawBody.byteLength > 0 ? rawBody : undefined,
+    body,
   });
   return auth.handler(req);
 });

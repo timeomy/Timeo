@@ -7,14 +7,18 @@ type ApiResponse<T> =
 
 function getBaseUrl(): string {
   if (typeof window !== "undefined") {
-    return (
-      (globalThis as Record<string, unknown>).NEXT_PUBLIC_API_URL as string ??
+    // Mobile (Expo) — use the explicit API URL so requests go directly
+    // to the Hono server (no browser-cookie concerns on native).
+    const expoUrl =
       (globalThis as Record<string, unknown>).EXPO_PUBLIC_API_URL as string ??
-      process.env.NEXT_PUBLIC_API_URL ??
-      process.env.EXPO_PUBLIC_API_URL ??
-      "http://localhost:4000"
-    );
+      process.env.EXPO_PUBLIC_API_URL;
+    if (expoUrl) return expoUrl;
+
+    // Web (Next.js) — use same origin so session cookies are sent.
+    // Next.js rewrites forward /api/* to the Hono API server.
+    return "";
   }
+  // Server-side (SSR / API routes)
   return (
     process.env.NEXT_PUBLIC_API_URL ??
     process.env.EXPO_PUBLIC_API_URL ??

@@ -785,6 +785,9 @@ importers:
       bullmq:
         specifier: ^5.0.0
         version: 5.70.1
+      dotenv:
+        specifier: ^16.4.0
+        version: 16.4.7
       hono:
         specifier: ^4.6.0
         version: 4.12.3
@@ -960,6 +963,9 @@ importers:
       bcryptjs:
         specifier: ^2.4.3
         version: 2.4.3
+      dotenv:
+        specifier: ^16.4.0
+        version: 16.4.7
       drizzle-kit:
         specifier: ^0.30.0
         version: 0.30.6

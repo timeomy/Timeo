@@ -34,7 +34,9 @@ ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
 ENV NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN pnpm --filter @timeo/web build
+# Limit build workers to prevent CPU overload on small VPS (KVM 2)
+ENV NODE_OPTIONS="--max-old-space-size=1024"
+RUN NEXT_BUILD_WORKERS=1 pnpm --filter @timeo/web build
 
 # ─── Runner ──────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner

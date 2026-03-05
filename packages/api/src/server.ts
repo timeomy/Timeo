@@ -1,3 +1,9 @@
+import { config } from "dotenv";
+import { resolve } from "path";
+
+// Load .env from monorepo root (three levels up from packages/api/src/)
+config({ path: resolve(__dirname, "../../..", ".env") });
+
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
 import { initSocketIO } from "./realtime/socket.js";

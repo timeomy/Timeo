@@ -45,6 +45,7 @@ import {
   Store,
   FileText,
   BarChart3,
+  Shield,
 } from "lucide-react";
 
 type SidebarLink = {
@@ -213,6 +214,22 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           );
         })}
       </nav>
+
+      <Separator className="bg-white/[0.06]" />
+
+      {/* Platform C2 Link (platform_admin only) */}
+      {activeRole === "platform_admin" && (
+        <div className="p-3">
+          <Link
+            href="/admin"
+            onClick={onNavigate}
+            className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm font-medium text-primary transition-all hover:bg-primary/10"
+          >
+            <Shield className="h-4 w-4" />
+            C2 Control Center
+          </Link>
+        </div>
+      )}
 
       <Separator className="bg-white/[0.06]" />
 

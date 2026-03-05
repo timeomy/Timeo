@@ -1,7 +1,9 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { db } from "@timeo/db";
-import { users, tenantMemberships, session } from "@timeo/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { users, tenantMemberships, session, account } from "@timeo/db/schema";
+import { eq, and, desc, sql } from "drizzle-orm";
+import { hashPassword } from "better-auth/crypto";
 import { authMiddleware } from "../../middleware/auth.js";
 import { requirePlatformAdmin } from "../../middleware/rbac.js";
 import { success, error } from "../../lib/response.js";
@@ -133,6 +135,175 @@ app.delete(
     );
 
     return c.json(success({ message: "All sessions revoked" }));
+  },
+);
+
+// PATCH /users/:id/activate — reactivate a deactivated user
+app.patch(
+  "/:id/activate",
+  authMiddleware,
+  requirePlatformAdmin,
+  async (c) => {
+    const actor = c.get("user");
+    const id = c.req.param("id");
+    const ip = getClientIp(c.req.raw.headers);
+
+    const [userRow] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+
+    if (!userRow) {
+      return c.json(error("NOT_FOUND", "User not found"), 404);
+    }
+
+    // Reactivate all memberships
+    await db
+      .update(tenantMemberships)
+      .set({ status: "active" })
+      .where(eq(tenantMemberships.user_id, id));
+
+    await insertAudit(
+      actor.id,
+      "platform_admin",
+      "user.activated",
+      "user",
+      id,
+      { email: userRow.email },
+      ip,
+    );
+
+    return c.json(success({ message: "User activated" }));
+  },
+);
+
+// PATCH /users/:id/memberships/:membershipId/role — change a user's role for a specific tenant
+const changeRoleSchema = z.object({
+  role: z.enum(["platform_admin", "admin", "staff", "customer"]),
+});
+
+app.patch(
+  "/:id/memberships/:membershipId/role",
+  authMiddleware,
+  requirePlatformAdmin,
+  async (c) => {
+    const actor = c.get("user");
+    const id = c.req.param("id");
+    const membershipId = c.req.param("membershipId");
+    const ip = getClientIp(c.req.raw.headers);
+
+    const body = await c.req.json();
+    const parsed = changeRoleSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return c.json(
+        error("VALIDATION_ERROR", "Invalid role. Must be one of: platform_admin, admin, staff, customer"),
+        400,
+      );
+    }
+
+    const { role: newRole } = parsed.data;
+
+    const [userRow] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+
+    if (!userRow) {
+      return c.json(error("NOT_FOUND", "User not found"), 404);
+    }
+
+    const [membership] = await db
+      .select()
+      .from(tenantMemberships)
+      .where(
+        and(
+          eq(tenantMemberships.id, membershipId),
+          eq(tenantMemberships.user_id, id),
+        ),
+      )
+      .limit(1);
+
+    if (!membership) {
+      return c.json(error("NOT_FOUND", "Membership not found"), 404);
+    }
+
+    const oldRole = membership.role;
+
+    await db
+      .update(tenantMemberships)
+      .set({ role: newRole })
+      .where(eq(tenantMemberships.id, membershipId));
+
+    await insertAudit(
+      actor.id,
+      "platform_admin",
+      "user.role_changed",
+      "user",
+      id,
+      { email: userRow.email, membershipId, oldRole, newRole },
+      ip,
+    );
+
+    return c.json(success({ message: "Role updated" }));
+  },
+);
+
+// POST /users/:id/reset-password — admin reset a user's password
+app.post(
+  "/:id/reset-password",
+  authMiddleware,
+  requirePlatformAdmin,
+  async (c) => {
+    const actor = c.get("user");
+    const id = c.req.param("id");
+    const ip = getClientIp(c.req.raw.headers);
+
+    const [userRow] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+
+    if (!userRow || !userRow.auth_id) {
+      return c.json(error("NOT_FOUND", "User not found"), 404);
+    }
+
+    // Use admin-provided password or generate a random one
+    const body = await c.req.json().catch(() => ({}));
+    const newPassword =
+      typeof body.newPassword === "string" && body.newPassword.length >= 8
+        ? body.newPassword
+        : crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+    const hashedPassword = await hashPassword(newPassword);
+
+    // Update the credential account's password
+    await db
+      .update(account)
+      .set({ password: hashedPassword })
+      .where(
+        and(
+          eq(account.userId, userRow.auth_id),
+          eq(account.providerId, "credential"),
+        ),
+      );
+
+    // Force logout — delete all sessions for this user
+    await db.delete(session).where(eq(session.userId, userRow.auth_id));
+
+    await insertAudit(
+      actor.id,
+      "platform_admin",
+      "user.password_reset",
+      "user",
+      id,
+      { email: userRow.email },
+      ip,
+    );
+
+    return c.json(success({ temporaryPassword: newPassword }));
   },
 );
 

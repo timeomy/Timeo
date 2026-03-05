@@ -319,6 +319,55 @@ export function useForceLogoutPlatformUser() {
   });
 }
 
+export function useActivatePlatformUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) =>
+      api.patch<{ message: string }>(`/api/platform/users/${userId}/activate`),
+    onSuccess: (_data, userId) => {
+      qc.invalidateQueries({ queryKey: queryKeys.platform.user(userId) });
+      qc.invalidateQueries({ queryKey: queryKeys.platform.users() });
+    },
+  });
+}
+
+export function useChangePlatformUserRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      userId,
+      membershipId,
+      role,
+    }: {
+      userId: string;
+      membershipId: string;
+      role: string;
+    }) =>
+      api.patch<{ message: string }>(
+        `/api/platform/users/${userId}/memberships/${membershipId}/role`,
+        { role },
+      ),
+    onSuccess: (_data, { userId }) => {
+      qc.invalidateQueries({ queryKey: queryKeys.platform.user(userId) });
+      qc.invalidateQueries({ queryKey: queryKeys.platform.users() });
+    },
+  });
+}
+
+export function useResetPlatformUserPassword() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, newPassword }: { userId: string; newPassword?: string }) =>
+      api.post<{ temporaryPassword: string }>(
+        `/api/platform/users/${userId}/reset-password`,
+        newPassword ? { newPassword } : undefined,
+      ),
+    onSuccess: (_data, { userId }) => {
+      qc.invalidateQueries({ queryKey: queryKeys.platform.user(userId) });
+    },
+  });
+}
+
 // ─── MODULE 3: Plans ─────────────────────────────────────────────────────────
 
 export function usePlatformPlans() {

@@ -26,6 +26,7 @@
     "@timeo/config-ts": "workspace:*",
     "@types/bcryptjs": "^2.4.6",
     "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.0",
     "drizzle-kit": "^0.30.0",
     "tsx": "^4.0.0",
     "typescript": "^5.3.3"

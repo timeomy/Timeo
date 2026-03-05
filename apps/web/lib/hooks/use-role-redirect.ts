@@ -1,12 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import { useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
 import type { TimeoRole } from "@timeo/auth/web";
 
-export function getRoleHomePath(role: TimeoRole, hasTenant: boolean): string {
-  if (role === "platform_admin" && !hasTenant) return "/platform";
+export function getRoleHomePath(role: TimeoRole, _hasTenant: boolean): string {
+  if (role === "platform_admin") return "/admin";
   if (role === "customer") return "/portal";
   return "/dashboard";
 }

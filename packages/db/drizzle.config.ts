@@ -1,4 +1,9 @@
+import { config } from "dotenv";
+import { resolve } from "path";
 import type { Config } from "drizzle-kit";
+
+// Load .env from monorepo root (two levels up from packages/db/)
+config({ path: resolve(import.meta.dirname ?? __dirname, "../..", ".env") });
 
 export default {
   schema: "./src/schema/index.ts",

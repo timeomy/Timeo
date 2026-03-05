@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTenant, useUpdateTenantSettings, useUpdateTenantBranding } from "@timeo/api-client";
+import { authClient } from "@timeo/auth/web";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import {
   Card,
@@ -27,6 +28,8 @@ import {
   Loader2,
   CheckCircle2,
   Image,
+  Shield,
+  AlertCircle,
 } from "lucide-react";
 
 const PLAN_BADGE_VARIANTS: Record<string, string> = {
@@ -41,6 +44,133 @@ const STATUS_BADGE_VARIANTS: Record<string, string> = {
   trial: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   suspended: "bg-red-500/20 text-red-400 border-red-500/30",
 };
+
+function PasswordChangeCard() {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
+
+  const passwordsMatch = newPassword === confirmPassword;
+  const isValid =
+    currentPassword.length > 0 &&
+    newPassword.length >= 8 &&
+    passwordsMatch;
+
+  async function handleChangePassword() {
+    if (!isValid) return;
+    setSaving(true);
+    setError("");
+    setSuccess(false);
+    try {
+      const res = await authClient.changePassword({
+        currentPassword,
+        newPassword,
+      });
+      if (res.error) {
+        setError(res.error.message || "Failed to change password.");
+        return;
+      }
+      setSuccess(true);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setTimeout(() => setSuccess(false), 5000);
+    } catch {
+      setError("An unexpected error occurred.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="glass-card">
+      <CardHeader>
+        <CardTitle className="text-lg">Change Password</CardTitle>
+        <CardDescription>
+          Update your account password. Use a strong password with at least 8
+          characters.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Current Password</label>
+          <Input
+            type="password"
+            value={currentPassword}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              setCurrentPassword(e.target.value)
+            }
+            placeholder="Enter current password"
+          />
+        </div>
+
+        <Separator className="bg-white/[0.06]" />
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium">New Password</label>
+          <Input
+            type="password"
+            value={newPassword}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              setNewPassword(e.target.value)
+            }
+            placeholder="Enter new password (min 8 characters)"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Confirm New Password</label>
+          <Input
+            type="password"
+            value={confirmPassword}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              setConfirmPassword(e.target.value)
+            }
+            placeholder="Confirm new password"
+          />
+          {confirmPassword && !passwordsMatch && (
+            <p className="flex items-center gap-1 text-xs text-red-400">
+              <AlertCircle className="h-3 w-3" />
+              Passwords do not match
+            </p>
+          )}
+        </div>
+
+        {error && (
+          <div className="flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {error}
+          </div>
+        )}
+      </CardContent>
+      <CardFooter className="flex items-center justify-between border-t border-white/[0.06] px-6 py-4">
+        {success ? (
+          <div className="flex items-center gap-2 text-sm text-emerald-400">
+            <CheckCircle2 className="h-4 w-4" />
+            Password changed successfully
+          </div>
+        ) : (
+          <div />
+        )}
+        <Button
+          onClick={handleChangePassword}
+          disabled={saving || !isValid}
+          className="gap-2"
+        >
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Shield className="h-4 w-4" />
+          )}
+          {saving ? "Changing..." : "Change Password"}
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
 
 export default function SettingsPage() {
   const { tenantId } = useTenantId();
@@ -128,6 +258,10 @@ export default function SettingsPage() {
           <TabsTrigger value="branding" className="gap-2">
             <Palette className="h-4 w-4" />
             Branding
+          </TabsTrigger>
+          <TabsTrigger value="security" className="gap-2">
+            <Shield className="h-4 w-4" />
+            Security
           </TabsTrigger>
         </TabsList>
 
@@ -244,6 +378,11 @@ export default function SettingsPage() {
               </CardFooter>
             )}
           </Card>
+        </TabsContent>
+
+        {/* Security Tab */}
+        <TabsContent value="security" className="space-y-6">
+          <PasswordChangeCard />
         </TabsContent>
 
         {/* Branding Tab */}

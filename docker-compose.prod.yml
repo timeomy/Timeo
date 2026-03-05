@@ -61,6 +61,7 @@ services:
       - timeo-net
 
   api:
+    image: ghcr.io/timeomy/timeo-api:latest
     build:
       context: .
       dockerfile: infra/api/Dockerfile
@@ -101,6 +102,7 @@ services:
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
 
   web:
+    image: ghcr.io/timeomy/timeo-web:latest
     build:
       context: .
       dockerfile: infra/web/Dockerfile

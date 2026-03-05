@@ -191,7 +191,10 @@ export {
   usePlatformUsers,
   usePlatformUser,
   useDeactivatePlatformUser,
+  useActivatePlatformUser,
   useForceLogoutPlatformUser,
+  useChangePlatformUserRole,
+  useResetPlatformUserPassword,
   // Module 3: Plans
   usePlatformPlans,
   useCreatePlatformPlan,
