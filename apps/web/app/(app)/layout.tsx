@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -277,21 +277,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Not signed in
-  if (!isSignedIn) {
-    router.push("/sign-in");
-    return null;
-  }
+  useEffect(() => {
+    if (!isLoaded || tenantsLoading) return;
+    if (!isSignedIn) { router.replace("/sign-in"); return; }
+    if (tenants.length === 0) { router.replace("/portal"); return; }
+    if (activeRole === "customer") { router.replace("/portal"); }
+  }, [isLoaded, tenantsLoading, isSignedIn, tenants, activeRole, router]);
 
-  // No tenants — redirect to portal
-  if (tenants.length === 0) {
-    router.push("/portal");
-    return null;
-  }
-
-  // Customers should use the portal, not the admin dashboard
-  if (activeRole === "customer") {
-    router.push("/portal");
+  if (!isSignedIn || tenants.length === 0 || activeRole === "customer") {
     return null;
   }
 

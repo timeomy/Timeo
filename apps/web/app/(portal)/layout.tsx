@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -64,6 +64,25 @@ export default function PortalLayout({
 
   const displayName = user?.name || user?.email || "User";
 
+  // Redirect logic in useEffect to avoid infinite re-render loops
+  useEffect(() => {
+    if (!isLoaded || tenantsLoading) return;
+
+    if (!isSignedIn) {
+      router.replace("/sign-in");
+      return;
+    }
+
+    if (tenants.length === 0) {
+      router.replace("/onboarding");
+      return;
+    }
+
+    if (activeRole !== "customer") {
+      router.replace("/dashboard");
+    }
+  }, [isLoaded, tenantsLoading, isSignedIn, tenants, activeRole, router]);
+
   // Loading state
   if (!isLoaded || tenantsLoading) {
     return (
@@ -80,21 +99,8 @@ export default function PortalLayout({
     );
   }
 
-  // Not signed in
-  if (!isSignedIn) {
-    router.push("/sign-in");
-    return null;
-  }
-
-  // No tenant memberships — redirect to onboarding
-  if (tenants.length === 0) {
-    router.push("/onboarding");
-    return null;
-  }
-
-  // Role guard: non-customers should go to dashboard
-  if (activeRole !== "customer") {
-    router.push("/dashboard");
+  // Show loading while redirecting
+  if (!isSignedIn || tenants.length === 0 || activeRole !== "customer") {
     return null;
   }
 

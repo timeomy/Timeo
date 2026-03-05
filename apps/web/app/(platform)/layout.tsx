@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
@@ -186,13 +186,13 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
     );
   }
 
-  if (!isSignedIn) {
-    router.push("/sign-in");
-    return null;
-  }
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!isSignedIn) { router.replace("/sign-in"); return; }
+    if (activeRole !== "platform_admin") { router.replace("/dashboard"); }
+  }, [isLoaded, isSignedIn, activeRole, router]);
 
-  if (activeRole !== "platform_admin") {
-    router.push("/dashboard");
+  if (!isSignedIn || activeRole !== "platform_admin") {
     return null;
   }
 
