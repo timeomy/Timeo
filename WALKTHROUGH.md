@@ -745,7 +745,7 @@ You now have these 4 values:
 | **SMTP Server** | `smtp-relay.brevo.com` |
 | **Port** | `587` |
 | **Login** | Your Brevo account email (e.g. `jabez@oxloz.com`) |
-| **SMTP Key** | The key you just generated (e.g. `xsmtpsib-abc123...`) |
+| **SMTP Key** | The key you just generated (starts with `xsmtpsib-...`) |
 
 **Important:** The SMTP key is NOT the same as an API key. Make sure you're on the **SMTP Keys** tab, not the API Keys tab.
 
@@ -761,8 +761,8 @@ Add or update these lines:
 ```env
 SMTP_HOST=smtp-relay.brevo.com
 SMTP_PORT=587
-SMTP_USER=jabez@oxloz.com
-SMTP_PASS=xsmtpsib-your-smtp-key-here
+SMTP_USER=<your-brevo-login-email>
+SMTP_PASS=<your-brevo-smtp-key>
 EMAIL_FROM=noreply@timeo.my
 ```
 
@@ -804,8 +804,8 @@ Find the email section (around the bottom) and fill in the same values:
 ```env
 SMTP_HOST=smtp-relay.brevo.com
 SMTP_PORT=587
-SMTP_USER=jabez@oxloz.com
-SMTP_PASS=xsmtpsib-your-smtp-key-here
+SMTP_USER=<your-brevo-login-email>
+SMTP_PASS=<your-brevo-smtp-key>
 EMAIL_FROM=noreply@timeo.my
 ```
 
