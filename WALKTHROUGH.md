@@ -636,22 +636,162 @@ docker compose -f docker-compose.prod.yml up -d --build api web
 
 ---
 
-## Phase 6: Email Setup
+## Phase 6: Email Setup (Brevo SMTP)
+
+> Brevo (formerly Sendinblue) is a free email service — 300 emails/day on the free tier.
+> Timeo uses it for: email verification, password reset, and transactional notifications.
+
+### What's Already Coded [DONE]
+
+- Nodemailer integration in `packages/auth/src/email.ts`
+- Better Auth hooks for verification & password reset emails
+- Email templates manageable from C2 → `/admin/communications`
+- Dev mode fallback: prints verification links to API terminal when SMTP is not configured
 
 ### Step 27 — Create a Brevo Account [YOU / BROWSER]
 
-1. Go to https://app.brevo.com and sign up (free tier = 300 emails/day)
-2. Verify your email address
-3. Go to **Settings** (gear icon, bottom-left) → **SMTP & API** → **SMTP** tab
-4. Note these values:
-   - **SMTP Server:** `smtp-relay.brevo.com`
-   - **Port:** `587`
-   - **Login:** (your Brevo login email)
-   - **Password:** (your SMTP key — click "Generate" if needed)
+1. Go to https://app.brevo.com
+2. Click **Sign Up Free**
+3. Fill in:
+   - Email: your email (e.g. `jabez@oxloz.com`)
+   - Password: choose a strong password
+   - Company: `Timeo` (or your company name)
+4. Click **Create an account**
+5. Check your inbox for Brevo's confirmation email → click the link to verify
+6. Complete the onboarding questionnaire:
+   - Company name, industry, team size (doesn't matter much — pick anything)
+   - Select "Transactional emails" when asked what you want to use Brevo for
 
-### Step 28 — Add SMTP Credentials to Production [YOU / VPS]
+### Step 28 — Authenticate Your Domain [YOU / BROWSER — Brevo + DNS Registrar]
 
-SSH into the VPS and edit the .env file:
+This step makes emails come from `noreply@timeo.my` instead of `@brevosend.com`. **Without this, Gmail and Yahoo will likely flag your emails as spam.**
+
+**In Brevo (BROWSER):**
+
+1. Click your name (top-right) → **Settings**
+2. In the left sidebar, find **Senders, Domains & Dedicated IPs** → click **Domains**
+3. Click **Add a domain**
+4. Enter: `timeo.my`
+5. Click **Authenticate this domain**
+6. Brevo shows you **DNS records** to add. You'll see something like:
+
+| Record # | Type | Name | Value |
+|----------|------|------|-------|
+| 1 | TXT | `mail._domainkey.timeo.my` | `v=DKIM1; k=rsa; p=MIGfMA0GCS...` (long string) |
+| 2 | TXT | `timeo.my` | `v=spf1 include:sendinblue.com ~all` |
+| 3 | TXT | `_dmarc.timeo.my` | `v=DMARC1; p=none` |
+
+**Keep this Brevo page open** — you'll come back to verify after adding the DNS records.
+
+**In your DNS registrar (BROWSER — Namecheap / Cloudflare / GoDaddy):**
+
+7. Log into wherever you manage `timeo.my` DNS
+8. Add each DNS record exactly as Brevo shows:
+
+**If using Namecheap:**
+- Domain List → Manage → Advanced DNS → Add New Record
+- Type: TXT Record
+- Host: `mail._domainkey` (Namecheap auto-appends `.timeo.my`)
+- Value: paste the DKIM value from Brevo
+- TTL: Automatic
+- Repeat for the SPF and DMARC records
+
+**If using Cloudflare:**
+- DNS → Records → Add Record
+- Type: TXT
+- Name: `mail._domainkey`
+- Content: paste the DKIM value
+- Proxy: DNS only (gray cloud)
+- Repeat for SPF and DMARC
+
+**If using GoDaddy:**
+- My Domains → DNS → Add Record
+- Type: TXT
+- Name: `mail._domainkey`
+- Value: paste the DKIM value
+- Repeat for SPF and DMARC
+
+9. **Go back to Brevo** and click **Verify** / **Check DNS Records**
+   - DNS propagation can take 5-30 minutes
+   - If it says "Not verified", wait 10 minutes and try again
+   - Once verified, you'll see green checkmarks next to each record
+
+**Verify from your Mac terminal (LOCAL):**
+
+```bash
+# Check DKIM record
+dig +short TXT mail._domainkey.timeo.my
+# Should return a long string starting with "v=DKIM1; k=rsa; p=..."
+
+# Check SPF record
+dig +short TXT timeo.my | grep spf
+# Should include "include:sendinblue.com"
+```
+
+### Step 29 — Generate Your SMTP Key [YOU / BROWSER — Brevo]
+
+1. In Brevo → click your name (top-right) → **Settings**
+2. In the left sidebar → **SMTP & API**
+3. Click the **SMTP Keys** tab (not API Keys — they're different!)
+4. Click **Generate a new SMTP key**
+5. Name: `timeo-production`
+6. Click **Generate**
+7. **Copy the SMTP key immediately** — you won't be able to see it again after closing the dialog
+
+You now have these 4 values:
+
+| Field | Value |
+|-------|-------|
+| **SMTP Server** | `smtp-relay.brevo.com` |
+| **Port** | `587` |
+| **Login** | Your Brevo account email (e.g. `jabez@oxloz.com`) |
+| **SMTP Key** | The key you just generated (e.g. `xsmtpsib-abc123...`) |
+
+**Important:** The SMTP key is NOT the same as an API key. Make sure you're on the **SMTP Keys** tab, not the API Keys tab.
+
+### Step 30 — Add SMTP to Local Dev [YOU / LOCAL]
+
+```bash
+cd ~/Timeo
+nano .env
+```
+
+Add or update these lines:
+
+```env
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USER=jabez@oxloz.com
+SMTP_PASS=xsmtpsib-your-smtp-key-here
+EMAIL_FROM=noreply@timeo.my
+```
+
+Save (`Ctrl+O`, `Enter`, `Ctrl+X`).
+
+Restart the API server (in the terminal where it's running, press `Ctrl+C`, then):
+
+```bash
+pnpm --filter @timeo/api dev
+```
+
+### Step 31 — Test Email Locally [YOU / BROWSER]
+
+1. Go to http://localhost:3000/sign-up
+2. Sign up with a **real email address** you can check (different from your existing account)
+3. Check your inbox — you should receive an email from `noreply@timeo.my` with a verification link
+4. Click the link to verify your email
+
+**If the email doesn't arrive:**
+
+| Problem | Fix |
+|---------|-----|
+| Check spam/junk folder | Gmail sometimes flags new sender domains |
+| `EAUTH` error in API terminal | SMTP key is wrong — regenerate in Brevo |
+| `ESOCKET` or `ECONNREFUSED` | Firewall blocking port 587 — try port 465 with `SMTP_PORT=465` |
+| Email arrives from `@brevosend.com` | Domain not verified — go back to Step 28 |
+| No error, no email | Check Brevo dashboard → Transactional → Logs to see if it was sent |
+
+### Step 32 — Add SMTP to Production [YOU / VPS]
 
 ```bash
 ssh root@YOUR_VPS_IP
@@ -659,13 +799,13 @@ cd /opt/timeo
 nano .env
 ```
 
-Find the email section and fill in your Brevo credentials:
+Find the email section (around the bottom) and fill in the same values:
 
 ```env
 SMTP_HOST=smtp-relay.brevo.com
 SMTP_PORT=587
-SMTP_USER=your-brevo-login@example.com
-SMTP_PASS=your-brevo-smtp-key-here
+SMTP_USER=jabez@oxloz.com
+SMTP_PASS=xsmtpsib-your-smtp-key-here
 EMAIL_FROM=noreply@timeo.my
 ```
 
@@ -675,16 +815,11 @@ Save (`Ctrl+O`, `Enter`, `Ctrl+X`), then restart the API:
 docker compose -f docker-compose.prod.yml up -d api
 ```
 
-**What's already coded [DONE]:**
-- Nodemailer integration in `packages/api/src/lib/email.ts`
-- Better Auth hooks for verification & password reset emails
-- Email templates manageable from C2 → `/admin/communications`
-
-### Step 29 — Verify Email Sending [YOU / BROWSER]
+### Step 33 — Verify Production Email [YOU / BROWSER]
 
 1. Go to https://timeo.my/sign-up
-2. Create a new test account with a real email
-3. Check your inbox — you should receive a verification email from `noreply@timeo.my`
+2. Sign up with a real email
+3. Check your inbox for the verification email from `noreply@timeo.my`
 4. If no email arrives, check the API logs:
 
 ```bash
@@ -692,11 +827,13 @@ docker compose -f docker-compose.prod.yml up -d api
 docker compose -f docker-compose.prod.yml logs api | grep -i "email\|smtp\|mail" | tail -20
 ```
 
+5. You can also check **Brevo dashboard** → **Transactional** → **Logs** to see all sent emails, delivery status, and bounce reasons
+
 ---
 
 ## Phase 7: Payment Gateway
 
-### Step 30 — Revenue Monster Setup (Malaysia) [YOU / BROWSER + VPS]
+### Step 34 — Revenue Monster Setup (Malaysia) [YOU / BROWSER + VPS]
 
 **BROWSER:**
 
@@ -740,7 +877,7 @@ Restart the API:
 docker compose -f docker-compose.prod.yml up -d api
 ```
 
-### Step 31 — Stripe Setup (Optional — International Payments) [YOU / BROWSER + VPS]
+### Step 35 — Stripe Setup (Optional — International Payments) [YOU / BROWSER + VPS]
 
 **BROWSER:**
 
@@ -803,7 +940,7 @@ docker compose -f docker-compose.prod.yml up -d --build web
 | Timeo Customer | `my.timeo.app` | `apps/customer` | End customers |
 | Timeo Platform | `my.timeo.platform` | `apps/platform` | Platform admins (you) |
 
-### Step 32 — Log In to Expo & EAS [YOU / LOCAL]
+### Step 36 — Log In to Expo & EAS [YOU / LOCAL]
 
 ```bash
 # Log in to your Expo account
@@ -814,7 +951,7 @@ eas login
 eas whoami
 ```
 
-### Step 33 — Build Android APKs [YOU / LOCAL]
+### Step 37 — Build Android APKs [YOU / LOCAL]
 
 Run from the Timeo root folder on your Mac:
 
@@ -841,7 +978,7 @@ cd ../..
 
 **What happens:** Each command uploads your code to Expo's build servers. They compile the Android app and produce an `.aab` (Android App Bundle) file. Track progress at https://expo.dev.
 
-### Step 34 — Create Google Play Listings [YOU / BROWSER]
+### Step 38 — Create Google Play Listings [YOU / BROWSER]
 
 1. **Google Play Console** — https://play.google.com/console
    - Sign up if you haven't ($25 one-time developer fee)
@@ -857,7 +994,7 @@ cd ../..
    - Save the JSON file as `google-service-account.json`
    - In Play Console → Settings → API Access → Link the service account
 
-### Step 35 — Submit to Google Play [YOU / LOCAL]
+### Step 39 — Submit to Google Play [YOU / LOCAL]
 
 ```bash
 # Submit each built app to Google Play internal testing track
@@ -880,7 +1017,7 @@ cd ../..
 
 Or manually: download the `.aab` from https://expo.dev → upload in Play Console → submit for review.
 
-### Step 36 — Build iOS Apps [YOU / LOCAL]
+### Step 40 — Build iOS Apps [YOU / LOCAL]
 
 ```bash
 cd apps/admin
@@ -902,7 +1039,7 @@ cd ../..
 
 **First iOS build:** EAS will ask for your Apple ID. It automatically manages certificates and provisioning profiles. You need an Apple Developer account ($99/year) — sign up at https://developer.apple.com.
 
-### Step 37 — Submit to App Store [YOU / BROWSER + LOCAL]
+### Step 41 — Submit to App Store [YOU / BROWSER + LOCAL]
 
 **BROWSER — Create App Store listings:**
 
@@ -948,7 +1085,7 @@ cd ../..
 
 Apple review takes 24-48 hours.
 
-### Step 38 — OTA Updates (After Initial Publish) [YOU / LOCAL]
+### Step 42 — OTA Updates (After Initial Publish) [YOU / LOCAL]
 
 For JavaScript-only changes (no native module changes), push updates without store review:
 
@@ -964,7 +1101,7 @@ Users get the update on next app launch. No store review needed.
 
 ## Phase 9: Database Backups
 
-### Step 39 — Set Up Daily Automated Backups [YOU / VPS]
+### Step 43 — Set Up Daily Automated Backups [YOU / VPS]
 
 ```bash
 ssh root@YOUR_VPS_IP
@@ -1000,7 +1137,7 @@ Save and exit. This runs a backup every day at 2:00 AM server time.
 crontab -l
 ```
 
-### Step 40 — How to Restore from Backup [REFERENCE / VPS]
+### Step 44 — How to Restore from Backup [REFERENCE / VPS]
 
 If you ever need to restore:
 
