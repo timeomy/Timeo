@@ -19,6 +19,7 @@ FROM base AS builder
 COPY --from=deps /app/ ./
 COPY apps/ ./apps/
 COPY packages/ ./packages/
+COPY scripts/ ./scripts/
 COPY turbo.json ./
 
 # Build-time env vars (baked into the Next.js bundle)
