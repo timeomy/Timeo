@@ -38,7 +38,12 @@ export interface SendMailOptions {
  */
 export async function sendMail({ to, subject, html }: SendMailOptions): Promise<void> {
   if (!isSmtpConfigured()) {
-    console.log(`[dev] Email to ${to} — ${subject}\n  (set SMTP_HOST/SMTP_USER/SMTP_PASS to send for real)`);
+    // Extract the first URL from the HTML so devs can click it in the terminal
+    const urlMatch = html.match(/href="([^"]+)"/);
+    const url = urlMatch ? urlMatch[1] : null;
+    console.log(`[dev] Email to ${to} — ${subject}`);
+    if (url) console.log(`[dev] Link: ${url}`);
+    console.log(`  (set SMTP_HOST/SMTP_USER/SMTP_PASS to send for real)`);
     return;
   }
 
