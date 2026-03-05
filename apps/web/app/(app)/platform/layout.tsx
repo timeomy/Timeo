@@ -158,6 +158,12 @@ export default function PlatformLayout({
   useEnsureUser(!!isSignedIn);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!isSignedIn) { router.replace("/sign-in"); return; }
+    if (!isRoleAtLeast(activeRole, "platform_admin")) { router.replace("/dashboard"); }
+  }, [isLoaded, isSignedIn, activeRole, router]);
+
   if (!isLoaded) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -172,12 +178,6 @@ export default function PlatformLayout({
       </div>
     );
   }
-
-  useEffect(() => {
-    if (!isLoaded) return;
-    if (!isSignedIn) { router.replace("/sign-in"); return; }
-    if (!isRoleAtLeast(activeRole, "platform_admin")) { router.replace("/dashboard"); }
-  }, [isLoaded, isSignedIn, activeRole, router]);
 
   if (!isSignedIn || !isRoleAtLeast(activeRole, "platform_admin")) {
     return null;

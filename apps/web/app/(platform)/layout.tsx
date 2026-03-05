@@ -171,6 +171,12 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
   useEnsureUser(!!isSignedIn);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!isSignedIn) { router.replace("/sign-in"); return; }
+    if (activeRole !== "platform_admin") { router.replace("/dashboard"); }
+  }, [isLoaded, isSignedIn, activeRole, router]);
+
   if (!isLoaded) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -185,12 +191,6 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
       </div>
     );
   }
-
-  useEffect(() => {
-    if (!isLoaded) return;
-    if (!isSignedIn) { router.replace("/sign-in"); return; }
-    if (activeRole !== "platform_admin") { router.replace("/dashboard"); }
-  }, [isLoaded, isSignedIn, activeRole, router]);
 
   if (!isSignedIn || activeRole !== "platform_admin") {
     return null;

@@ -261,7 +261,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Loading state
+  useEffect(() => {
+    if (!isLoaded || tenantsLoading) return;
+    if (!isSignedIn) { router.replace("/sign-in"); return; }
+    if (tenants.length === 0) { router.replace("/portal"); return; }
+    if (activeRole === "customer") { router.replace("/portal"); }
+  }, [isLoaded, tenantsLoading, isSignedIn, tenants, activeRole, router]);
+
   if (!isLoaded || tenantsLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -276,13 +282,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-
-  useEffect(() => {
-    if (!isLoaded || tenantsLoading) return;
-    if (!isSignedIn) { router.replace("/sign-in"); return; }
-    if (tenants.length === 0) { router.replace("/portal"); return; }
-    if (activeRole === "customer") { router.replace("/portal"); }
-  }, [isLoaded, tenantsLoading, isSignedIn, tenants, activeRole, router]);
 
   if (!isSignedIn || tenants.length === 0 || activeRole === "customer") {
     return null;
