@@ -28,6 +28,7 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 hono
 
 COPY --from=builder --chown=hono:nodejs /app/packages/api/dist ./dist
+COPY --from=builder --chown=hono:nodejs /app/packages/api/migrate.mjs ./migrate.mjs
 COPY --from=builder --chown=hono:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=hono:nodejs /app/packages/db ./packages/db
 COPY --from=builder --chown=hono:nodejs /app/packages/auth ./packages/auth
@@ -38,4 +39,5 @@ RUN echo '{"type":"module"}' > package.json
 
 USER hono
 EXPOSE 4000
-CMD ["node", "dist/server.js"]
+# Run migrations before starting the server
+CMD ["sh", "-c", "node migrate.mjs && node dist/server.js"]
