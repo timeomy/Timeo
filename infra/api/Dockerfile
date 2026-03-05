@@ -33,6 +33,9 @@ COPY --from=builder --chown=hono:nodejs /app/packages/db ./packages/db
 COPY --from=builder --chown=hono:nodejs /app/packages/auth ./packages/auth
 COPY --from=builder --chown=hono:nodejs /app/packages/shared ./packages/shared
 
+# ESM support — the bundled dist/server.js is ESM format
+RUN echo '{"type":"module"}' > package.json
+
 USER hono
 EXPOSE 4000
 CMD ["node", "dist/server.js"]
