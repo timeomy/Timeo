@@ -45,8 +45,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     typedRoutes: true,
   },
   extra: {
-    convexUrl: process.env.EXPO_PUBLIC_CONVEX_URL,
-    convexSiteUrl: process.env.EXPO_PUBLIC_CONVEX_SITE_URL,
+    apiUrl: process.env.EXPO_PUBLIC_API_URL,
     posthogKey: process.env.EXPO_PUBLIC_POSTHOG_KEY,
     posthogHost: process.env.EXPO_PUBLIC_POSTHOG_HOST,
     eas: {
