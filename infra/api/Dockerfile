@@ -32,6 +32,9 @@ RUN addgroup --system --gid 1001 nodejs && \
 
 COPY --from=builder --chown=hono:nodejs /app/packages/api/dist ./dist
 COPY --from=builder --chown=hono:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=hono:nodejs /app/packages/db ./packages/db
+COPY --from=builder --chown=hono:nodejs /app/packages/auth ./packages/auth
+COPY --from=builder --chown=hono:nodejs /app/packages/shared ./packages/shared
 
 USER hono
 EXPOSE 4000

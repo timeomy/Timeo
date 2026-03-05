@@ -115,6 +115,7 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: https://api.timeo.my
       NEXT_PUBLIC_SITE_URL: https://timeo.my
+      INTERNAL_API_URL: http://timeo-api:4000
       NODE_ENV: production
     depends_on:
       api:

@@ -28,6 +28,20 @@ const nextConfig = {
     "@timeo/notifications",
     "recharts",
   ],
+  async rewrites() {
+    // Proxy /api/* requests through Next.js to the Hono API server.
+    // Auth routes (/api/auth/*) are handled by the catch-all route handler
+    // in app/api/auth/[...all]/route.ts and take priority over rewrites.
+    // All other /api/* calls go through this rewrite so cookies (set on
+    // the web origin) are sent along automatically.
+    const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${apiUrl}/api/:path*`,
+      },
+    ];
+  },
   async headers() {
     return [
       {
