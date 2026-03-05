@@ -62,10 +62,10 @@ export const auth = betterAuth({
     },
   },
   advanced: {
-    crossSubDomainCookies: {
-      enabled: true,
-      domain: ".timeo.my",
-    },
+    crossSubDomainCookies:
+      process.env.NODE_ENV === "production"
+        ? { enabled: true, domain: ".timeo.my" }
+        : { enabled: false },
     generateId: () => {
       return crypto.randomUUID();
     },
