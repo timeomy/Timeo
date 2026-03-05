@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from "react";
-import { View, Text, Alert } from "react-native";
+import { View, Text } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTimeoAuth } from "@timeo/auth";
 import {
@@ -14,7 +14,6 @@ import {
   Switch,
   Row,
   Spacer,
-  StatCard,
   Separator,
   Modal,
   LoadingScreen,
@@ -23,8 +22,13 @@ import {
   useTheme,
 } from "@timeo/ui";
 import { getInitials } from "@timeo/shared";
-import { api } from "@timeo/api";
-import { useQuery, useMutation } from "convex/react";
+import {
+  useStaffMembers,
+  useUpdateStaffRole,
+  useRemoveStaffMember,
+  useStaffAvailability,
+  useUpdateStaffAvailability,
+} from "@timeo/api-client";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -38,7 +42,6 @@ interface DayAvailability {
 const ROLE_OPTIONS = [
   { label: "Admin", value: "admin" },
   { label: "Staff", value: "staff" },
-  { label: "Customer", value: "customer" },
 ];
 
 const ROLE_BADGE_VARIANTS: Record<string, "default" | "success" | "warning" | "error" | "info"> = {
@@ -56,24 +59,27 @@ export default function StaffDetailScreen() {
 
   const tenantId = activeTenantId as string;
 
-  const members = useQuery(
-    api.tenantMemberships.listByTenant,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
+  const { data: staffMembers, isLoading } = useStaffMembers(tenantId);
+  const { mutateAsync: updateRole } = useUpdateStaffRole(tenantId ?? "");
+  const { mutateAsync: removeMember } = useRemoveStaffMember(tenantId ?? "");
 
-  const bookings = useQuery(
-    api.bookings.listByTenant,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
+  const member = useMemo(() => {
+    if (!staffMembers) return null;
+    return staffMembers.find((m) => m.id === id) ?? null;
+  }, [staffMembers, id]);
 
-  const updateRole = useMutation(api.tenantMemberships.updateRole);
-  const suspendMember = useMutation(api.tenantMemberships.suspend);
-  const setStaffAvailabilityMutation = useMutation(api.scheduling.setStaffAvailability);
+  const staffUserId = member?.userId;
+
+  const { data: availabilityData } = useStaffAvailability(tenantId, staffUserId);
+  const { mutateAsync: updateAvailability } = useUpdateStaffAvailability(
+    tenantId ?? "",
+    staffUserId ?? ""
+  );
 
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [updatingRole, setUpdatingRole] = useState(false);
-  const [suspending, setSuspending] = useState(false);
-  const [showSuspendModal, setShowSuspendModal] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [availability, setAvailability] = useState<DayAvailability[]>([]);
   const [savingAvailability, setSavingAvailability] = useState(false);
   const [toast, setToast] = useState<{
@@ -82,35 +88,42 @@ export default function StaffDetailScreen() {
     visible: boolean;
   }>({ message: "", type: "success", visible: false });
 
-  const member = useMemo(() => {
-    if (!members) return null;
-    return members.find((m) => m._id === id) ?? null;
-  }, [members, id]);
-
-  const staffUserId = member?.userId;
-
-  const staffAvailabilityData = useQuery(
-    api.scheduling.getStaffAvailability,
-    tenantId && staffUserId
-      ? { tenantId: tenantId as any, staffId: staffUserId as any }
-      : "skip"
-  );
-
   useEffect(() => {
-    if (staffAvailabilityData && availability.length === 0) {
+    if (availabilityData && availability.length === 0) {
+      const defaultSchedule: DayAvailability[] = Array.from({ length: 7 }, (_, i) => ({
+        dayOfWeek: i,
+        startTime: "09:00",
+        endTime: "17:00",
+        isAvailable: i > 0 && i < 6, // Mon-Fri
+      }));
+
+      const schedule = (availabilityData as Array<{ schedule?: Array<{ dayOfWeek: number; isOpen: boolean; openTime?: string; closeTime?: string }> }>)[0]?.schedule;
+      if (schedule) {
+        setAvailability(
+          schedule.map((s) => ({
+            dayOfWeek: s.dayOfWeek,
+            startTime: s.openTime ?? "09:00",
+            endTime: s.closeTime ?? "17:00",
+            isAvailable: s.isOpen,
+          }))
+        );
+      } else {
+        setAvailability(defaultSchedule);
+      }
+    } else if (!availabilityData && availability.length === 0 && member) {
       setAvailability(
-        staffAvailabilityData.map((a: any) => ({
-          dayOfWeek: a.dayOfWeek,
-          startTime: a.startTime,
-          endTime: a.endTime,
-          isAvailable: a.isAvailable,
+        Array.from({ length: 7 }, (_, i) => ({
+          dayOfWeek: i,
+          startTime: "09:00",
+          endTime: "17:00",
+          isAvailable: i > 0 && i < 6,
         }))
       );
     }
-  }, [staffAvailabilityData, availability.length]);
+  }, [availabilityData, availability.length, member]);
 
   const updateDayAvailability = useCallback(
-    (dayOfWeek: number, field: keyof DayAvailability, value: any) => {
+    (dayOfWeek: number, field: keyof DayAvailability, value: boolean | string) => {
       setAvailability((prev) =>
         prev.map((a) =>
           a.dayOfWeek === dayOfWeek ? { ...a, [field]: value } : a
@@ -124,10 +137,13 @@ export default function StaffDetailScreen() {
     if (!tenantId || !staffUserId) return;
     setSavingAvailability(true);
     try {
-      await setStaffAvailabilityMutation({
-        tenantId: tenantId as any,
-        staffId: staffUserId as any,
-        availability,
+      await updateAvailability({
+        schedule: availability.map((a) => ({
+          dayOfWeek: a.dayOfWeek,
+          isOpen: a.isAvailable,
+          openTime: a.startTime,
+          closeTime: a.endTime,
+        })),
       });
       setToast({
         message: "Availability saved",
@@ -141,22 +157,10 @@ export default function StaffDetailScreen() {
     } finally {
       setSavingAvailability(false);
     }
-  }, [tenantId, staffUserId, availability, setStaffAvailabilityMutation]);
-
-  const staffBookings = useMemo(() => {
-    if (!bookings || !member) return { total: 0, completed: 0 };
-    const staffBookingList = bookings.filter(
-      (b) => b.staffId === member.userId
-    );
-    return {
-      total: staffBookingList.length,
-      completed: staffBookingList.filter((b) => b.status === "completed")
-        .length,
-    };
-  }, [bookings, member]);
+  }, [tenantId, staffUserId, availability, updateAvailability]);
 
   // Initialize selectedRole from member data
-  React.useEffect(() => {
+  useEffect(() => {
     if (member && selectedRole === null) {
       setSelectedRole(member.role);
     }
@@ -168,9 +172,8 @@ export default function StaffDetailScreen() {
     setUpdatingRole(true);
     try {
       await updateRole({
-        tenantId: tenantId as any,
-        membershipId: member._id as any,
-        role: selectedRole as any,
+        memberId: member.id,
+        role: selectedRole,
       });
       setToast({
         message: "Role updated successfully",
@@ -184,33 +187,31 @@ export default function StaffDetailScreen() {
     } finally {
       setUpdatingRole(false);
     }
-  }, [selectedRole, member, tenantId, updateRole]);
+  }, [selectedRole, member, updateRole]);
 
-  const handleSuspend = useCallback(async () => {
+  const handleRemove = useCallback(async () => {
     if (!member) return;
 
-    setSuspending(true);
+    setRemoving(true);
     try {
-      await suspendMember({
-        tenantId: tenantId as any,
-        membershipId: member._id as any,
-      });
-      setShowSuspendModal(false);
+      await removeMember(member.id);
+      setShowRemoveModal(false);
       setToast({
-        message: "Member suspended",
+        message: "Member removed",
         type: "success",
         visible: true,
       });
+      setTimeout(() => router.back(), 1200);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Failed to suspend member";
+        err instanceof Error ? err.message : "Failed to remove member";
       setToast({ message, type: "error", visible: true });
     } finally {
-      setSuspending(false);
+      setRemoving(false);
     }
-  }, [member, tenantId, suspendMember]);
+  }, [member, removeMember, router]);
 
-  if (members === undefined || bookings === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading staff member..." />;
   }
 
@@ -224,8 +225,6 @@ export default function StaffDetailScreen() {
     );
   }
 
-  const isSuspended = member.status === "suspended";
-
   return (
     <Screen scroll>
       <Header title="Staff Detail" onBack={() => router.back()} />
@@ -234,8 +233,7 @@ export default function StaffDetailScreen() {
       <Card className="mb-4">
         <View className="items-center">
           <Avatar
-            src={member.userAvatarUrl}
-            fallback={getInitials(member.userName)}
+            fallback={getInitials(member.name)}
             size="lg"
           />
           <Spacer size={12} />
@@ -243,13 +241,13 @@ export default function StaffDetailScreen() {
             className="text-xl font-bold"
             style={{ color: theme.colors.text }}
           >
-            {member.userName}
+            {member.name}
           </Text>
           <Text
             className="mt-1 text-sm"
             style={{ color: theme.colors.textSecondary }}
           >
-            {member.userEmail}
+            {member.email}
           </Text>
           <Spacer size={8} />
           <Row gap={8}>
@@ -257,29 +255,10 @@ export default function StaffDetailScreen() {
               label={member.role}
               variant={ROLE_BADGE_VARIANTS[member.role] ?? "default"}
             />
-            {isSuspended && <Badge label="Suspended" variant="error" />}
-            {member.status === "invited" && (
-              <Badge label="Invited" variant="warning" />
-            )}
+            {!member.isActive && <Badge label="Inactive" variant="error" />}
           </Row>
         </View>
       </Card>
-
-      {/* Performance Stats */}
-      <Row gap={12} className="mb-4">
-        <View className="flex-1">
-          <StatCard
-            label="Bookings Handled"
-            value={staffBookings.total}
-          />
-        </View>
-        <View className="flex-1">
-          <StatCard
-            label="Completed"
-            value={staffBookings.completed}
-          />
-        </View>
-      </Row>
 
       <Separator className="my-4" />
 
@@ -394,49 +373,35 @@ export default function StaffDetailScreen() {
         >
           Actions
         </Text>
-        {!isSuspended ? (
-          <Button
-            variant="destructive"
-            onPress={() => setShowSuspendModal(true)}
-          >
-            Suspend Member
-          </Button>
-        ) : (
-          <View
-            className="items-center rounded-xl py-3"
-            style={{ backgroundColor: theme.colors.error + "10" }}
-          >
-            <Text
-              className="text-sm font-medium"
-              style={{ color: theme.colors.error }}
-            >
-              This member is currently suspended
-            </Text>
-          </View>
-        )}
+        <Button
+          variant="destructive"
+          onPress={() => setShowRemoveModal(true)}
+        >
+          Remove from Team
+        </Button>
       </Card>
 
       <Spacer size={20} />
 
-      {/* Suspend Confirmation Modal */}
+      {/* Remove Confirmation Modal */}
       <Modal
-        visible={showSuspendModal}
-        onClose={() => setShowSuspendModal(false)}
-        title="Suspend Member"
+        visible={showRemoveModal}
+        onClose={() => setShowRemoveModal(false)}
+        title="Remove Member"
       >
         <Text
           className="mb-4 text-base"
           style={{ color: theme.colors.text }}
         >
-          Are you sure you want to suspend{" "}
-          <Text className="font-bold">{member.userName}</Text>? They will lose
+          Are you sure you want to remove{" "}
+          <Text className="font-bold">{member.name}</Text> from the team? They will lose
           access to this organization.
         </Text>
         <Row gap={12}>
           <View className="flex-1">
             <Button
               variant="outline"
-              onPress={() => setShowSuspendModal(false)}
+              onPress={() => setShowRemoveModal(false)}
             >
               Cancel
             </Button>
@@ -444,10 +409,10 @@ export default function StaffDetailScreen() {
           <View className="flex-1">
             <Button
               variant="destructive"
-              onPress={handleSuspend}
-              loading={suspending}
+              onPress={handleRemove}
+              loading={removing}
             >
-              Suspend
+              Remove
             </Button>
           </View>
         </Row>

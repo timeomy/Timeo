@@ -15,14 +15,12 @@ import {
   XCircle,
   Percent,
 } from "lucide-react-native";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
 import { useTimeoAuth } from "@timeo/auth";
+import { usePosTransactions, useDailySummary } from "@timeo/api-client";
 import {
   Screen,
   Header,
   Card,
-  Badge,
   StatCard,
   LoadingScreen,
   EmptyState,
@@ -86,24 +84,18 @@ export default function POSScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as any;
+  const tenantId = activeTenantId as string;
 
   const [refreshing, setRefreshing] = useState(false);
 
-  const onRefresh = useCallback(() => {
+  const { data: transactions, isLoading, refetch } = usePosTransactions(tenantId);
+  const { data: summary } = useDailySummary(tenantId);
+
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
-
-  const transactions = useQuery(
-    api.pos.listTransactions,
-    tenantId ? { tenantId } : "skip"
-  );
-
-  const summary = useQuery(
-    api.pos.getDailySummary,
-    tenantId ? { tenantId } : "skip"
-  );
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   if (!tenantId) {
     return (
@@ -118,7 +110,7 @@ export default function POSScreen() {
     );
   }
 
-  if (transactions === undefined) {
+  if (isLoading && !transactions) {
     return <LoadingScreen message="Loading transactions..." />;
   }
 
@@ -170,14 +162,14 @@ export default function POSScreen() {
           className="text-sm font-semibold uppercase tracking-wide"
           style={{ color: theme.colors.textSecondary }}
         >
-          Recent Transactions ({transactions.length})
+          Recent Transactions ({transactions?.length ?? 0})
         </Text>
       </View>
 
       {/* Transaction List */}
       <FlatList
-        data={transactions}
-        keyExtractor={(item) => item._id}
+        data={transactions ?? []}
+        keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -195,14 +187,11 @@ export default function POSScreen() {
         }
         renderItem={({ item }) => {
           const statusColors = getStatusColor(item.status, theme);
-          const methodColors = getPaymentMethodColor(
-            item.paymentMethod,
-            theme
-          );
+          const methodColors = getPaymentMethodColor(item.paymentMethod, theme);
 
           return (
             <TouchableOpacity
-              onPress={() => router.push(`/pos/${item._id}` as any)}
+              onPress={() => router.push(`/pos/${item.id}` as any)}
               activeOpacity={0.7}
             >
               <Card>
@@ -224,7 +213,7 @@ export default function POSScreen() {
                       className="text-xs"
                       style={{ color: theme.colors.textSecondary }}
                     >
-                      {formatDate(item.createdAt)}
+                      {formatDate(new Date(item.createdAt).getTime())}
                     </Text>
                   </View>
                   <View className="items-end">
@@ -232,7 +221,7 @@ export default function POSScreen() {
                       className="text-base font-bold"
                       style={{ color: theme.colors.text }}
                     >
-                      RM {(item.total / 100).toFixed(2)}
+                      RM {((item.total ?? item.amount) / 100).toFixed(2)}
                     </Text>
                     <View className="mt-1 flex-row" style={{ gap: 4 }}>
                       <View

@@ -15,27 +15,25 @@ import {
   EmptyState,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useQuery } from "convex/react";
+import { useGiftCards } from "@timeo/api-client";
 
-type StatusFilter = "all" | "active" | "depleted" | "expired" | "cancelled";
+type StatusFilter = "all" | "active" | "fully_used" | "expired" | "cancelled";
 
 const STATUS_OPTIONS: { label: string; value: StatusFilter }[] = [
   { label: "All", value: "all" },
   { label: "Active", value: "active" },
-  { label: "Depleted", value: "depleted" },
+  { label: "Used", value: "fully_used" },
   { label: "Expired", value: "expired" },
   { label: "Cancelled", value: "cancelled" },
 ];
 
-function getStatusVariant(status: string): "success" | "warning" | "error" | "default" {
+function getStatusVariant(status: string | undefined): "success" | "warning" | "error" | "default" {
   switch (status) {
     case "active":
       return "success";
-    case "depleted":
+    case "fully_used":
       return "warning";
     case "expired":
-      return "error";
     case "cancelled":
       return "error";
     default:
@@ -43,8 +41,8 @@ function getStatusVariant(status: string): "success" | "warning" | "error" | "de
   }
 }
 
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString("en-MY", {
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-MY", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -60,21 +58,19 @@ export default function GiftCardsScreen() {
 
   const tenantId = activeTenantId as string;
 
-  const giftCards = useQuery(
-    api.giftCards.listByTenant,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
+  const { data: giftCards, isLoading, refetch } = useGiftCards(tenantId);
 
   const filteredCards = useMemo(() => {
     if (!giftCards) return [];
     if (statusFilter === "all") return giftCards;
-    return giftCards.filter((c) => c.status === statusFilter);
+    return giftCards.filter((c) => (c.status ?? (c.isActive ? "active" : "cancelled")) === statusFilter);
   }, [giftCards, statusFilter]);
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   if (!tenantId) {
     return (
@@ -92,68 +88,71 @@ export default function GiftCardsScreen() {
     );
   }
 
-  if (giftCards === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading gift cards..." />;
   }
 
-  const renderCard = ({ item }: { item: (typeof filteredCards)[0] }) => (
-    <Card
-      className="mb-3"
-      onPress={() => router.push(`/gift-cards/${item._id}` as any)}
-    >
-      <Row justify="between" align="start">
-        <View className="flex-1">
-          <Text
-            className="text-base font-bold"
-            style={{ color: theme.colors.text, fontFamily: "monospace" }}
-          >
-            {item.code}
-          </Text>
-          <Spacer size={4} />
-          <Badge label={item.status} variant={getStatusVariant(item.status)} />
-          <Spacer size={6} />
-          {item.purchaserName ? (
+  const renderCard = ({ item }: { item: NonNullable<typeof giftCards>[0] }) => {
+    const cardStatus = item.status ?? (item.isActive ? "active" : "cancelled");
+    return (
+      <Card
+        className="mb-3"
+        onPress={() => router.push(`/gift-cards/${item.id}` as any)}
+      >
+        <Row justify="between" align="start">
+          <View className="flex-1">
             <Text
-              className="text-xs"
+              className="text-base font-bold"
+              style={{ color: theme.colors.text, fontFamily: "monospace" }}
+            >
+              {item.code}
+            </Text>
+            <Spacer size={4} />
+            <Badge label={cardStatus} variant={getStatusVariant(cardStatus)} />
+            <Spacer size={6} />
+            {item.purchaserName ? (
+              <Text
+                className="text-xs"
+                style={{ color: theme.colors.textSecondary }}
+              >
+                From: {item.purchaserName}
+              </Text>
+            ) : null}
+            {item.recipientName ? (
+              <Text
+                className="text-xs"
+                style={{ color: theme.colors.textSecondary }}
+              >
+                To: {item.recipientName}
+              </Text>
+            ) : null}
+            <Text
+              className="mt-1 text-xs"
               style={{ color: theme.colors.textSecondary }}
             >
-              From: {item.purchaserName}
+              {formatDate(item.createdAt)}
             </Text>
-          ) : null}
-          {item.recipientName ? (
+          </View>
+          <View className="items-end">
             <Text
-              className="text-xs"
-              style={{ color: theme.colors.textSecondary }}
+              className="text-lg font-bold"
+              style={{ color: theme.colors.text }}
             >
-              To: {item.recipientName}
+              RM {(item.currentBalance / 100).toFixed(2)}
             </Text>
-          ) : null}
-          <Text
-            className="mt-1 text-xs"
-            style={{ color: theme.colors.textSecondary }}
-          >
-            {formatDate(item.createdAt)}
-          </Text>
-        </View>
-        <View className="items-end">
-          <Text
-            className="text-lg font-bold"
-            style={{ color: theme.colors.text }}
-          >
-            RM {(item.currentBalance / 100).toFixed(2)}
-          </Text>
-          {item.currentBalance !== item.initialBalance && (
-            <Text
-              className="text-xs"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              of RM {(item.initialBalance / 100).toFixed(2)}
-            </Text>
-          )}
-        </View>
-      </Row>
-    </Card>
-  );
+            {item.currentBalance !== item.initialBalance && (
+              <Text
+                className="text-xs"
+                style={{ color: theme.colors.textSecondary }}
+              >
+                of RM {(item.initialBalance / 100).toFixed(2)}
+              </Text>
+            )}
+          </View>
+        </Row>
+      </Card>
+    );
+  };
 
   return (
     <Screen>
@@ -208,7 +207,7 @@ export default function GiftCardsScreen() {
       </View>
       <FlatList
         data={filteredCards}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         renderItem={renderCard}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}

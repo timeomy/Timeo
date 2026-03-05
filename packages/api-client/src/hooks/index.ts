@@ -156,6 +156,27 @@ export {
 
 export { useDownloadReport } from "./exports";
 
+export type {
+  PlatformTenant,
+  TenantMember,
+  PlatformUser,
+  PlatformUserDetail,
+  Plan,
+  FeatureFlag,
+  PlatformConfig,
+  AuditLogEntry,
+  AuditLogResponse,
+  Announcement,
+  EmailTemplate,
+  ApiKey,
+  ApiKeyCreateResponse,
+  HealthStatus,
+  AnalyticsOverview,
+  TenantGrowthPoint,
+  PlatformStats,
+  PlatformLogEntry,
+} from "./platform";
+
 export {
   // Module 1: Tenants
   usePlatformTenants,
@@ -207,6 +228,10 @@ export {
   usePlatformTenantGrowth,
   // Module 12: Data
   useSeedFeatureFlags,
+  // Additional
+  useUpdatePlatformTenant,
+  usePlatformStats,
+  usePlatformLogs,
 } from "./platform";
 
 export {

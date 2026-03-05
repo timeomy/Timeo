@@ -2,21 +2,20 @@ import { useState, useCallback } from "react";
 import { View, Text, Alert, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { useMutation } from "convex/react";
-import { api } from "@timeo/api";
 import { useTimeoAuth } from "@timeo/auth";
+import { useCheckInByQr } from "@timeo/api-client";
 import { Screen, Header, Button, Spacer, useTheme } from "@timeo/ui";
 
 export default function ScanQRScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as any;
+  const tenantId = activeTenantId as string;
 
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const checkIn = useMutation(api.checkIns.checkIn);
+  const { mutateAsync: checkInByQr } = useCheckInByQr(tenantId ?? "");
 
   const handleBarcodeScanned = useCallback(
     async ({ data }: { data: string }) => {
@@ -24,7 +23,7 @@ export default function ScanQRScreen() {
       setScanned(true);
       setProcessing(true);
       try {
-        await checkIn({ tenantId, code: data, method: "qr" });
+        await checkInByQr(data);
         Alert.alert("Success", "Member checked in successfully!", [
           { text: "OK", onPress: () => router.back() },
         ]);
@@ -38,7 +37,7 @@ export default function ScanQRScreen() {
         setProcessing(false);
       }
     },
-    [scanned, processing, tenantId, checkIn, router]
+    [scanned, processing, tenantId, checkInByQr, router]
   );
 
   if (!permission) {

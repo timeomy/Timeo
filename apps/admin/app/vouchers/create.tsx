@@ -13,8 +13,7 @@ import {
   Toast,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useMutation } from "convex/react";
+import { useCreateVoucher } from "@timeo/api-client";
 
 const TYPE_OPTIONS = [
   { label: "Percentage", value: "percentage" },
@@ -35,7 +34,7 @@ export default function CreateVoucherScreen() {
 
   const tenantId = activeTenantId as string;
 
-  const createVoucher = useMutation(api.vouchers.create);
+  const { mutateAsync: createVoucher } = useCreateVoucher(tenantId ?? "");
 
   const [code, setCode] = useState("");
   const [type, setType] = useState("percentage");
@@ -88,12 +87,11 @@ export default function CreateVoucherScreen() {
     setSaving(true);
     try {
       await createVoucher({
-        tenantId: tenantId as any,
         code: code.trim(),
-        type: type as any,
+        type,
         value: finalValue,
         maxUses: parsedMaxUses,
-        source: source as any,
+        source,
         partnerName: source === "partner" ? partnerName.trim() || undefined : undefined,
         description: description.trim() || undefined,
       });

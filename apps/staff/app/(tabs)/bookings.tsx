@@ -9,9 +9,13 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { CalendarDays } from "lucide-react-native";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
 import { useTimeoAuth } from "@timeo/auth";
+import {
+  useBookings,
+  useConfirmBooking,
+  useCancelBooking,
+  useCompleteBooking,
+} from "@timeo/api-client";
 import {
   Screen,
   Header,
@@ -38,44 +42,39 @@ export default function BookingsScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as any;
+  const tenantId = activeTenantId as string;
 
   const [activeTab, setActiveTab] = useState<StatusTab>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
-  const bookings = useQuery(
-    api.bookings.listByTenant,
-    tenantId ? { tenantId } : "skip"
-  );
+  const { data: bookings, isLoading, refetch } = useBookings(tenantId);
+  const { mutateAsync: confirmBooking } = useConfirmBooking(tenantId ?? "");
+  const { mutateAsync: cancelBooking } = useCancelBooking(tenantId ?? "");
+  const { mutateAsync: completeBooking } = useCompleteBooking(tenantId ?? "");
 
-  const confirmBooking = useMutation(api.bookings.confirm);
-  const cancelBooking = useMutation(api.bookings.cancel);
-  const completeBooking = useMutation(api.bookings.complete);
-
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const filteredBookings = useMemo(() => {
     if (!bookings) return [];
 
     let filtered = bookings;
 
-    // Filter by status tab
     const statusFilter = TAB_TO_STATUS[activeTab];
     if (statusFilter) {
       filtered = filtered.filter((b) => b.status === statusFilter);
     }
 
-    // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (b) =>
-          b.serviceName.toLowerCase().includes(query) ||
-          b.customerName.toLowerCase().includes(query) ||
+          (b.serviceName ?? "").toLowerCase().includes(query) ||
+          (b.customerName ?? "").toLowerCase().includes(query) ||
           (b.staffName && b.staffName.toLowerCase().includes(query))
       );
     }
@@ -84,9 +83,9 @@ export default function BookingsScreen() {
   }, [bookings, activeTab, searchQuery]);
 
   const handleConfirm = useCallback(
-    async (bookingId: any) => {
+    async (bookingId: string) => {
       try {
-        await confirmBooking({ bookingId });
+        await confirmBooking(bookingId);
       } catch (err) {
         Alert.alert(
           "Error",
@@ -98,7 +97,7 @@ export default function BookingsScreen() {
   );
 
   const handleCancel = useCallback(
-    (bookingId: any) => {
+    (bookingId: string) => {
       Alert.alert(
         "Cancel Booking",
         "Are you sure you want to cancel this booking?",
@@ -127,9 +126,9 @@ export default function BookingsScreen() {
   );
 
   const handleComplete = useCallback(
-    async (bookingId: any) => {
+    async (bookingId: string) => {
       try {
-        await completeBooking({ bookingId });
+        await completeBooking(bookingId);
       } catch (err) {
         Alert.alert(
           "Error",
@@ -151,7 +150,7 @@ export default function BookingsScreen() {
     );
   }
 
-  if (bookings === undefined) {
+  if (isLoading && !bookings) {
     return <LoadingScreen message="Loading bookings..." />;
   }
 
@@ -205,7 +204,7 @@ export default function BookingsScreen() {
       {/* Booking List */}
       <FlatList
         data={filteredBookings}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24, gap: 10 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -224,16 +223,15 @@ export default function BookingsScreen() {
         renderItem={({ item }) => (
           <View>
             <BookingCard
-              serviceName={item.serviceName}
+              serviceName={item.serviceName ?? ""}
               staffName={item.staffName}
               status={item.status}
-              startTime={item.startTime}
+              startTime={new Date(item.startTime).getTime()}
               duration={Math.round(
-                (item.endTime - item.startTime) / (60 * 1000)
+                (new Date(item.endTime).getTime() - new Date(item.startTime).getTime()) / (60 * 1000)
               )}
-              onPress={() => router.push(`/bookings/${item._id}`)}
+              onPress={() => router.push(`/bookings/${item.id}`)}
             />
-            {/* Action buttons below the card */}
             {(item.status === "pending" || item.status === "confirmed") && (
               <View
                 className="mt-1 flex-row px-1"
@@ -243,7 +241,7 @@ export default function BookingsScreen() {
                   <Button
                     size="sm"
                     className="flex-1"
-                    onPress={() => handleConfirm(item._id as any)}
+                    onPress={() => handleConfirm(item.id)}
                   >
                     Confirm
                   </Button>
@@ -252,7 +250,7 @@ export default function BookingsScreen() {
                   <Button
                     size="sm"
                     className="flex-1"
-                    onPress={() => handleComplete(item._id as any)}
+                    onPress={() => handleComplete(item.id)}
                   >
                     Complete
                   </Button>
@@ -261,7 +259,7 @@ export default function BookingsScreen() {
                   variant="destructive"
                   size="sm"
                   className="flex-1"
-                  onPress={() => handleCancel(item._id as any)}
+                  onPress={() => handleCancel(item.id)}
                 >
                   Cancel
                 </Button>

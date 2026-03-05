@@ -1,13 +1,10 @@
-import React, { useState, useCallback } from "react";
-import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
-import { useQuery, useAction } from "convex/react";
-import { api } from "@timeo/api";
+import React, { useState } from "react";
+import { View, Text, ScrollView } from "react-native";
 import { useTimeoAuth } from "@timeo/auth";
 import {
   Screen,
   Header,
   Card,
-  Button,
   Badge,
   LoadingScreen,
   Toast,
@@ -20,24 +17,22 @@ import {
 import {
   CreditCard,
   DollarSign,
-  RotateCcw,
   CheckCircle2,
   XCircle,
   Clock,
-  ArrowLeft,
 } from "lucide-react-native";
 import { useRouter } from "expo-router";
+import { usePayments } from "@timeo/api-client";
 
-function getStatusColor(status: string, theme: any) {
+function getStatusColor(status: string, theme: ReturnType<typeof useTheme>) {
   switch (status) {
-    case "succeeded":
+    case "completed":
       return theme.colors.success;
     case "failed":
       return theme.colors.error;
     case "refunded":
       return theme.colors.warning;
     case "pending":
-    case "processing":
       return theme.colors.info;
     default:
       return theme.colors.textSecondary;
@@ -46,17 +41,29 @@ function getStatusColor(status: string, theme: any) {
 
 function getStatusIcon(status: string) {
   switch (status) {
-    case "succeeded":
+    case "completed":
       return CheckCircle2;
     case "failed":
       return XCircle;
     case "pending":
-    case "processing":
       return Clock;
-    case "refunded":
-      return RotateCcw;
     default:
       return DollarSign;
+  }
+}
+
+function getStatusVariant(status: string): "success" | "warning" | "error" | "default" | "info" {
+  switch (status) {
+    case "completed":
+      return "success";
+    case "failed":
+      return "error";
+    case "refunded":
+      return "warning";
+    case "pending":
+      return "info";
+    default:
+      return "default";
   }
 }
 
@@ -68,8 +75,8 @@ function formatCents(amount: number, currency: string): string {
   }).format(amount / 100);
 }
 
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString("en-MY", {
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-MY", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -84,12 +91,7 @@ export default function PaymentsScreen() {
   const { activeTenantId } = useTimeoAuth();
   const tenantId = activeTenantId as string;
 
-  const refundPayment = useAction(api.payments.refundPayment);
-
-  const payments = useQuery(
-    api.payments.listPaymentsByTenant,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
+  const { data: payments, isLoading } = usePayments(tenantId);
 
   const [toast, setToast] = useState<{
     message: string;
@@ -97,46 +99,10 @@ export default function PaymentsScreen() {
     visible: boolean;
   }>({ message: "", type: "success", visible: false });
 
-  const [refundingId, setRefundingId] = useState<string | null>(null);
-
-  const handleRefund = useCallback(
-    (paymentId: string, amount: number, currency: string) => {
-      Alert.alert(
-        "Confirm Refund",
-        `Are you sure you want to refund ${formatCents(amount, currency)}? This action cannot be undone.`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Refund",
-            style: "destructive",
-            onPress: async () => {
-              setRefundingId(paymentId);
-              try {
-                await refundPayment({ paymentId: paymentId as any });
-                setToast({
-                  message: "Refund processed successfully",
-                  type: "success",
-                  visible: true,
-                });
-              } catch (err) {
-                const message =
-                  err instanceof Error ? err.message : "Failed to process refund";
-                setToast({ message, type: "error", visible: true });
-              } finally {
-                setRefundingId(null);
-              }
-            },
-          },
-        ]
-      );
-    },
-    [refundPayment]
-  );
-
   if (!tenantId) {
     return (
       <Screen>
-        <Header title="Payments" leftAction={{ onPress: () => router.back() }} />
+        <Header title="Payments" onBack={() => router.back()} />
         <View className="flex-1 items-center justify-center">
           <Text style={{ color: theme.colors.textSecondary }}>
             No organization selected.
@@ -146,19 +112,15 @@ export default function PaymentsScreen() {
     );
   }
 
-  if (payments === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading payments..." />;
   }
 
+  const paymentList = payments ?? [];
+
   return (
     <Screen scroll={false}>
-      <Header
-        title="Payments"
-        leftAction={{
-          icon: ArrowLeft,
-          onPress: () => router.back(),
-        }}
-      />
+      <Header title="Payments" onBack={() => router.back()} />
       <ScrollView
         className="flex-1 px-4"
         showsVerticalScrollIndicator={false}
@@ -179,8 +141,8 @@ export default function PaymentsScreen() {
                 style={{ color: theme.colors.success }}
               >
                 {formatCents(
-                  payments
-                    .filter((p) => p.status === "succeeded")
+                  paymentList
+                    .filter((p) => p.status === "completed")
                     .reduce((sum, p) => sum + p.amount, 0),
                   "MYR"
                 )}
@@ -200,7 +162,7 @@ export default function PaymentsScreen() {
                 style={{ color: theme.colors.warning }}
               >
                 {formatCents(
-                  payments
+                  paymentList
                     .filter((p) => p.status === "refunded")
                     .reduce((sum, p) => sum + p.amount, 0),
                   "MYR"
@@ -213,7 +175,7 @@ export default function PaymentsScreen() {
         <Separator className="mb-4" />
 
         {/* Payment List */}
-        {payments.length === 0 ? (
+        {paymentList.length === 0 ? (
           <View className="items-center justify-center py-16">
             <CreditCard size={48} color={theme.colors.textSecondary + "50"} />
             <Text
@@ -230,13 +192,13 @@ export default function PaymentsScreen() {
             </Text>
           </View>
         ) : (
-          <Section title={`${payments.length} Payments`}>
-            {payments.map((payment) => {
+          <Section title={`${paymentList.length} Payments`}>
+            {paymentList.map((payment) => {
               const StatusIcon = getStatusIcon(payment.status);
               const statusColor = getStatusColor(payment.status, theme);
 
               return (
-                <Card key={payment._id} className="mb-3">
+                <Card key={payment.id} className="mb-3">
                   <Row justify="between" align="start">
                     <Row align="center" gap={12} className="flex-1">
                       <View
@@ -250,7 +212,7 @@ export default function PaymentsScreen() {
                           className="text-sm font-semibold"
                           style={{ color: theme.colors.text }}
                         >
-                          {payment.customerName}
+                          {payment.provider} · {payment.method ?? "—"}
                         </Text>
                         <Text
                           className="text-xs"
@@ -258,18 +220,11 @@ export default function PaymentsScreen() {
                         >
                           {formatDate(payment.createdAt)}
                         </Text>
-                        <View className="mt-1 flex-row items-center gap-2">
-                          <View
-                            className="rounded-full px-2 py-0.5"
-                            style={{ backgroundColor: statusColor + "15" }}
-                          >
-                            <Text
-                              className="text-xs font-medium capitalize"
-                              style={{ color: statusColor }}
-                            >
-                              {payment.status}
-                            </Text>
-                          </View>
+                        <View className="mt-1">
+                          <Badge
+                            label={payment.status}
+                            variant={getStatusVariant(payment.status)}
+                          />
                         </View>
                       </View>
                     </Row>
@@ -280,34 +235,6 @@ export default function PaymentsScreen() {
                       >
                         {formatCents(payment.amount, payment.currency)}
                       </Text>
-                      {payment.status === "succeeded" && (
-                        <TouchableOpacity
-                          onPress={() =>
-                            handleRefund(
-                              payment._id,
-                              payment.amount,
-                              payment.currency
-                            )
-                          }
-                          disabled={refundingId === payment._id}
-                          className="mt-2"
-                        >
-                          <View
-                            className="flex-row items-center gap-1 rounded px-2 py-1"
-                            style={{ backgroundColor: theme.colors.error + "10" }}
-                          >
-                            <RotateCcw size={12} color={theme.colors.error} />
-                            <Text
-                              className="text-xs font-medium"
-                              style={{ color: theme.colors.error }}
-                            >
-                              {refundingId === payment._id
-                                ? "Refunding..."
-                                : "Refund"}
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
-                      )}
                     </View>
                   </Row>
                 </Card>

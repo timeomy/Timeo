@@ -93,6 +93,10 @@ export const queryKeys = {
     customers: (tenantId: string) =>
       ["analytics", tenantId, "customers"] as const,
     staff: (tenantId: string) => ["analytics", tenantId, "staff"] as const,
+    revenueTrend: (tenantId: string, period?: string) =>
+      ["analytics", tenantId, "revenueTrend", period] as const,
+    bookingTrend: (tenantId: string, period?: string) =>
+      ["analytics", tenantId, "bookingTrend", period] as const,
   },
 
   platform: {

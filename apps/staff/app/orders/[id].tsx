@@ -1,9 +1,9 @@
 import { useCallback } from "react";
 import { View, Text, ScrollView, Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Mail, Package, FileText } from "lucide-react-native";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
+import { Package, FileText } from "lucide-react-native";
+import { useTimeoAuth } from "@timeo/auth";
+import { useOrder, useUpdateOrderStatus } from "@timeo/api-client";
 import {
   Screen,
   Header,
@@ -19,7 +19,6 @@ import {
   useTheme,
 } from "@timeo/ui";
 import { formatDate, formatTime, formatPrice } from "@timeo/shared";
-// Next valid status for progression
 const NEXT_STATUS: Record<string, string | null> = {
   pending: "confirmed",
   confirmed: "preparing",
@@ -40,11 +39,12 @@ export default function OrderDetailScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const orderId = id as any;
+  const { activeTenantId } = useTimeoAuth();
+  const tenantId = activeTenantId as string;
+  const orderId = id as string;
 
-  const order = useQuery(api.orders.getById, { orderId });
-
-  const updateStatus = useMutation(api.orders.updateStatus);
+  const { data: order, isLoading } = useOrder(tenantId, orderId);
+  const { mutateAsync: updateStatus } = useUpdateOrderStatus(tenantId ?? "");
 
   const handleAdvanceStatus = useCallback(async () => {
     if (!order) return;
@@ -52,16 +52,7 @@ export default function OrderDetailScreen() {
     if (!nextStatus) return;
 
     try {
-      await updateStatus({
-        orderId,
-        status: nextStatus as
-          | "pending"
-          | "confirmed"
-          | "preparing"
-          | "ready"
-          | "completed"
-          | "cancelled",
-      });
+      await updateStatus({ orderId, status: nextStatus });
     } catch (err) {
       Alert.alert(
         "Error",
@@ -81,10 +72,7 @@ export default function OrderDetailScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await updateStatus({
-                orderId,
-                status: "cancelled",
-              });
+              await updateStatus({ orderId, status: "cancelled" });
             } catch (err) {
               Alert.alert(
                 "Error",
@@ -99,11 +87,11 @@ export default function OrderDetailScreen() {
     );
   }, [updateStatus, orderId]);
 
-  if (order === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading order..." />;
   }
 
-  if (order === null) {
+  if (!order) {
     return (
       <ErrorScreen
         title="Order not found"
@@ -116,7 +104,7 @@ export default function OrderDetailScreen() {
   const nextStatusLabel = NEXT_STATUS_LABEL[order.status];
   const canCancel =
     order.status !== "completed" && order.status !== "cancelled";
-  const orderNumber = order._id.slice(-6).toUpperCase();
+  const orderNumber = order.id.slice(-6).toUpperCase();
 
   return (
     <Screen padded={false}>
@@ -141,7 +129,7 @@ export default function OrderDetailScreen() {
             className="mt-1 text-sm"
             style={{ color: theme.colors.textSecondary }}
           >
-            {formatDate(order.createdAt)} at {formatTime(order.createdAt)}
+            {formatDate(new Date(order.createdAt).getTime())} at {formatTime(new Date(order.createdAt).getTime())}
           </Text>
         </View>
 
@@ -154,25 +142,14 @@ export default function OrderDetailScreen() {
             style={{ backgroundColor: theme.colors.surface }}
           >
             <View className="flex-row items-center">
-              <Avatar fallback={order.customerName} size="md" />
+              <Avatar fallback={order.customerName ?? ""} size="md" />
               <View className="ml-3 flex-1">
                 <Text
                   className="text-base font-semibold"
                   style={{ color: theme.colors.text }}
                 >
-                  {order.customerName}
+                  {order.customerName ?? ""}
                 </Text>
-                {order.customerEmail && (
-                  <View className="mt-1 flex-row items-center">
-                    <Mail size={13} color={theme.colors.textSecondary} />
-                    <Text
-                      className="ml-1.5 text-sm"
-                      style={{ color: theme.colors.textSecondary }}
-                    >
-                      {order.customerEmail}
-                    </Text>
-                  </View>
-                )}
               </View>
             </View>
           </View>
@@ -185,7 +162,7 @@ export default function OrderDetailScreen() {
             style={{ backgroundColor: theme.colors.surface }}
           >
             {order.items.map((item, index) => (
-              <View key={item._id}>
+              <View key={`${item.productId}-${index}`}>
                 <View className="flex-row items-center p-4">
                   <View
                     className="mr-3 h-10 w-10 items-center justify-center rounded-xl"
@@ -199,20 +176,20 @@ export default function OrderDetailScreen() {
                       style={{ color: theme.colors.text }}
                       numberOfLines={1}
                     >
-                      {item.snapshotName}
+                      {item.snapshotName ?? item.productName ?? ""}
                     </Text>
                     <Text
                       className="mt-0.5 text-xs"
                       style={{ color: theme.colors.textSecondary }}
                     >
-                      {formatPrice(item.snapshotPrice)} x {item.quantity}
+                      {formatPrice(item.snapshotPrice ?? item.unitPrice)} x {item.quantity}
                     </Text>
                   </View>
                   <Text
                     className="text-sm font-bold"
                     style={{ color: theme.colors.text }}
                   >
-                    {formatPrice(item.snapshotPrice * item.quantity)}
+                    {formatPrice((item.snapshotPrice ?? item.unitPrice) * item.quantity)}
                   </Text>
                 </View>
                 {index < order.items.length - 1 && (

@@ -20,8 +20,7 @@ import {
   Toast,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useQuery, useMutation } from "convex/react";
+import { useProducts, useCreateProduct, useUpdateProduct } from "@timeo/api-client";
 
 interface ProductFormData {
   name: string;
@@ -53,14 +52,9 @@ export default function ProductsScreen() {
 
   const tenantId = activeTenantId as string;
 
-  const products = useQuery(
-    api.products.list,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
-
-  const createProduct = useMutation(api.products.create);
-  const updateProduct = useMutation(api.products.update);
-  const toggleActive = useMutation(api.products.toggleActive);
+  const { data: products, isLoading } = useProducts(tenantId);
+  const { mutateAsync: createProduct } = useCreateProduct(tenantId ?? "");
+  const { mutateAsync: updateProduct } = useUpdateProduct(tenantId ?? "");
 
   const filteredProducts = useMemo(() => {
     if (!products) return [];
@@ -69,21 +63,21 @@ export default function ProductsScreen() {
     return products.filter(
       (p) =>
         p.name.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q)
+        (p.description ?? "").toLowerCase().includes(q)
     );
   }, [products, search]);
 
   const handleToggleActive = useCallback(
-    async (productId: string) => {
+    async (productId: string, currentIsActive: boolean) => {
       try {
-        await toggleActive({ productId: productId as any });
+        await updateProduct({ id: productId, isActive: !currentIsActive });
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Failed to toggle product";
         setToast({ message, type: "error", visible: true });
       }
     },
-    [toggleActive]
+    [updateProduct]
   );
 
   const openCreateModal = useCallback(() => {
@@ -96,11 +90,11 @@ export default function ProductsScreen() {
     (product: NonNullable<typeof products>[0]) => {
       setForm({
         name: product.name,
-        description: product.description,
+        description: product.description ?? "",
         price: String(product.price / 100),
         imageUrl: product.imageUrl ?? "",
       });
-      setEditingProduct(product._id);
+      setEditingProduct(product.id);
       setShowModal(true);
     },
     []
@@ -130,7 +124,7 @@ export default function ProductsScreen() {
     try {
       if (editingProduct) {
         await updateProduct({
-          productId: editingProduct as any,
+          id: editingProduct,
           name: form.name.trim(),
           description: form.description.trim(),
           price: Math.round(price * 100),
@@ -143,7 +137,6 @@ export default function ProductsScreen() {
         });
       } else {
         await createProduct({
-          tenantId: tenantId as any,
           name: form.name.trim(),
           description: form.description.trim(),
           price: Math.round(price * 100),
@@ -183,7 +176,7 @@ export default function ProductsScreen() {
     );
   }
 
-  if (products === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading products..." />;
   }
 
@@ -229,7 +222,7 @@ export default function ProductsScreen() {
         </View>
         <Switch
           value={item.isActive}
-          onValueChange={() => handleToggleActive(item._id)}
+          onValueChange={() => handleToggleActive(item.id, item.isActive)}
         />
       </Row>
     </Card>
@@ -259,7 +252,7 @@ export default function ProductsScreen() {
       </View>
       <FlatList
         data={filteredProducts}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         renderItem={renderProduct}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}

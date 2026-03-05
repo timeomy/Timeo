@@ -91,9 +91,10 @@ export default function StaffDetailScreen() {
   }>({ message: "", type: "success", visible: false });
 
   useEffect(() => {
-    if (availabilityData?.schedule && availability.length === 0) {
+    const firstEntry = availabilityData?.[0];
+    if (firstEntry?.schedule && availability.length === 0) {
       setAvailability(
-        availabilityData.schedule.map((a) => ({
+        firstEntry.schedule.map((a) => ({
           dayOfWeek: a.dayOfWeek,
           startTime: a.openTime ?? "09:00",
           endTime: a.closeTime ?? "17:00",

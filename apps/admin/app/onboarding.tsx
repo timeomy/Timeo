@@ -2,9 +2,8 @@ import { useState, useCallback } from "react";
 import { View, Text, Alert, KeyboardAvoidingView, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { Building2 } from "lucide-react-native";
-import { useMutation } from "convex/react";
-import { api } from "@timeo/api";
 import { Screen, Card, Input, Button, Spacer, useTheme } from "@timeo/ui";
+import { useCreateTenant } from "@timeo/api-client";
 
 function slugify(text: string): string {
   return text
@@ -17,7 +16,7 @@ function slugify(text: string): string {
 export default function OnboardingScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const createTenant = useMutation(api.tenants.createForOnboarding);
+  const { mutateAsync: createTenant } = useCreateTenant();
 
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -55,8 +54,6 @@ export default function OnboardingScreen() {
     setCreating(true);
     try {
       await createTenant({ name: trimmedName, slug: trimmedSlug });
-      // After creation, the auth provider will auto-detect the new tenant
-      // and activeTenantId will be set, redirecting to tabs
       router.replace("/(tabs)");
     } catch (err) {
       const message =

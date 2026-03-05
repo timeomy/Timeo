@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { View, Text, RefreshControl, ScrollView, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -25,13 +25,11 @@ import {
   Spacer,
   Skeleton,
   Row,
-  BarChart,
   useTheme,
 } from "@timeo/ui";
 import { useTimeoAuth } from "@timeo/auth";
-import { api } from "@timeo/api";
-import { useQuery } from "convex/react";
-import { formatPrice, formatRelativeTime } from "@timeo/shared";
+import { usePlatformStats, usePlatformTenants } from "@timeo/api-client";
+import { formatPrice } from "@timeo/shared";
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -39,23 +37,41 @@ export default function DashboardScreen() {
   const { user } = useTimeoAuth();
   const [refreshing, setRefreshing] = useState(false);
 
-  const platformOverview = useQuery(api.analytics.getPlatformOverview);
-  const tenants = useQuery(api.tenants.list);
-  const revenueRankings = useQuery(api.analytics.getTenantRankings, {
-    metric: "revenue",
-    limit: 5,
-  });
-  const bookingRankings = useQuery(api.analytics.getTenantRankings, {
-    metric: "bookings",
-    limit: 5,
-  });
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = usePlatformStats();
+  const { data: tenants, isLoading: tenantsLoading, refetch: refetchTenants } = usePlatformTenants();
+
+  const revenueRankings = useMemo(() => {
+    if (!tenants) return undefined;
+    return [...tenants]
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5)
+      .map((t) => ({ tenantId: t.id, tenantName: t.name, value: t.revenue }));
+  }, [tenants]);
+
+  const bookingRankings = useMemo(() => {
+    if (!tenants) return undefined;
+    return [...tenants]
+      .sort((a, b) => b.memberCount - a.memberCount)
+      .slice(0, 5)
+      .map((t) => ({ tenantId: t.id, tenantName: t.name, value: t.memberCount }));
+  }, [tenants]);
+
+  const tenantsByPlan = useMemo(() => {
+    if (!tenants) return {} as Record<string, number>;
+    return tenants.reduce((acc: Record<string, number>, t) => {
+      acc[t.plan] = (acc[t.plan] ?? 0) + 1;
+      return acc;
+    }, {});
+  }, [tenants]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    Promise.all([refetchStats(), refetchTenants()]).finally(() =>
+      setRefreshing(false)
+    );
+  }, [refetchStats, refetchTenants]);
 
-  if (platformOverview === undefined || tenants === undefined) {
+  if (statsLoading || tenantsLoading) {
     return (
       <Screen scroll>
         <View className="mt-4">
@@ -81,7 +97,13 @@ export default function DashboardScreen() {
   }
 
   const displayName = user?.name ?? "Admin";
-  const growth = platformOverview.growthMetrics;
+  const growth = {
+    newTenantsThisMonth: stats?.newTenants30d ?? 0,
+    tenantGrowthPercent: 0,
+    newUsersThisMonth: 0,
+    userGrowthPercent: 0,
+  };
+  const totalUsers = (tenants ?? []).reduce((sum, t) => sum + t.memberCount, 0);
 
   return (
     <Screen scroll={false}>
@@ -118,33 +140,15 @@ export default function DashboardScreen() {
           <View className="flex-1">
             <StatCard
               label="Total Tenants"
-              value={platformOverview.totalTenants}
+              value={stats?.totalTenants ?? 0}
               icon={<Building2 size={18} color={theme.colors.primary} />}
-              trend={
-                growth.tenantGrowthPercent !== 0
-                  ? {
-                      value: Math.abs(growth.tenantGrowthPercent),
-                      direction:
-                        growth.tenantGrowthPercent >= 0 ? "up" : "down",
-                    }
-                  : undefined
-              }
             />
           </View>
           <View className="flex-1">
             <StatCard
               label="Total Users"
-              value={platformOverview.totalUsers}
+              value={totalUsers}
               icon={<Users size={18} color={theme.colors.secondary} />}
-              trend={
-                growth.userGrowthPercent !== 0
-                  ? {
-                      value: Math.abs(growth.userGrowthPercent),
-                      direction:
-                        growth.userGrowthPercent >= 0 ? "up" : "down",
-                    }
-                  : undefined
-              }
             />
           </View>
         </View>
@@ -152,15 +156,15 @@ export default function DashboardScreen() {
         <View className="mt-3 flex-row gap-3">
           <View className="flex-1">
             <StatCard
-              label="Total Bookings"
-              value={platformOverview.totalBookings}
+              label="New Tenants (30d)"
+              value={stats?.newTenants30d ?? 0}
               icon={<CalendarCheck size={18} color={theme.colors.warning} />}
             />
           </View>
           <View className="flex-1">
             <StatCard
-              label="Total Revenue"
-              value={formatPrice(platformOverview.totalRevenue)}
+              label="MRR"
+              value={formatPrice(stats?.mrr ?? 0)}
               icon={<DollarSign size={18} color={theme.colors.success} />}
             />
           </View>
@@ -169,15 +173,15 @@ export default function DashboardScreen() {
         <View className="mt-3 flex-row gap-3">
           <View className="flex-1">
             <StatCard
-              label="Total Orders"
-              value={platformOverview.totalOrders}
+              label="ARR"
+              value={formatPrice(stats?.arr ?? 0)}
               icon={<ShoppingCart size={18} color={theme.colors.info} />}
             />
           </View>
           <View className="flex-1">
             <StatCard
-              label="Active Tenants"
-              value={platformOverview.activeTenants}
+              label="Active Tenants (30d)"
+              value={stats?.activeTenants30d ?? 0}
               icon={<Activity size={18} color={theme.colors.success} />}
             />
           </View>
@@ -186,7 +190,7 @@ export default function DashboardScreen() {
         {/* Plan Distribution */}
         <Section title="Tenant Plans">
           <Card>
-            {Object.entries(platformOverview.tenantsByPlan).map(
+            {Object.entries(tenantsByPlan).map(
               ([plan, count]) => (
                 <Row key={plan} justify="between" className="mb-1">
                   <Text
@@ -284,7 +288,7 @@ export default function DashboardScreen() {
         <Section title="Top Tenants by Revenue">
           {revenueRankings === undefined ? (
             <Skeleton height={80} borderRadius={12} />
-          ) : (revenueRankings ?? []).length === 0 ? (
+          ) : revenueRankings.length === 0 ? (
             <Card>
               <Text
                 className="text-center text-sm"
@@ -295,7 +299,7 @@ export default function DashboardScreen() {
             </Card>
           ) : (
             <View>
-              {(revenueRankings ?? []).map((t, i) => (
+              {revenueRankings.map((t, i) => (
                 <Card key={t.tenantId} className="mb-2">
                   <Row justify="between" align="center">
                     <View className="flex-row items-center flex-1">
@@ -333,22 +337,22 @@ export default function DashboardScreen() {
           )}
         </Section>
 
-        {/* Tenant Rankings by Bookings */}
-        <Section title="Top Tenants by Bookings">
+        {/* Tenant Rankings by Members */}
+        <Section title="Top Tenants by Members">
           {bookingRankings === undefined ? (
             <Skeleton height={80} borderRadius={12} />
-          ) : (bookingRankings ?? []).length === 0 ? (
+          ) : bookingRankings.length === 0 ? (
             <Card>
               <Text
                 className="text-center text-sm"
                 style={{ color: theme.colors.textSecondary }}
               >
-                No booking data yet.
+                No member data yet.
               </Text>
             </Card>
           ) : (
             <View>
-              {(bookingRankings ?? []).map((t, i) => (
+              {bookingRankings.map((t, i) => (
                 <Card key={t.tenantId} className="mb-2">
                   <Row justify="between" align="center">
                     <View className="flex-row items-center flex-1">
@@ -421,7 +425,7 @@ export default function DashboardScreen() {
             onPress: () => router.push("/(tabs)/tenants"),
           }}
         >
-          {tenants.length === 0 ? (
+          {(tenants ?? []).length === 0 ? (
             <Card>
               <Text
                 className="text-center text-sm"
@@ -431,12 +435,12 @@ export default function DashboardScreen() {
               </Text>
             </Card>
           ) : (
-            tenants.slice(0, 5).map((tenant) => (
+            (tenants ?? []).slice(0, 5).map((tenant) => (
               <TouchableOpacity
-                key={tenant._id}
+                key={tenant.id}
                 activeOpacity={0.7}
                 onPress={() =>
-                  router.push(`/tenants/${tenant._id}` as any)
+                  router.push(`/tenants/${tenant.id}` as any)
                 }
               >
                 <Card className="mb-2">

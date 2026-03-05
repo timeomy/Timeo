@@ -2,9 +2,8 @@ import { useState, useCallback } from "react";
 import { View, Text, TextInput, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { CreditCard, Check, AlertCircle } from "lucide-react-native";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
 import { useTimeoAuth } from "@timeo/auth";
+import { useGiftCardByCode, useRedeemGiftCard } from "@timeo/api-client";
 import {
   Screen,
   Header,
@@ -18,23 +17,26 @@ export default function RedeemGiftCardScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as any;
+  const tenantId = activeTenantId as string;
 
   const [code, setCode] = useState("");
+  const [lookupCode, setLookupCode] = useState("");
   const [amount, setAmount] = useState("");
   const [redeeming, setRedeeming] = useState(false);
 
-  const validation = useQuery(
-    api.giftCards.validateCode,
-    tenantId && code.trim().length >= 3
-      ? { tenantId, code: code.trim().toUpperCase() }
-      : "skip"
+  const { data: giftCard, isError: codeInvalid } = useGiftCardByCode(
+    tenantId,
+    lookupCode.length >= 3 ? lookupCode : null
   );
 
-  const redeemGiftCard = useMutation(api.giftCards.redeem);
+  const { mutateAsync: redeemGiftCard } = useRedeemGiftCard(tenantId ?? "");
+
+  const handleCodeSubmit = useCallback(() => {
+    setLookupCode(code.trim().toUpperCase());
+  }, [code]);
 
   const handleRedeem = useCallback(async () => {
-    if (!tenantId || !code.trim() || !amount.trim()) return;
+    if (!tenantId || !giftCard || !amount.trim()) return;
     const amountCents = Math.round(parseFloat(amount) * 100);
     if (isNaN(amountCents) || amountCents <= 0) {
       Alert.alert("Error", "Please enter a valid amount");
@@ -43,13 +45,12 @@ export default function RedeemGiftCardScreen() {
     setRedeeming(true);
     try {
       const result = await redeemGiftCard({
-        tenantId,
-        code: code.trim().toUpperCase(),
+        giftCardId: giftCard.id,
         amount: amountCents,
       });
       Alert.alert(
         "Success",
-        `Redeemed RM ${(amountCents / 100).toFixed(2)}.\nNew balance: RM ${(result.newBalance / 100).toFixed(2)}`,
+        `Redeemed RM ${(amountCents / 100).toFixed(2)}.\nNew balance: RM ${(result.remainingBalance / 100).toFixed(2)}`,
         [{ text: "OK", onPress: () => router.back() }]
       );
     } catch (err) {
@@ -60,7 +61,7 @@ export default function RedeemGiftCardScreen() {
     } finally {
       setRedeeming(false);
     }
-  }, [tenantId, code, amount, redeemGiftCard, router]);
+  }, [tenantId, giftCard, amount, redeemGiftCard, router]);
 
   if (!tenantId) {
     return (
@@ -75,8 +76,8 @@ export default function RedeemGiftCardScreen() {
     );
   }
 
-  const isValid = validation && validation.valid === true;
-  const isInvalid = validation && validation.valid === false;
+  const isValid = !!giftCard && giftCard.isActive;
+  const isInvalid = lookupCode.length >= 3 && (codeInvalid || (!!giftCard && !giftCard.isActive));
 
   return (
     <Screen padded={false}>
@@ -111,13 +112,16 @@ export default function RedeemGiftCardScreen() {
             onChangeText={setCode}
             autoCapitalize="characters"
             autoCorrect={false}
+            onEndEditing={handleCodeSubmit}
+            onSubmitEditing={handleCodeSubmit}
+            returnKeyType="search"
           />
         </Card>
 
         <Spacer size={12} />
 
         {/* Validation Result */}
-        {isValid && validation.card && (
+        {isValid && giftCard && (
           <Card>
             <View
               className="rounded-xl p-4"
@@ -137,13 +141,13 @@ export default function RedeemGiftCardScreen() {
                 className="text-sm"
                 style={{ color: theme.colors.text }}
               >
-                Code: {validation.card.code}
+                Code: {giftCard.code}
               </Text>
               <Text
                 className="mt-1 text-2xl font-bold"
                 style={{ color: theme.colors.success }}
               >
-                RM {(validation.card.currentBalance / 100).toFixed(2)}
+                RM {(giftCard.currentBalance / 100).toFixed(2)}
               </Text>
               <Text
                 className="text-xs"
@@ -166,7 +170,7 @@ export default function RedeemGiftCardScreen() {
                 className="ml-2 text-sm font-medium"
                 style={{ color: theme.colors.error }}
               >
-                {validation.reason}
+                {giftCard && !giftCard.isActive ? "Gift card is inactive or expired" : "Gift card not found"}
               </Text>
             </View>
           </Card>

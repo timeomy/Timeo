@@ -50,8 +50,12 @@ interface TopItem {
 
 interface CustomerAnalytics {
   total: number;
+  totalCustomers: number;
   newThisMonth: number;
+  newCustomers: number;
   returning: number;
+  returningCustomers: number;
+  retentionRate: number;
   topSpenders: Array<{
     userId: string;
     name: string;

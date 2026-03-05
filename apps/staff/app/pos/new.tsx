@@ -16,9 +16,12 @@ import {
   Tag,
   Save,
 } from "lucide-react-native";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
 import { useTimeoAuth } from "@timeo/auth";
+import {
+  useCustomers,
+  useValidateVoucher,
+  useCreatePosTransaction,
+} from "@timeo/api-client";
 import {
   Screen,
   Header,
@@ -57,9 +60,9 @@ export default function NewTransactionScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as any;
+  const tenantId = activeTenantId as string;
 
-  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [selectedCustomerEmail, setSelectedCustomerEmail] = useState("");
   const [items, setItems] = useState<LineItem[]>([
     { type: "product", name: "", price: "", quantity: "1" },
   ]);
@@ -68,29 +71,26 @@ export default function NewTransactionScreen() {
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const members = useQuery(
-    api.tenantMemberships.listByTenant,
-    tenantId ? { tenantId } : "skip"
+  const { data: customers, isLoading } = useCustomers(tenantId);
+
+  const { data: voucherValidation } = useValidateVoucher(
+    tenantId,
+    voucherCode.trim().length >= 3
+      ? { code: voucherCode.trim().toUpperCase() }
+      : undefined
   );
 
-  const voucherValidation = useQuery(
-    api.vouchers.validateCode,
-    tenantId && voucherCode.trim().length >= 3
-      ? { tenantId, code: voucherCode.trim().toUpperCase() }
-      : "skip"
+  const { mutateAsync: createTransaction } = useCreatePosTransaction(
+    tenantId ?? ""
   );
-
-  const createTransaction = useMutation(api.pos.createTransaction);
 
   const customerOptions = useMemo(() => {
-    if (!members) return [];
-    return members
-      .filter((m) => m.status === "active")
-      .map((m) => ({
-        label: `${m.userName} (${m.userEmail})`,
-        value: m.userId as string,
-      }));
-  }, [members]);
+    if (!customers) return [];
+    return customers.map((c) => ({
+      label: `${c.name} (${c.email})`,
+      value: c.email,
+    }));
+  }, [customers]);
 
   const addItem = useCallback(() => {
     setItems((prev) => [
@@ -124,11 +124,7 @@ export default function NewTransactionScreen() {
     }
 
     let disc = 0;
-    if (
-      voucherValidation &&
-      voucherValidation.valid &&
-      voucherValidation.voucher
-    ) {
+    if (voucherValidation?.valid && voucherValidation.voucher) {
       const v = voucherValidation.voucher;
       if (v.type === "percentage") {
         disc = Math.round((sub * v.value) / 100);
@@ -145,7 +141,7 @@ export default function NewTransactionScreen() {
   }, [items, voucherValidation]);
 
   const handleSubmit = useCallback(async () => {
-    if (!selectedCustomerId) {
+    if (!selectedCustomerEmail) {
       Alert.alert("Error", "Please select a customer.");
       return;
     }
@@ -158,17 +154,15 @@ export default function NewTransactionScreen() {
     );
 
     if (validItems.length === 0) {
-      Alert.alert("Error", "Please add at least one item with a valid name, price, and quantity.");
+      Alert.alert(
+        "Error",
+        "Please add at least one item with a valid name, price, and quantity."
+      );
       return;
     }
 
     const formattedItems = validItems.map((item) => ({
-      type: item.type as
-        | "membership"
-        | "session_package"
-        | "service"
-        | "product",
-      referenceId: selectedCustomerId,
+      type: item.type,
       name: item.name.trim(),
       price: Math.round(parseFloat(item.price) * 100),
       quantity: parseInt(item.quantity, 10),
@@ -177,20 +171,19 @@ export default function NewTransactionScreen() {
     setIsSubmitting(true);
     try {
       const result = await createTransaction({
-        tenantId,
-        customerId: selectedCustomerId as any,
+        customerEmail: selectedCustomerEmail,
         items: formattedItems,
-        paymentMethod: paymentMethod as any,
+        paymentMethod,
         voucherId:
-          voucherValidation?.valid && voucherValidation.voucher
-            ? (voucherValidation.voucher._id as any)
+          voucherValidation?.valid
+            ? (voucherValidation.voucher?.id ?? voucherValidation.voucherId)
             : undefined,
         discount: discount > 0 ? discount : undefined,
         notes: notes.trim() || undefined,
       });
       Alert.alert(
         "Transaction Complete",
-        `Receipt: ${result.receiptNumber}\nTotal: RM ${(total / 100).toFixed(2)}`,
+        `Receipt: ${result.receiptNumber ?? ""}\nTotal: RM ${(total / 100).toFixed(2)}`,
         [{ text: "OK", onPress: () => router.back() }]
       );
     } catch (err) {
@@ -202,13 +195,12 @@ export default function NewTransactionScreen() {
       setIsSubmitting(false);
     }
   }, [
-    selectedCustomerId,
+    selectedCustomerEmail,
     items,
     paymentMethod,
     voucherValidation,
     discount,
     total,
-    tenantId,
     notes,
     createTransaction,
     router,
@@ -227,7 +219,7 @@ export default function NewTransactionScreen() {
     );
   }
 
-  if (members === undefined) {
+  if (isLoading && !customers) {
     return <LoadingScreen message="Loading..." />;
   }
 
@@ -252,8 +244,8 @@ export default function NewTransactionScreen() {
           </View>
           <Select
             options={customerOptions}
-            value={selectedCustomerId}
-            onChange={setSelectedCustomerId}
+            value={selectedCustomerEmail}
+            onChange={setSelectedCustomerEmail}
             placeholder="Select a customer..."
           />
         </Card>
@@ -411,7 +403,7 @@ export default function NewTransactionScreen() {
               color: theme.colors.text,
               borderWidth: 1,
               borderColor:
-                voucherValidation && voucherValidation.valid
+                voucherValidation?.valid
                   ? theme.colors.success
                   : voucherValidation && !voucherValidation.valid
                     ? theme.colors.error
@@ -424,7 +416,7 @@ export default function NewTransactionScreen() {
             autoCapitalize="characters"
             autoCorrect={false}
           />
-          {voucherValidation && voucherValidation.valid && voucherValidation.voucher && (
+          {voucherValidation?.valid && voucherValidation.voucher && (
             <Text
               className="mt-1 text-xs"
               style={{ color: theme.colors.success }}
@@ -532,7 +524,10 @@ export default function NewTransactionScreen() {
         <Button size="lg" onPress={handleSubmit} loading={isSubmitting}>
           <View className="flex-row items-center">
             <Save size={18} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
-            <Text className="ml-2 text-base font-semibold" style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}>
+            <Text
+              className="ml-2 text-base font-semibold"
+              style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}
+            >
               Complete Transaction
             </Text>
           </View>

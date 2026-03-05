@@ -10,7 +10,7 @@ export default function SignIn() {
       appSubtitle="Manage your business"
       onSignUp={() => router.replace("/(auth)/sign-up")}
       onSuccess={() => router.replace("/(tabs)")}
-      onForgotPassword={() => router.push("/(auth)/forgot-password")}
+      onForgotPassword={() => router.push("/(auth)/forgot-password" as any)}
     />
   );
 }

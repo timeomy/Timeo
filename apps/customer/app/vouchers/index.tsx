@@ -2,8 +2,7 @@ import { useState, useCallback } from "react";
 import { View, Text, FlatList, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { Ticket, Tag, Percent } from "lucide-react-native";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { useVouchers } from "@timeo/api-client";
 import { useTimeoAuth } from "@timeo/auth";
 import {
   Screen,
@@ -14,20 +13,22 @@ import {
   useTheme,
 } from "@timeo/ui";
 
-function formatRedemptionDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString("en-MY", {
+function formatRedemptionDate(dateStr: string | undefined): string {
+  if (!dateStr) return "";
+  return new Date(dateStr).toLocaleDateString("en-MY", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
 }
 
-function formatDiscount(type: string | undefined, value: number | undefined): string {
+function formatDiscount(
+  type: string | undefined,
+  value: number | undefined
+): string {
   if (!type || value == null) return "";
   if (type === "percentage") return `${value}% off`;
-  if (type === "fixed") {
-    return `RM ${(value / 100).toFixed(2)} off`;
-  }
+  if (type === "fixed") return `RM ${(value / 100).toFixed(2)} off`;
   if (type === "free_session") return "Free Session";
   return "";
 }
@@ -36,20 +37,16 @@ export default function VouchersScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as any;
   const [refreshing, setRefreshing] = useState(false);
+
+  const { data: vouchers, isLoading, refetch } = useVouchers(activeTenantId);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    refetch().finally(() => setRefreshing(false));
+  }, [refetch]);
 
-  const vouchers = useQuery(
-    api.vouchers.getMyVouchers,
-    tenantId ? { tenantId } : "skip"
-  );
-
-  if (!tenantId) {
+  if (!activeTenantId) {
     return (
       <Screen>
         <Header title="My Vouchers" onBack={() => router.back()} />
@@ -62,7 +59,7 @@ export default function VouchersScreen() {
     );
   }
 
-  if (vouchers === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading vouchers..." />;
   }
 
@@ -72,7 +69,7 @@ export default function VouchersScreen() {
 
       <FlatList
         data={vouchers}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -89,74 +86,86 @@ export default function VouchersScreen() {
             icon={<Ticket size={32} color={theme.colors.textSecondary} />}
           />
         }
-        renderItem={({ item }) => (
-          <Card>
-            <View className="flex-row items-start">
-              <View
-                className="mr-3 rounded-lg p-2"
-                style={{ backgroundColor: theme.colors.primary + "15" }}
-              >
-                {item.voucherType === "percentage" ? (
-                  <Percent size={20} color={theme.colors.primary} />
-                ) : (
-                  <Tag size={20} color={theme.colors.primary} />
-                )}
-              </View>
-              <View className="flex-1">
-                <View className="flex-row items-center justify-between">
-                  <Text
-                    className="text-base font-bold font-mono"
-                    style={{ color: theme.colors.text }}
-                  >
-                    {item.voucherCode}
-                  </Text>
-                  <Text
-                    className="text-sm font-semibold"
-                    style={{ color: theme.colors.success }}
-                  >
-                    -RM {(item.discountAmount / 100).toFixed(2)}
-                  </Text>
+        renderItem={({ item }) => {
+          const voucherType = item.voucherType ?? item.discountType;
+          const voucherValue = item.voucherValue ?? item.discountValue;
+          const voucherCode = item.voucherCode ?? item.code;
+          const discountAmount = item.discountAmount;
+          const redeemedAt = item.redeemedAt;
+
+          return (
+            <Card>
+              <View className="flex-row items-start">
+                <View
+                  className="mr-3 rounded-lg p-2"
+                  style={{ backgroundColor: theme.colors.primary + "15" }}
+                >
+                  {voucherType === "percentage" ? (
+                    <Percent size={20} color={theme.colors.primary} />
+                  ) : (
+                    <Tag size={20} color={theme.colors.primary} />
+                  )}
                 </View>
-                <Text
-                  className="mt-1 text-sm"
-                  style={{ color: theme.colors.textSecondary }}
-                >
-                  {formatDiscount(item.voucherType, item.voucherValue)}
-                </Text>
-                {item.voucherSource === "partner" && item.voucherPartnerName ? (
-                  <View className="mt-1 flex-row items-center">
-                    <View
-                      className="rounded-full px-2 py-0.5"
-                      style={{ backgroundColor: theme.colors.info + "15" }}
+                <View className="flex-1">
+                  <View className="flex-row items-center justify-between">
+                    <Text
+                      className="text-base font-bold font-mono"
+                      style={{ color: theme.colors.text }}
                     >
+                      {voucherCode}
+                    </Text>
+                    {discountAmount != null ? (
                       <Text
-                        className="text-xs font-medium"
-                        style={{ color: theme.colors.info }}
+                        className="text-sm font-semibold"
+                        style={{ color: theme.colors.success }}
                       >
-                        Partner: {item.voucherPartnerName}
+                        -RM {(discountAmount / 100).toFixed(2)}
                       </Text>
-                    </View>
+                    ) : null}
                   </View>
-                ) : null}
-                {item.voucherDescription ? (
                   <Text
-                    className="mt-1 text-xs"
+                    className="mt-1 text-sm"
                     style={{ color: theme.colors.textSecondary }}
-                    numberOfLines={2}
                   >
-                    {item.voucherDescription}
+                    {formatDiscount(voucherType, voucherValue)}
                   </Text>
-                ) : null}
-                <Text
-                  className="mt-1 text-xs"
-                  style={{ color: theme.colors.textSecondary }}
-                >
-                  Redeemed {formatRedemptionDate(item.redeemedAt)}
-                </Text>
+                  {item.source === "partner" && item.partnerName ? (
+                    <View className="mt-1 flex-row items-center">
+                      <View
+                        className="rounded-full px-2 py-0.5"
+                        style={{ backgroundColor: theme.colors.info + "15" }}
+                      >
+                        <Text
+                          className="text-xs font-medium"
+                          style={{ color: theme.colors.info }}
+                        >
+                          Partner: {item.partnerName}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
+                  {item.description ? (
+                    <Text
+                      className="mt-1 text-xs"
+                      style={{ color: theme.colors.textSecondary }}
+                      numberOfLines={2}
+                    >
+                      {item.description}
+                    </Text>
+                  ) : null}
+                  {redeemedAt ? (
+                    <Text
+                      className="mt-1 text-xs"
+                      style={{ color: theme.colors.textSecondary }}
+                    >
+                      Redeemed {formatRedemptionDate(redeemedAt)}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
-            </View>
-          </Card>
-        )}
+            </Card>
+          );
+        }}
       />
     </Screen>
   );

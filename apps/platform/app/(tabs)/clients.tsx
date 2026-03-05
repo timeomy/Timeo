@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { View, Text, FlatList, RefreshControl } from "react-native";
 import { Users } from "lucide-react-native";
 import {
@@ -11,25 +11,32 @@ import {
   Spacer,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useQuery } from "convex/react";
+import { usePlatformUsers } from "@timeo/api-client";
 
 export default function ClientsScreen() {
   const theme = useTheme();
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
-  const clients = useQuery(
-    api.platform.listAllUsers,
-    search.trim() ? { search } : {}
-  );
+  const { data: allClients, isLoading, refetch } = usePlatformUsers();
+
+  const clients = useMemo(() => {
+    if (!allClients) return [];
+    if (!search.trim()) return allClients;
+    const q = search.toLowerCase().trim();
+    return allClients.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.email.toLowerCase().includes(q)
+    );
+  }, [allClients, search]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    refetch().finally(() => setRefreshing(false));
+  }, [refetch]);
 
-  if (clients === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading clients..." />;
   }
 
@@ -47,7 +54,7 @@ export default function ClientsScreen() {
 
       <FlatList
         data={clients}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -105,19 +112,19 @@ export default function ClientsScreen() {
                     {client.email}
                   </Text>
                 ) : null}
-                {client.tenantNames.length > 0 ? (
+                {client.tenantCount > 0 ? (
                   <Text
                     className="mt-0.5 text-xs"
                     style={{ color: theme.colors.textSecondary }}
                     numberOfLines={1}
                   >
-                    {client.tenantNames.join(" · ")}
+                    {client.tenantCount} tenant{client.tenantCount !== 1 ? "s" : ""}
                   </Text>
                 ) : null}
               </View>
 
-              {/* Membership count */}
-              {client.membershipCount > 0 ? (
+              {/* Tenant count badge */}
+              {client.tenantCount > 0 ? (
                 <View
                   className="rounded-full px-2 py-0.5"
                   style={{ backgroundColor: theme.colors.primary + "15" }}
@@ -126,7 +133,7 @@ export default function ClientsScreen() {
                     className="text-xs font-semibold"
                     style={{ color: theme.colors.primary }}
                   >
-                    {client.membershipCount}
+                    {client.tenantCount}
                   </Text>
                 </View>
               ) : null}

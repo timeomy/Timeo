@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -22,8 +22,12 @@ import {
   useTheme,
 } from "@timeo/ui";
 import { useTimeoAuth } from "@timeo/auth";
-import { api } from "@timeo/api";
-import { useQuery, useMutation } from "convex/react";
+import {
+  useBookings,
+  useBlockedSlots,
+  useCreateBlockedSlot,
+  useDeleteBlockedSlot,
+} from "@timeo/api-client";
 // Uses local formatHourMinute instead of shared formatTime for schedule display
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -79,40 +83,27 @@ export default function StaffScheduleScreen() {
     return { start: weekStart.getTime(), end: weekEnd.getTime() };
   }, [weekOffset]);
 
-  // Get the Convex user to find internal userId
-  const convexUser = useQuery(api.users.getCurrent);
-
-  const staffSchedule = useQuery(
-    api.scheduling.getStaffSchedule,
-    convexUser && tenantId
-      ? {
-          tenantId: tenantId as any,
-          staffId: convexUser._id as any,
-          startDate: weekRange.start,
-          endDate: weekRange.end,
-        }
-      : "skip"
-  );
-
-  const createBlockedSlot = useMutation(api.scheduling.createBlockedSlot);
-  const deleteBlockedSlot = useMutation(api.scheduling.deleteBlockedSlot);
+  const { data: allBookings, isLoading: bookingsLoading } = useBookings(tenantId);
+  const { data: allBlockedSlots, isLoading: slotsLoading } = useBlockedSlots(tenantId);
+  const { mutateAsync: createBlockedSlot } = useCreateBlockedSlot(tenantId ?? "");
+  const { mutateAsync: deleteBlockedSlot } = useDeleteBlockedSlot(tenantId ?? "");
 
   // Group events by day
   const dayEvents = useMemo(() => {
-    if (!staffSchedule) return [];
-
     const days = [];
     for (let i = 0; i < 7; i++) {
       const dayStart = weekRange.start + i * DAY_MS;
       const dayEnd = dayStart + DAY_MS;
       const dayDate = new Date(dayStart);
 
-      const bookings = staffSchedule.bookings.filter(
-        (b: any) => b.startTime >= dayStart && b.startTime < dayEnd
-      );
-      const blocked = staffSchedule.blockedSlots.filter(
-        (bs: any) => bs.startTime >= dayStart && bs.startTime < dayEnd
-      );
+      const bookings = (allBookings ?? []).filter((b) => {
+        const t = new Date(b.startTime).getTime();
+        return t >= dayStart && t < dayEnd;
+      });
+      const blocked = (allBlockedSlots ?? []).filter((bs) => {
+        const t = new Date(bs.startTime).getTime();
+        return t >= dayStart && t < dayEnd;
+      });
 
       days.push({
         date: dayStart,
@@ -125,10 +116,10 @@ export default function StaffScheduleScreen() {
       });
     }
     return days;
-  }, [staffSchedule, weekRange]);
+  }, [allBookings, allBlockedSlots, weekRange]);
 
   const handleCreateBlock = useCallback(async () => {
-    if (!tenantId || !convexUser || !blockDate || !blockStartTime || !blockEndTime) {
+    if (!tenantId || !blockDate || !blockStartTime || !blockEndTime) {
       setToast({
         message: "Please fill in all fields",
         type: "error",
@@ -147,10 +138,9 @@ export default function StaffScheduleScreen() {
       }
 
       await createBlockedSlot({
-        tenantId: tenantId as any,
-        staffId: convexUser._id as any,
-        startTime: startMs,
-        endTime: endMs,
+        staffId: user?.id,
+        startTime: new Date(startMs).toISOString(),
+        endTime: new Date(endMs).toISOString(),
         reason: blockReason || "Blocked",
       });
 
@@ -171,7 +161,7 @@ export default function StaffScheduleScreen() {
     } finally {
       setBlocking(false);
     }
-  }, [tenantId, convexUser, blockDate, blockStartTime, blockEndTime, blockReason, createBlockedSlot]);
+  }, [tenantId, user, blockDate, blockStartTime, blockEndTime, blockReason, createBlockedSlot]);
 
   const handleDeleteBlock = useCallback(
     (slotId: string, reason: string) => {
@@ -182,7 +172,7 @@ export default function StaffScheduleScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await deleteBlockedSlot({ blockedSlotId: slotId as any });
+              await deleteBlockedSlot(slotId);
               setToast({
                 message: "Block removed",
                 type: "success",
@@ -200,11 +190,12 @@ export default function StaffScheduleScreen() {
     [deleteBlockedSlot]
   );
 
-  if (!tenantId || convexUser === undefined) {
+  if (!tenantId) {
     return <LoadingScreen message="Loading schedule..." />;
   }
 
   const weekLabel = `${formatShortDate(weekRange.start)} — ${formatShortDate(weekRange.end - DAY_MS)}`;
+  const scheduleLoading = bookingsLoading || slotsLoading;
 
   return (
     <Screen padded={false}>
@@ -275,7 +266,7 @@ export default function StaffScheduleScreen() {
         <Separator />
 
         {/* Daily Schedule */}
-        {staffSchedule === undefined ? (
+        {scheduleLoading ? (
           <View className="items-center py-8">
             <Text
               className="text-sm"
@@ -300,7 +291,11 @@ export default function StaffScheduleScreen() {
                     <Text
                       className="text-xs font-bold"
                       style={{
-                        color: day.isToday ? (theme.dark ? "#0B0B0F" : "#FFFFFF") : theme.colors.text,
+                        color: day.isToday
+                          ? theme.dark
+                            ? "#0B0B0F"
+                            : "#FFFFFF"
+                          : theme.colors.text,
                       }}
                     >
                       {day.dayNum}
@@ -316,19 +311,20 @@ export default function StaffScheduleScreen() {
                   >
                     {day.dayName} {day.month}
                   </Text>
-                  {day.bookings.length === 0 && day.blockedSlots.length === 0 && (
-                    <Text
-                      className="text-xs"
-                      style={{ color: theme.colors.textSecondary }}
-                    >
-                      No events
-                    </Text>
-                  )}
+                  {day.bookings.length === 0 &&
+                    day.blockedSlots.length === 0 && (
+                      <Text
+                        className="text-xs"
+                        style={{ color: theme.colors.textSecondary }}
+                      >
+                        No events
+                      </Text>
+                    )}
                 </Row>
 
                 {/* Bookings */}
-                {day.bookings.map((booking: any) => (
-                  <Card key={booking._id} className="mb-1.5 ml-10">
+                {day.bookings.map((booking) => (
+                  <Card key={booking.id} className="mb-1.5 ml-10">
                     <Row justify="between" align="center">
                       <View className="flex-1">
                         <Text
@@ -341,9 +337,14 @@ export default function StaffScheduleScreen() {
                           className="text-xs"
                           style={{ color: theme.colors.textSecondary }}
                         >
-                          {formatHourMinute(booking.startTime)} –{" "}
-                          {formatHourMinute(booking.endTime)} ·{" "}
-                          {booking.customerName}
+                          {formatHourMinute(
+                            new Date(booking.startTime).getTime()
+                          )}{" "}
+                          –{" "}
+                          {formatHourMinute(
+                            new Date(booking.endTime).getTime()
+                          )}{" "}
+                          · {booking.customerName}
                         </Text>
                       </View>
                       <Badge
@@ -361,8 +362,8 @@ export default function StaffScheduleScreen() {
                 ))}
 
                 {/* Blocked Slots */}
-                {day.blockedSlots.map((bs: any) => (
-                  <Card key={bs._id} className="mb-1.5 ml-10">
+                {day.blockedSlots.map((bs) => (
+                  <Card key={bs.id} className="mb-1.5 ml-10">
                     <Row justify="between" align="center">
                       <View className="flex-1">
                         <Row align="center" gap={4}>
@@ -378,12 +379,17 @@ export default function StaffScheduleScreen() {
                           className="text-xs"
                           style={{ color: theme.colors.textSecondary }}
                         >
-                          {formatHourMinute(bs.startTime)} –{" "}
-                          {formatHourMinute(bs.endTime)}
+                          {formatHourMinute(
+                            new Date(bs.startTime).getTime()
+                          )}{" "}
+                          –{" "}
+                          {formatHourMinute(new Date(bs.endTime).getTime())}
                         </Text>
                       </View>
                       <TouchableOpacity
-                        onPress={() => handleDeleteBlock(bs._id, bs.reason)}
+                        onPress={() =>
+                          handleDeleteBlock(bs.id, bs.reason ?? "")
+                        }
                         className="rounded-lg p-2"
                       >
                         <Trash2 size={16} color={theme.colors.error} />

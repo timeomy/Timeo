@@ -14,8 +14,7 @@ import {
   EmptyState,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useQuery } from "convex/react";
+import { useEInvoiceRequests } from "@timeo/api-client";
 
 type StatusFilter = "all" | "pending" | "submitted" | "rejected";
 
@@ -31,6 +30,7 @@ function getStatusVariant(status: string): "success" | "warning" | "error" | "de
     case "pending":
       return "warning";
     case "submitted":
+    case "accepted":
       return "success";
     case "rejected":
       return "error";
@@ -39,8 +39,8 @@ function getStatusVariant(status: string): "success" | "warning" | "error" | "de
   }
 }
 
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString("en-MY", {
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-MY", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -58,10 +58,7 @@ export default function EInvoiceScreen() {
 
   const tenantId = activeTenantId as string;
 
-  const requests = useQuery(
-    api.eInvoice.listByTenant,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
+  const { data: requests, isLoading, refetch } = useEInvoiceRequests(tenantId);
 
   const filteredRequests = useMemo(() => {
     if (!requests) return [];
@@ -69,10 +66,11 @@ export default function EInvoiceScreen() {
     return requests.filter((r) => r.status === statusFilter);
   }, [requests, statusFilter]);
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   if (!tenantId) {
     return (
@@ -90,14 +88,14 @@ export default function EInvoiceScreen() {
     );
   }
 
-  if (requests === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading e-invoice requests..." />;
   }
 
-  const renderRequest = ({ item }: { item: (typeof filteredRequests)[0] }) => (
+  const renderRequest = ({ item }: { item: NonNullable<typeof requests>[0] }) => (
     <Card
       className="mb-3"
-      onPress={() => router.push(`/e-invoice/${item._id}` as any)}
+      onPress={() => router.push(`/e-invoice/${item.id}` as any)}
     >
       <Row justify="between" align="start">
         <View className="flex-1">
@@ -105,15 +103,17 @@ export default function EInvoiceScreen() {
             className="text-base font-semibold"
             style={{ color: theme.colors.text }}
           >
-            {item.receiptNumber}
+            {item.receiptNumber ?? item.invoiceNumber}
           </Text>
           <Spacer size={4} />
-          <Text
-            className="text-sm"
-            style={{ color: theme.colors.textSecondary }}
-          >
-            {item.buyerName}
-          </Text>
+          {item.buyerName ? (
+            <Text
+              className="text-sm"
+              style={{ color: theme.colors.textSecondary }}
+            >
+              {item.buyerName}
+            </Text>
+          ) : null}
           {item.buyerEmail ? (
             <Text
               className="text-xs"
@@ -177,7 +177,7 @@ export default function EInvoiceScreen() {
       </View>
       <FlatList
         data={filteredRequests}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         renderItem={renderRequest}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}

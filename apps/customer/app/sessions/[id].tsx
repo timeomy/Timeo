@@ -9,8 +9,8 @@ import {
   Heart,
   Weight,
 } from "lucide-react-native";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { useSessionLogs } from "@timeo/api-client";
+import { useTimeoAuth } from "@timeo/auth";
 import {
   Screen,
   Header,
@@ -23,8 +23,8 @@ import {
   useTheme,
 } from "@timeo/ui";
 
-function formatSessionDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString("en-MY", {
+function formatSessionDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-MY", {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -40,17 +40,16 @@ export default function SessionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const theme = useTheme();
+  const { activeTenantId } = useTimeoAuth();
 
-  const session = useQuery(
-    api.sessionLogs.getById,
-    id ? { sessionLogId: id as any } : "skip"
-  );
+  const { data: sessions, isLoading } = useSessionLogs(activeTenantId);
+  const session = sessions?.find((s) => s.id === id);
 
-  if (session === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading session..." />;
   }
 
-  if (session === null) {
+  if (!session) {
     return (
       <ErrorScreen
         title="Session not found"
@@ -59,6 +58,8 @@ export default function SessionDetailScreen() {
       />
     );
   }
+
+  const metrics = session.metrics as Record<string, unknown> | undefined;
 
   return (
     <Screen padded={false}>
@@ -71,7 +72,9 @@ export default function SessionDetailScreen() {
         {/* Session Type & Date */}
         <Card>
           <View className="flex-row items-center justify-between">
-            <Badge label={formatSessionType(session.sessionType)} />
+            <Badge
+              label={formatSessionType(session.sessionType ?? "session")}
+            />
             <View className="flex-row items-center">
               <Calendar size={14} color={theme.colors.textSecondary} />
               <Text
@@ -88,28 +91,30 @@ export default function SessionDetailScreen() {
           <Spacer size={12} />
 
           {/* Coach */}
-          <View className="flex-row items-center">
-            <View
-              className="mr-3 rounded-lg p-2"
-              style={{ backgroundColor: theme.colors.primary + "15" }}
-            >
-              <User size={18} color={theme.colors.primary} />
-            </View>
-            <View>
-              <Text
-                className="text-xs"
-                style={{ color: theme.colors.textSecondary }}
+          {session.coachName ? (
+            <View className="flex-row items-center">
+              <View
+                className="mr-3 rounded-lg p-2"
+                style={{ backgroundColor: theme.colors.primary + "15" }}
               >
-                Coach
-              </Text>
-              <Text
-                className="text-base font-semibold"
-                style={{ color: theme.colors.text }}
-              >
-                {session.coachName}
-              </Text>
+                <User size={18} color={theme.colors.primary} />
+              </View>
+              <View>
+                <Text
+                  className="text-xs"
+                  style={{ color: theme.colors.textSecondary }}
+                >
+                  Coach
+                </Text>
+                <Text
+                  className="text-base font-semibold"
+                  style={{ color: theme.colors.text }}
+                >
+                  {session.coachName}
+                </Text>
+              </View>
             </View>
-          </View>
+          ) : null}
         </Card>
 
         {/* Notes */}
@@ -150,7 +155,7 @@ export default function SessionDetailScreen() {
                   Exercises ({session.exercises.length})
                 </Text>
               </View>
-              {session.exercises.map((exercise: any, index: number) => (
+              {session.exercises.map((exercise, index) => (
                 <View key={index}>
                   {index > 0 && <Separator className="my-2" />}
                   <View>
@@ -210,7 +215,7 @@ export default function SessionDetailScreen() {
         ) : null}
 
         {/* Metrics */}
-        {session.metrics ? (
+        {metrics ? (
           <>
             <Spacer size={12} />
             <Card>
@@ -224,14 +229,14 @@ export default function SessionDetailScreen() {
                 </Text>
               </View>
               <View className="flex-row flex-wrap" style={{ gap: 16 }}>
-                {session.metrics.weight != null && (
+                {metrics.weight != null && (
                   <View className="items-center">
                     <Weight size={20} color={theme.colors.primary} />
                     <Text
                       className="mt-1 text-lg font-bold"
                       style={{ color: theme.colors.text }}
                     >
-                      {session.metrics.weight}
+                      {String(metrics.weight)}
                     </Text>
                     <Text
                       className="text-xs"
@@ -241,14 +246,14 @@ export default function SessionDetailScreen() {
                     </Text>
                   </View>
                 )}
-                {session.metrics.bodyFat != null && (
+                {metrics.bodyFat != null && (
                   <View className="items-center">
                     <Activity size={20} color={theme.colors.warning} />
                     <Text
                       className="mt-1 text-lg font-bold"
                       style={{ color: theme.colors.text }}
                     >
-                      {session.metrics.bodyFat}%
+                      {String(metrics.bodyFat)}%
                     </Text>
                     <Text
                       className="text-xs"
@@ -258,14 +263,14 @@ export default function SessionDetailScreen() {
                     </Text>
                   </View>
                 )}
-                {session.metrics.heartRate != null && (
+                {metrics.heartRate != null && (
                   <View className="items-center">
                     <Heart size={20} color={theme.colors.error} />
                     <Text
                       className="mt-1 text-lg font-bold"
                       style={{ color: theme.colors.text }}
                     >
-                      {session.metrics.heartRate}
+                      {String(metrics.heartRate)}
                     </Text>
                     <Text
                       className="text-xs"
@@ -275,14 +280,14 @@ export default function SessionDetailScreen() {
                     </Text>
                   </View>
                 )}
-                {session.metrics.bloodPressure ? (
+                {metrics.bloodPressure != null && (
                   <View className="items-center">
                     <Activity size={20} color={theme.colors.success} />
                     <Text
                       className="mt-1 text-lg font-bold"
                       style={{ color: theme.colors.text }}
                     >
-                      {session.metrics.bloodPressure}
+                      {String(metrics.bloodPressure)}
                     </Text>
                     <Text
                       className="text-xs"
@@ -291,16 +296,16 @@ export default function SessionDetailScreen() {
                       BP
                     </Text>
                   </View>
-                ) : null}
+                )}
               </View>
-              {session.metrics.notes ? (
+              {metrics.notes != null ? (
                 <>
                   <Spacer size={8} />
                   <Text
                     className="text-xs italic"
                     style={{ color: theme.colors.textSecondary }}
                   >
-                    {session.metrics.notes}
+                    {String(metrics.notes)}
                   </Text>
                 </>
               ) : null}

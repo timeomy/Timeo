@@ -16,9 +16,8 @@ import {
   Bell,
   Wrench,
 } from "lucide-react-native";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
 import { useTimeoAuth, useTenantSwitcher } from "@timeo/auth";
+import { useBookings, useOrders } from "@timeo/api-client";
 import {
   Screen,
   StatCard,
@@ -37,25 +36,17 @@ export default function Dashboard() {
   const { activeTenant } = useTenantSwitcher();
   const [refreshing, setRefreshing] = useState(false);
 
-  const tenantId = activeTenantId as any;
+  const tenantId = activeTenantId as string;
 
-  const bookings = useQuery(
-    api.bookings.listByTenant,
-    tenantId ? { tenantId } : "skip"
-  );
+  const { data: bookings, isLoading: bookingsLoading, refetch: refetchBookings } = useBookings(tenantId);
+  const { data: orders, isLoading: ordersLoading, refetch: refetchOrders } = useOrders(tenantId);
 
-  const orders = useQuery(
-    api.orders.listByTenant,
-    tenantId ? { tenantId } : "skip"
-  );
-
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    // Convex queries auto-refresh; the RefreshControl gives visual feedback
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    await Promise.all([refetchBookings(), refetchOrders()]);
+    setRefreshing(false);
+  }, [refetchBookings, refetchOrders]);
 
-  // Compute today's stats
   const stats = useMemo(() => {
     if (!bookings || !orders) {
       return {
@@ -74,9 +65,10 @@ export default function Dashboard() {
     ).getTime();
     const endOfDay = startOfDay + 24 * 60 * 60 * 1000;
 
-    const todaysBookings = bookings.filter(
-      (b) => b.startTime >= startOfDay && b.startTime < endOfDay
-    );
+    const todaysBookings = bookings.filter((b) => {
+      const t = new Date(b.startTime).getTime();
+      return t >= startOfDay && t < endOfDay;
+    });
 
     return {
       bookingsToday: todaysBookings.length,
@@ -86,26 +78,24 @@ export default function Dashboard() {
     };
   }, [bookings, orders]);
 
-  // Upcoming bookings: next 5 future bookings that are pending/confirmed
   const upcomingBookings = useMemo(() => {
     if (!bookings) return [];
     const now = Date.now();
     return bookings
       .filter(
         (b) =>
-          b.startTime > now &&
+          new Date(b.startTime).getTime() > now &&
           (b.status === "pending" || b.status === "confirmed")
       )
-      .sort((a, b) => a.startTime - b.startTime)
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
       .slice(0, 5);
   }, [bookings]);
 
-  // Pending orders: most recent 5
   const recentPendingOrders = useMemo(() => {
     if (!orders) return [];
     return orders
       .filter((o) => o.status === "pending")
-      .sort((a, b) => b.createdAt - a.createdAt)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 5);
   }, [orders]);
 
@@ -120,7 +110,7 @@ export default function Dashboard() {
     );
   }
 
-  if (bookings === undefined || orders === undefined) {
+  if ((bookingsLoading && !bookings) || (ordersLoading && !orders)) {
     return <LoadingScreen message="Loading dashboard..." />;
   }
 
@@ -416,15 +406,15 @@ export default function Dashboard() {
             <View style={{ gap: 10 }}>
               {upcomingBookings.map((booking) => (
                 <BookingCard
-                  key={booking._id}
-                  serviceName={booking.serviceName}
+                  key={booking.id}
+                  serviceName={booking.serviceName ?? ""}
                   staffName={booking.staffName}
                   status={booking.status}
-                  startTime={booking.startTime}
+                  startTime={new Date(booking.startTime).getTime()}
                   duration={Math.round(
-                    (booking.endTime - booking.startTime) / (60 * 1000)
+                    (new Date(booking.endTime).getTime() - new Date(booking.startTime).getTime()) / (60 * 1000)
                   )}
-                  onPress={() => router.push(`/bookings/${booking._id}`)}
+                  onPress={() => router.push(`/bookings/${booking.id}`)}
                 />
               ))}
             </View>
@@ -448,14 +438,14 @@ export default function Dashboard() {
             <View style={{ gap: 10 }}>
               {recentPendingOrders.map((order) => (
                 <OrderCard
-                  key={order._id}
-                  orderNumber={order._id.slice(-6).toUpperCase()}
+                  key={order.id}
+                  orderNumber={order.id.slice(-6).toUpperCase()}
                   status={order.status}
                   totalAmount={order.totalAmount}
                   currency={order.currency}
-                  itemCount={order.itemCount}
-                  createdAt={order.createdAt}
-                  onPress={() => router.push(`/orders/${order._id}`)}
+                  itemCount={order.itemCount ?? 0}
+                  createdAt={new Date(order.createdAt).getTime()}
+                  onPress={() => router.push(`/orders/${order.id}`)}
                 />
               ))}
             </View>

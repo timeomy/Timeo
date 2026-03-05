@@ -16,11 +16,13 @@ import {
   Users,
   Search,
   X,
-  Unlock,
 } from "lucide-react-native";
-import { useQuery, useMutation, useAction } from "convex/react";
-import { api } from "@timeo/api";
 import { useTimeoAuth } from "@timeo/auth";
+import {
+  useCheckIns,
+  useCheckInStats,
+  useCreateCheckIn,
+} from "@timeo/api-client";
 import {
   Screen,
   Header,
@@ -31,12 +33,12 @@ import {
   LoadingScreen,
   EmptyState,
   Spacer,
-  Separator,
   useTheme,
 } from "@timeo/ui";
 
-function formatTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString([], {
+
+function formatTime(ts: string): string {
+  return new Date(ts).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -52,85 +54,30 @@ export default function CheckInsScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as any;
+  const tenantId = activeTenantId as string;
 
   const [showManualCheckIn, setShowManualCheckIn] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-  const [openingDoor, setOpeningDoor] = useState(false);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
-
-  const todayStart = useMemo(() => {
+  const todayStr = useMemo(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
-    return now.getTime();
+    return now.toISOString().split("T")[0];
   }, []);
 
-  const checkIns = useQuery(
-    api.checkIns.listByTenant,
-    tenantId ? { tenantId, date: todayStart } : "skip"
-  );
+  const { data: checkIns, isLoading, refetch } = useCheckIns(tenantId, { date: todayStr });
+  const { data: stats } = useCheckInStats(tenantId);
+  const { mutateAsync: createCheckIn } = useCreateCheckIn(tenantId ?? "");
 
-  const stats = useQuery(
-    api.checkIns.getStats,
-    tenantId ? { tenantId } : "skip"
-  );
-
-  const members = useQuery(
-    api.tenantMemberships.listByTenant,
-    tenantId ? { tenantId } : "skip"
-  );
-
-  const manualCheckIn = useMutation(api.checkIns.manualCheckIn);
-  const remoteOpenDoor = useAction(api.actions.door.remoteOpenDoor);
-
-  const filteredMembers = useMemo(() => {
-    if (!members || !memberSearch.trim()) return [];
-    const q = memberSearch.toLowerCase();
-    return members
-      .filter(
-        (m) =>
-          m.status === "active" &&
-          (m.userName.toLowerCase().includes(q) ||
-            m.userEmail.toLowerCase().includes(q))
-      )
-      .slice(0, 10);
-  }, [members, memberSearch]);
-
-  const handleOpenDoor = useCallback(async () => {
-    if (!tenantId) return;
-    Alert.alert(
-      "Open Door",
-      "Remotely trigger the door relay to open?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Open",
-          onPress: async () => {
-            setOpeningDoor(true);
-            try {
-              await remoteOpenDoor({ tenantId });
-              Alert.alert("Door Opened", "The door relay has been triggered.");
-            } catch (err) {
-              Alert.alert(
-                "Error",
-                err instanceof Error ? err.message : "Failed to open door"
-              );
-            } finally {
-              setOpeningDoor(false);
-            }
-          },
-        },
-      ]
-    );
-  }, [tenantId, remoteOpenDoor]);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const handleManualCheckIn = useCallback(
-    async (userId: string, userName: string) => {
+    async (email: string, userName: string) => {
       Alert.alert(
         "Manual Check-in",
         `Check in ${userName}?`,
@@ -140,7 +87,7 @@ export default function CheckInsScreen() {
             text: "Check In",
             onPress: async () => {
               try {
-                await manualCheckIn({ tenantId, userId: userId as any });
+                await createCheckIn({ email, method: "manual" });
                 setShowManualCheckIn(false);
                 setMemberSearch("");
                 Alert.alert("Success", `${userName} has been checked in.`);
@@ -157,7 +104,7 @@ export default function CheckInsScreen() {
         ]
       );
     },
-    [tenantId, manualCheckIn]
+    [createCheckIn]
   );
 
   if (!tenantId) {
@@ -173,7 +120,7 @@ export default function CheckInsScreen() {
     );
   }
 
-  if (checkIns === undefined) {
+  if (isLoading && !checkIns) {
     return <LoadingScreen message="Loading check-ins..." />;
   }
 
@@ -250,21 +197,6 @@ export default function CheckInsScreen() {
             </View>
           </Button>
         </View>
-        <Button
-          variant="outline"
-          onPress={handleOpenDoor}
-          loading={openingDoor}
-        >
-          <View className="flex-row items-center justify-center">
-            <Unlock size={16} color={theme.colors.success} />
-            <Text
-              className="ml-2 font-semibold"
-              style={{ color: theme.colors.success }}
-            >
-              Open Door
-            </Text>
-          </View>
-        </Button>
       </View>
 
       <View className="px-4 pb-2">
@@ -272,14 +204,14 @@ export default function CheckInsScreen() {
           className="text-sm font-semibold uppercase tracking-wide"
           style={{ color: theme.colors.textSecondary }}
         >
-          Today's Check-ins ({checkIns.length})
+          Today's Check-ins ({checkIns?.length ?? 0})
         </Text>
       </View>
 
       {/* Check-in List */}
       <FlatList
-        data={checkIns}
-        keyExtractor={(item) => item._id}
+        data={checkIns ?? []}
+        keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -306,7 +238,7 @@ export default function CheckInsScreen() {
                   className="text-sm font-bold"
                   style={{ color: theme.colors.primary }}
                 >
-                  {item.userName.charAt(0).toUpperCase()}
+                  {(item.userName ?? "?").charAt(0).toUpperCase()}
                 </Text>
               </View>
               <View className="flex-1">
@@ -314,7 +246,7 @@ export default function CheckInsScreen() {
                   className="text-base font-medium"
                   style={{ color: theme.colors.text }}
                 >
-                  {item.userName}
+                  {item.userName ?? "Unknown"}
                 </Text>
                 {item.userEmail ? (
                   <Text
@@ -330,7 +262,7 @@ export default function CheckInsScreen() {
                   className="text-sm font-medium"
                   style={{ color: theme.colors.text }}
                 >
-                  {formatTime(item.timestamp)}
+                  {formatTime(item.checkedInAt)}
                 </Text>
                 <View
                   className="mt-1 rounded-full px-2 py-0.5"
@@ -385,11 +317,13 @@ export default function CheckInsScreen() {
             <TextInput
               className="ml-2 flex-1 text-base"
               style={{ color: theme.colors.text }}
-              placeholder="Search members..."
+              placeholder="Enter member email..."
               placeholderTextColor={theme.colors.textSecondary}
               value={memberSearch}
               onChangeText={setMemberSearch}
               autoFocus
+              keyboardType="email-address"
+              autoCapitalize="none"
             />
             {memberSearch ? (
               <TouchableOpacity onPress={() => setMemberSearch("")}>
@@ -400,52 +334,16 @@ export default function CheckInsScreen() {
 
           <Spacer size={12} />
 
-          {filteredMembers.length === 0 && memberSearch.trim() ? (
-            <Text
-              className="py-4 text-center text-sm"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              No members found
-            </Text>
-          ) : (
-            filteredMembers.map((member, index) => (
-              <View key={member._id}>
-                {index > 0 && <Separator />}
-                <TouchableOpacity
-                  onPress={() =>
-                    handleManualCheckIn(member.userId as any, member.userName)
-                  }
-                  className="flex-row items-center py-3"
-                >
-                  <View
-                    className="mr-3 h-8 w-8 items-center justify-center rounded-full"
-                    style={{ backgroundColor: theme.colors.primary + "15" }}
-                  >
-                    <Text
-                      className="text-xs font-bold"
-                      style={{ color: theme.colors.primary }}
-                    >
-                      {member.userName.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View className="flex-1">
-                    <Text
-                      className="text-sm font-medium"
-                      style={{ color: theme.colors.text }}
-                    >
-                      {member.userName}
-                    </Text>
-                    <Text
-                      className="text-xs"
-                      style={{ color: theme.colors.textSecondary }}
-                    >
-                      {member.userEmail}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            ))
-          )}
+          <Button
+            onPress={() => {
+              if (memberSearch.trim()) {
+                handleManualCheckIn(memberSearch.trim(), memberSearch.trim());
+              }
+            }}
+            disabled={!memberSearch.trim()}
+          >
+            Check In
+          </Button>
         </View>
       </Modal>
     </Screen>

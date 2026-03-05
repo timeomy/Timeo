@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { View, Text, FlatList, RefreshControl, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { Building2, Plus, ChevronRight } from "lucide-react-native";
@@ -13,9 +13,8 @@ import {
   Spacer,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useQuery } from "convex/react";
-import { formatDate, type TenantPlan, type TenantStatus } from "@timeo/shared";
+import { usePlatformTenants } from "@timeo/api-client";
+import { formatDate } from "@timeo/shared";
 
 function getPlanBadgeVariant(
   plan: string
@@ -54,7 +53,7 @@ export default function TenantsScreen() {
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
-  const tenants = useQuery(api.tenants.list);
+  const { data: tenants, isLoading, refetch } = usePlatformTenants();
 
   const filteredTenants = useMemo(() => {
     if (!tenants) return [];
@@ -70,10 +69,10 @@ export default function TenantsScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    refetch().finally(() => setRefreshing(false));
+  }, [refetch]);
 
-  if (tenants === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading tenants..." />;
   }
 
@@ -102,7 +101,7 @@ export default function TenantsScreen() {
 
       <FlatList
         data={filteredTenants}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -135,7 +134,7 @@ export default function TenantsScreen() {
         renderItem={({ item: tenant }) => (
           <Card
             onPress={() =>
-              router.push(`/tenants/${tenant._id}` as any)
+              router.push(`/tenants/${tenant.id}` as any)
             }
           >
             <View className="flex-row items-start justify-between">

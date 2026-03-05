@@ -17,8 +17,14 @@ import {
   EmptyState,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useQuery, useMutation } from "convex/react";
+import {
+  usePlatformFlags,
+  useUpdatePlatformFlag,
+  useSetFlagOverride,
+  usePlatformTenants,
+  type FeatureFlag,
+  type PlatformTenant,
+} from "@timeo/api-client";
 
 export default function FlagDetailScreen() {
   const router = useRouter();
@@ -29,39 +35,33 @@ export default function FlagDetailScreen() {
     new Set()
   );
 
-  const allFlags = useQuery(api.platform.listFeatureFlags, {});
-  const tenants = useQuery(api.tenants.list);
-  const setFeatureFlag = useMutation(api.platform.setFeatureFlag);
+  const { data: allFlags } = usePlatformFlags();
+  const { data: tenants } = usePlatformTenants();
+  const { mutateAsync: updateFlag } = useUpdatePlatformFlag();
+  const { mutateAsync: setFlagOverride } = useSetFlagOverride();
 
-  // Global flag (no tenantId)
   const globalFlag = useMemo(() => {
     if (!allFlags) return null;
-    return allFlags.find((f) => f.key === key && !f.tenantId) ?? null;
+    return allFlags.find((f: FeatureFlag) => f.key === key) ?? null;
   }, [allFlags, key]);
 
-  // Per-tenant overrides
-  const tenantOverrides = useMemo(() => {
-    if (!allFlags) return [];
-    return allFlags.filter((f) => f.key === key && f.tenantId);
-  }, [allFlags, key]);
-
-  // Map of tenantId -> enabled for quick lookup
+  // Map of tenantId -> enabled from overrides
   const overrideMap = useMemo(() => {
     const map = new Map<string, boolean>();
-    for (const override of tenantOverrides) {
-      if (override.tenantId) {
+    if (globalFlag) {
+      for (const override of globalFlag.overrides) {
         map.set(override.tenantId, override.enabled);
       }
     }
     return map;
-  }, [tenantOverrides]);
+  }, [globalFlag]);
 
   const handleToggleGlobal = useCallback(
     async (enabled: boolean) => {
       if (!key) return;
       setTogglingGlobal(true);
       try {
-        await setFeatureFlag({ key, enabled });
+        await updateFlag({ key, enabled });
       } catch (error) {
         Alert.alert(
           "Error",
@@ -71,19 +71,15 @@ export default function FlagDetailScreen() {
         setTogglingGlobal(false);
       }
     },
-    [key, setFeatureFlag]
+    [key, updateFlag]
   );
 
   const handleToggleTenantOverride = useCallback(
     async (tenantId: string, enabled: boolean) => {
-      if (!key) return;
+      if (!key || !globalFlag) return;
       setTogglingTenants((prev) => new Set(prev).add(tenantId));
       try {
-        await setFeatureFlag({
-          key,
-          enabled,
-          tenantId: tenantId as any,
-        });
+        await setFlagOverride({ flagId: globalFlag.id, tenantId, enabled });
       } catch (error) {
         Alert.alert(
           "Error",
@@ -97,7 +93,7 @@ export default function FlagDetailScreen() {
         });
       }
     },
-    [key, setFeatureFlag]
+    [key, globalFlag, setFlagOverride]
   );
 
   if (!key) {
@@ -148,12 +144,12 @@ export default function FlagDetailScreen() {
               >
                 {globalFlag.key}
               </Text>
-              {globalFlag.metadata?.description ? (
+              {globalFlag.description ? (
                 <Text
                   className="mt-0.5 text-sm"
                   style={{ color: theme.colors.textSecondary }}
                 >
-                  {String(globalFlag.metadata.description)}
+                  {globalFlag.description}
                 </Text>
               ) : null}
             </View>
@@ -208,15 +204,15 @@ export default function FlagDetailScreen() {
             />
           ) : (
             <Card>
-              {tenants.map((tenant, index) => {
-                const hasOverride = overrideMap.has(tenant._id);
+              {tenants.map((tenant: PlatformTenant, index: number) => {
+                const hasOverride = overrideMap.has(tenant.id);
                 const isEnabled = hasOverride
-                  ? overrideMap.get(tenant._id)!
+                  ? overrideMap.get(tenant.id)!
                   : globalFlag.enabled;
-                const isToggling = togglingTenants.has(tenant._id);
+                const isToggling = togglingTenants.has(tenant.id);
 
                 return (
-                  <View key={tenant._id}>
+                  <View key={tenant.id}>
                     <View className="flex-row items-center justify-between py-3">
                       <View className="flex-1 pr-3">
                         <View className="flex-row items-center">
@@ -246,7 +242,7 @@ export default function FlagDetailScreen() {
                       <Switch
                         value={isEnabled}
                         onValueChange={(val) =>
-                          handleToggleTenantOverride(tenant._id, val)
+                          handleToggleTenantOverride(tenant.id, val)
                         }
                       />
                     </View>

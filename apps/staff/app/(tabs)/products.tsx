@@ -9,9 +9,8 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Package, Plus } from "lucide-react-native";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
 import { useTimeoAuth } from "@timeo/auth";
+import { useProducts, useUpdateProduct } from "@timeo/api-client";
 import {
   Screen,
   Header,
@@ -27,22 +26,19 @@ export default function ProductsScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as any | null;
+  const tenantId = activeTenantId as string;
 
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
-  const products = useQuery(
-    api.products.list,
-    tenantId ? { tenantId } : "skip"
-  );
+  const { data: products, isLoading, refetch } = useProducts(tenantId);
+  const { mutateAsync: updateProduct } = useUpdateProduct(tenantId ?? "");
 
-  const toggleActive = useMutation(api.products.toggleActive);
-
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const filteredProducts = useMemo(() => {
     if (!products) return [];
@@ -52,14 +48,14 @@ export default function ProductsScreen() {
     return products.filter(
       (p) =>
         p.name.toLowerCase().includes(query) ||
-        p.description.toLowerCase().includes(query)
+        (p.description ?? "").toLowerCase().includes(query)
     );
   }, [products, searchQuery]);
 
   const handleToggleActive = useCallback(
-    async (productId: any) => {
+    async (productId: string, currentIsActive: boolean) => {
       try {
-        await toggleActive({ productId });
+        await updateProduct({ id: productId, isActive: !currentIsActive });
       } catch (err) {
         Alert.alert(
           "Error",
@@ -67,7 +63,7 @@ export default function ProductsScreen() {
         );
       }
     },
-    [toggleActive]
+    [updateProduct]
   );
 
   if (!tenantId) {
@@ -81,7 +77,7 @@ export default function ProductsScreen() {
     );
   }
 
-  if (products === undefined) {
+  if (isLoading && !products) {
     return <LoadingScreen message="Loading products..." />;
   }
 
@@ -112,7 +108,7 @@ export default function ProductsScreen() {
       {/* Product List */}
       <FlatList
         data={filteredProducts}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100, gap: 10 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -130,7 +126,7 @@ export default function ProductsScreen() {
         }
         renderItem={({ item }) => (
           <TouchableOpacity
-            onPress={() => router.push(`/products/${item._id}/edit`)}
+            onPress={() => router.push(`/products/${item.id}/edit`)}
             activeOpacity={0.7}
             className="rounded-2xl p-4"
             style={{ backgroundColor: theme.colors.surface }}
@@ -169,9 +165,7 @@ export default function ProductsScreen() {
                 />
                 <Switch
                   value={item.isActive}
-                  onValueChange={() =>
-                    handleToggleActive(item._id as any)
-                  }
+                  onValueChange={() => handleToggleActive(item.id, item.isActive)}
                 />
               </View>
             </View>

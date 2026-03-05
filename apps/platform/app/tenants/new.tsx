@@ -11,8 +11,7 @@ import {
   Spacer,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useMutation } from "convex/react";
+import { useCreatePlatformTenant } from "@timeo/api-client";
 import { slugify } from "@timeo/shared";
 
 type TenantPlan = "free" | "starter" | "pro" | "enterprise";
@@ -36,7 +35,7 @@ export default function CreateTenantScreen() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const createTenant = useMutation(api.platform.createTenantByEmail);
+  const { mutateAsync: createTenant } = useCreatePlatformTenant();
 
   // Auto-generate slug from name unless manually edited
   useEffect(() => {

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -26,8 +26,7 @@ import {
   useTheme,
 } from "@timeo/ui";
 import { useTimeoAuth } from "@timeo/auth";
-import { api } from "@timeo/api";
-import { useMutation } from "convex/react";
+import { useCreateOrder } from "@timeo/api-client";
 import { useCart } from "../providers/cart";
 
 export default function CartScreen() {
@@ -47,7 +46,7 @@ export default function CartScreen() {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
 
-  const createOrder = useMutation(api.orders.create);
+  const { mutateAsync: createOrder } = useCreateOrder(activeTenantId ?? "");
 
   const handleCheckout = useCallback(async () => {
     if (!activeTenantId || items.length === 0) return;
@@ -63,9 +62,8 @@ export default function CartScreen() {
             try {
               setIsCheckingOut(true);
               await createOrder({
-                tenantId: activeTenantId as any,
                 items: items.map((item) => ({
-                  productId: item.productId as any,
+                  productId: item.productId,
                   quantity: item.quantity,
                 })),
               });

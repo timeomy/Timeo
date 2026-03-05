@@ -16,9 +16,8 @@ import {
   Activity,
   Save,
 } from "lucide-react-native";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
 import { useTimeoAuth } from "@timeo/auth";
+import { useCustomers, useCreateSessionLog } from "@timeo/api-client";
 import {
   Screen,
   Header,
@@ -51,9 +50,9 @@ export default function CreateSessionLogScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as any;
+  const tenantId = activeTenantId as string;
 
-  const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedClientEmail, setSelectedClientEmail] = useState("");
   const [sessionType, setSessionType] = useState("personal_training");
   const [notes, setNotes] = useState("");
   const [exercises, setExercises] = useState<Exercise[]>([
@@ -65,41 +64,16 @@ export default function CreateSessionLogScreen() {
   const [metricsBloodPressure, setMetricsBloodPressure] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const members = useQuery(
-    api.tenantMemberships.listByTenant,
-    tenantId ? { tenantId } : "skip"
-  );
-
-  const credits = useQuery(
-    api.sessionCredits.getByUser,
-    tenantId && selectedClientId
-      ? { tenantId, userId: selectedClientId as any }
-      : "skip"
-  );
-
-  const [selectedCreditId, setSelectedCreditId] = useState("");
-
-  const createSessionLog = useMutation(api.sessionLogs.create);
+  const { data: customers, isLoading } = useCustomers(tenantId);
+  const { mutateAsync: createSessionLog } = useCreateSessionLog(tenantId ?? "");
 
   const clientOptions = useMemo(() => {
-    if (!members) return [];
-    return members
-      .filter((m) => m.status === "active")
-      .map((m) => ({
-        label: `${m.userName} (${m.userEmail})`,
-        value: m.userId as string,
-      }));
-  }, [members]);
-
-  const creditOptions = useMemo(() => {
-    if (!credits) return [];
-    return credits
-      .filter((c) => c.remaining > 0)
-      .map((c) => ({
-        label: `${c.packageName} (${c.remaining} left)`,
-        value: c._id as string,
-      }));
-  }, [credits]);
+    if (!customers) return [];
+    return customers.map((c) => ({
+      label: `${c.name} (${c.email})`,
+      value: c.email,
+    }));
+  }, [customers]);
 
   const addExercise = useCallback(() => {
     setExercises((prev) => [
@@ -122,7 +96,7 @@ export default function CreateSessionLogScreen() {
   );
 
   const handleSubmit = useCallback(async () => {
-    if (!selectedClientId) {
+    if (!selectedClientEmail) {
       Alert.alert("Error", "Please select a client.");
       return;
     }
@@ -140,7 +114,7 @@ export default function CreateSessionLogScreen() {
 
     const hasMetrics =
       metricsWeight || metricsBodyFat || metricsHeartRate || metricsBloodPressure;
-    const metrics = hasMetrics
+    const metrics: Record<string, unknown> | undefined = hasMetrics
       ? {
           weight: metricsWeight ? parseFloat(metricsWeight) : undefined,
           bodyFat: metricsBodyFat ? parseFloat(metricsBodyFat) : undefined,
@@ -154,13 +128,11 @@ export default function CreateSessionLogScreen() {
     setIsSubmitting(true);
     try {
       await createSessionLog({
-        tenantId,
-        clientId: selectedClientId as any,
-        sessionType: sessionType as any,
+        clientEmail: selectedClientEmail,
+        sessionType,
         exercises: validExercises,
         notes: notes || undefined,
         metrics,
-        creditId: selectedCreditId ? (selectedCreditId as any) : undefined,
       });
       Alert.alert("Success", "Session log created successfully.", [
         { text: "OK", onPress: () => router.back() },
@@ -174,7 +146,7 @@ export default function CreateSessionLogScreen() {
       setIsSubmitting(false);
     }
   }, [
-    selectedClientId,
+    selectedClientEmail,
     sessionType,
     exercises,
     notes,
@@ -182,7 +154,6 @@ export default function CreateSessionLogScreen() {
     metricsBodyFat,
     metricsHeartRate,
     metricsBloodPressure,
-    selectedCreditId,
     tenantId,
     createSessionLog,
     router,
@@ -201,7 +172,7 @@ export default function CreateSessionLogScreen() {
     );
   }
 
-  if (members === undefined) {
+  if (isLoading && !customers) {
     return <LoadingScreen message="Loading..." />;
   }
 
@@ -215,7 +186,7 @@ export default function CreateSessionLogScreen() {
       >
         {/* Client Picker */}
         <Card>
-          <View className="flex-row items-center mb-2">
+          <View className="mb-2 flex-row items-center">
             <User size={16} color={theme.colors.primary} />
             <Text
               className="ml-2 text-sm font-semibold uppercase tracking-wide"
@@ -226,8 +197,8 @@ export default function CreateSessionLogScreen() {
           </View>
           <Select
             options={clientOptions}
-            value={selectedClientId}
-            onChange={setSelectedClientId}
+            value={selectedClientEmail}
+            onChange={setSelectedClientEmail}
             placeholder="Select a client..."
           />
         </Card>
@@ -252,33 +223,9 @@ export default function CreateSessionLogScreen() {
 
         <Spacer size={12} />
 
-        {/* Credit Selection */}
-        {selectedClientId && creditOptions.length > 0 && (
-          <>
-            <Card>
-              <Text
-                className="mb-2 text-sm font-semibold uppercase tracking-wide"
-                style={{ color: theme.colors.textSecondary }}
-              >
-                Use Session Credit (Optional)
-              </Text>
-              <Select
-                options={[
-                  { label: "No credit", value: "" },
-                  ...creditOptions,
-                ]}
-                value={selectedCreditId}
-                onChange={setSelectedCreditId}
-                placeholder="Select credit package..."
-              />
-            </Card>
-            <Spacer size={12} />
-          </>
-        )}
-
         {/* Exercises */}
         <Card>
-          <View className="flex-row items-center justify-between mb-3">
+          <View className="mb-3 flex-row items-center justify-between">
             <View className="flex-row items-center">
               <Dumbbell size={16} color={theme.colors.primary} />
               <Text
@@ -307,7 +254,7 @@ export default function CreateSessionLogScreen() {
           {exercises.map((exercise, index) => (
             <View key={index}>
               {index > 0 && <Separator className="my-3" />}
-              <View className="flex-row items-center justify-between mb-2">
+              <View className="mb-2 flex-row items-center justify-between">
                 <Text
                   className="text-xs font-semibold"
                   style={{ color: theme.colors.textSecondary }}
@@ -385,7 +332,7 @@ export default function CreateSessionLogScreen() {
 
         {/* Body Metrics */}
         <Card>
-          <View className="flex-row items-center mb-3">
+          <View className="mb-3 flex-row items-center">
             <Activity size={16} color={theme.colors.warning} />
             <Text
               className="ml-2 text-sm font-semibold uppercase tracking-wide"
@@ -522,7 +469,10 @@ export default function CreateSessionLogScreen() {
         <Button size="lg" onPress={handleSubmit} loading={isSubmitting}>
           <View className="flex-row items-center">
             <Save size={18} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
-            <Text className="ml-2 text-base font-semibold" style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}>
+            <Text
+              className="ml-2 text-base font-semibold"
+              style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}
+            >
               Save Session Log
             </Text>
           </View>

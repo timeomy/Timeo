@@ -25,12 +25,9 @@ import {
   Separator,
   Spacer,
   Button,
-  ImageUploader,
   useTheme,
 } from "@timeo/ui";
 import { useTimeoAuth, useTenantSwitcher } from "@timeo/auth";
-import { api } from "@timeo/api";
-import { useMutation } from "convex/react";
 import { useCart } from "../../providers/cart";
 
 export default function ProfileScreen() {
@@ -40,34 +37,6 @@ export default function ProfileScreen() {
   const { tenants, activeTenant, switchTenant, isLoading } =
     useTenantSwitcher();
   const { totalItems } = useCart();
-
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
-  const updateEntityImage = useMutation(api.files.updateEntityImage);
-  const saveFile = useMutation(api.files.saveFile);
-
-  const handleAvatarUpload = useCallback(
-    async (storageId: string) => {
-      if (!user?.id) return;
-      try {
-        await saveFile({
-          filename: "avatar",
-          mimeType: "image/jpeg",
-          size: 0,
-          type: "avatar" as const,
-          entityId: user.id,
-          storageId,
-        });
-        await updateEntityImage({
-          entityType: "user",
-          entityId: user.id,
-          storageId,
-        });
-      } catch {
-        Alert.alert("Error", "Failed to update avatar.");
-      }
-    },
-    [user?.id, saveFile, updateEntityImage]
-  );
 
   const displayName = user?.name || "User";
 
@@ -119,15 +88,6 @@ export default function ProfileScreen() {
       {/* Profile Card */}
       <Card className="mt-2">
         <View className="items-center">
-          <ImageUploader
-            label=""
-            generateUploadUrl={generateUploadUrl}
-            currentImageUrl={user?.imageUrl}
-            onUpload={(storageId) => handleAvatarUpload(storageId)}
-            onRemove={() => {}}
-            circular
-            size={80}
-          />
           <Text
             className="mt-3 text-xl font-bold"
             style={{ color: theme.colors.text }}

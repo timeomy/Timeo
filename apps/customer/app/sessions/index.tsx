@@ -1,9 +1,8 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { View, Text, FlatList, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { Dumbbell, User, Calendar } from "lucide-react-native";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { useSessionLogs, useSessionCredits } from "@timeo/api-client";
 import { useTimeoAuth } from "@timeo/auth";
 import {
   Screen,
@@ -16,8 +15,8 @@ import {
   useTheme,
 } from "@timeo/ui";
 
-function formatSessionDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString("en-MY", {
+function formatSessionDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-MY", {
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -33,25 +32,24 @@ export default function SessionsScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as any;
   const [refreshing, setRefreshing] = useState(false);
+
+  const { data: sessions, isLoading, refetch } = useSessionLogs(activeTenantId);
+  const { data: credits } = useSessionCredits(activeTenantId);
+
+  // Compute total remaining from credits array
+  const totalRemaining = useMemo(
+    () => credits?.reduce((sum, c) => sum + c.remaining, 0) ?? 0,
+    [credits]
+  );
+  const packagesCount = credits?.length ?? 0;
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    refetch().finally(() => setRefreshing(false));
+  }, [refetch]);
 
-  const sessions = useQuery(
-    api.sessionLogs.listByClient,
-    tenantId ? { tenantId } : "skip"
-  );
-
-  const balance = useQuery(
-    api.sessionCredits.getBalance,
-    tenantId ? { tenantId } : "skip"
-  );
-
-  if (!tenantId) {
+  if (!activeTenantId) {
     return (
       <Screen>
         <Header title="My Sessions" onBack={() => router.back()} />
@@ -64,7 +62,7 @@ export default function SessionsScreen() {
     );
   }
 
-  if (sessions === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading sessions..." />;
   }
 
@@ -73,7 +71,7 @@ export default function SessionsScreen() {
       <Header title="My Sessions" onBack={() => router.back()} />
 
       {/* Credit Balance */}
-      {balance && (
+      {credits && credits.length > 0 && (
         <View className="px-4 pb-3">
           <Card>
             <View className="flex-row items-center justify-between">
@@ -88,7 +86,7 @@ export default function SessionsScreen() {
                   className="text-2xl font-bold"
                   style={{ color: theme.colors.primary }}
                 >
-                  {balance.totalRemaining}
+                  {totalRemaining}
                 </Text>
               </View>
               <View
@@ -99,7 +97,7 @@ export default function SessionsScreen() {
                   className="text-xs font-semibold"
                   style={{ color: theme.colors.primary }}
                 >
-                  {balance.packages} package{balance.packages !== 1 ? "s" : ""}
+                  {packagesCount} package{packagesCount !== 1 ? "s" : ""}
                 </Text>
               </View>
             </View>
@@ -110,7 +108,7 @@ export default function SessionsScreen() {
       {/* Session List */}
       <FlatList
         data={sessions}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -127,13 +125,16 @@ export default function SessionsScreen() {
           />
         }
         renderItem={({ item }) => (
-          <Card onPress={() => router.push(`/sessions/${item._id}` as any)}>
-              <View className="flex-row items-start justify-between">
-                <View className="flex-1">
-                  <View className="flex-row items-center">
-                    <Badge label={formatSessionType(item.sessionType)} />
-                  </View>
-                  <Spacer size={8} />
+          <Card onPress={() => router.push(`/sessions/${item.id}` as any)}>
+            <View className="flex-row items-start justify-between">
+              <View className="flex-1">
+                <View className="flex-row items-center">
+                  <Badge
+                    label={formatSessionType(item.sessionType ?? "session")}
+                  />
+                </View>
+                <Spacer size={8} />
+                {item.coachName ? (
                   <View className="flex-row items-center">
                     <User size={14} color={theme.colors.textSecondary} />
                     <Text
@@ -143,31 +144,32 @@ export default function SessionsScreen() {
                       {item.coachName}
                     </Text>
                   </View>
-                  <View className="mt-1 flex-row items-center">
-                    <Calendar size={14} color={theme.colors.textSecondary} />
-                    <Text
-                      className="ml-1.5 text-sm"
-                      style={{ color: theme.colors.textSecondary }}
-                    >
-                      {formatSessionDate(item.createdAt)}
-                    </Text>
-                  </View>
-                </View>
-                {item.exercises && item.exercises.length > 0 && (
-                  <View
-                    className="rounded-full px-2 py-1"
-                    style={{ backgroundColor: theme.colors.surface }}
+                ) : null}
+                <View className="mt-1 flex-row items-center">
+                  <Calendar size={14} color={theme.colors.textSecondary} />
+                  <Text
+                    className="ml-1.5 text-sm"
+                    style={{ color: theme.colors.textSecondary }}
                   >
-                    <Text
-                      className="text-xs font-medium"
-                      style={{ color: theme.colors.textSecondary }}
-                    >
-                      {item.exercises.length} exercise
-                      {item.exercises.length !== 1 ? "s" : ""}
-                    </Text>
-                  </View>
-                )}
+                    {formatSessionDate(item.createdAt)}
+                  </Text>
+                </View>
               </View>
+              {item.exercises && item.exercises.length > 0 && (
+                <View
+                  className="rounded-full px-2 py-1"
+                  style={{ backgroundColor: theme.colors.surface }}
+                >
+                  <Text
+                    className="text-xs font-medium"
+                    style={{ color: theme.colors.textSecondary }}
+                  >
+                    {item.exercises.length} exercise
+                    {item.exercises.length !== 1 ? "s" : ""}
+                  </Text>
+                </View>
+              )}
+            </View>
           </Card>
         )}
       />

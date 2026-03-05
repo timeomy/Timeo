@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { View, Text, ScrollView, Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -21,12 +21,11 @@ import {
   LoadingScreen,
   ErrorScreen,
   Card,
-  Separator,
   Spacer,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useQuery, useMutation } from "convex/react";
+import { useTimeoAuth } from "@timeo/auth";
+import { useBooking, useBookingEvents, useCancelBooking } from "@timeo/api-client";
 import { formatDate, formatTime, formatRelativeTime } from "@timeo/shared";
 
 // ─── Event Timeline Icon ───────────────────────────────────────────────
@@ -54,20 +53,20 @@ function EventIcon({
   }
 }
 
-function getEventColor(type: string, theme: any): string {
+function getEventColor(type: string, colors: Record<string, string>): string {
   switch (type) {
     case "created":
-      return theme.colors.info;
+      return colors.info;
     case "confirmed":
-      return theme.colors.success;
+      return colors.success;
     case "cancelled":
-      return theme.colors.error;
+      return colors.error;
     case "completed":
-      return theme.colors.success;
+      return colors.success;
     case "no_show":
-      return theme.colors.warning;
+      return colors.warning;
     default:
-      return theme.colors.textSecondary;
+      return colors.textSecondary;
   }
 }
 
@@ -81,20 +80,13 @@ export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const theme = useTheme();
+  const { activeTenantId } = useTimeoAuth();
 
   const [isCancelling, setIsCancelling] = useState(false);
 
-  const booking = useQuery(
-    api.bookings.getById,
-    id ? { bookingId: id as any } : "skip"
-  );
-
-  const events = useQuery(
-    api.bookingEvents.listByBooking,
-    id ? { bookingId: id as any } : "skip"
-  );
-
-  const cancelBooking = useMutation(api.bookings.cancel);
+  const { data: booking, isLoading: bookingLoading } = useBooking(activeTenantId, id);
+  const { data: events, isLoading: eventsLoading } = useBookingEvents(activeTenantId, id);
+  const { mutateAsync: cancelBooking } = useCancelBooking(activeTenantId ?? "");
 
   const handleCancel = useCallback(() => {
     if (!booking) return;
@@ -111,14 +103,14 @@ export default function BookingDetailScreen() {
             try {
               setIsCancelling(true);
               await cancelBooking({
-                bookingId: booking._id as any,
+                bookingId: booking.id,
                 reason: "Cancelled by customer",
               });
               Alert.alert("Booking Cancelled", "Your booking has been cancelled.");
-            } catch (error: any) {
+            } catch (error: unknown) {
               Alert.alert(
                 "Error",
-                error?.message ?? "Unable to cancel booking. Please try again."
+                error instanceof Error ? error.message : "Unable to cancel booking. Please try again."
               );
             } finally {
               setIsCancelling(false);
@@ -129,11 +121,11 @@ export default function BookingDetailScreen() {
     );
   }, [booking, cancelBooking]);
 
-  if (booking === undefined) {
+  if (bookingLoading) {
     return <LoadingScreen message="Loading booking..." />;
   }
 
-  if (booking === null) {
+  if (!booking) {
     return (
       <ErrorScreen
         title="Booking not found"
@@ -143,6 +135,8 @@ export default function BookingDetailScreen() {
     );
   }
 
+  const startTimeMs = new Date(booking.startTime).getTime();
+  const endTimeMs = new Date(booking.endTime).getTime();
   const canCancel =
     booking.status === "pending" || booking.status === "confirmed";
 
@@ -200,13 +194,13 @@ export default function BookingDetailScreen() {
                   className="text-base font-medium"
                   style={{ color: theme.colors.text }}
                 >
-                  {formatDate(booking.startTime)}
+                  {formatDate(startTimeMs)}
                 </Text>
                 <Text
                   className="text-sm"
                   style={{ color: theme.colors.textSecondary }}
                 >
-                  <DateTimeDisplay timestamp={booking.startTime} format="relative" />
+                  <DateTimeDisplay timestamp={startTimeMs} format="relative" />
                 </Text>
               </View>
             </View>
@@ -222,7 +216,7 @@ export default function BookingDetailScreen() {
                   className="text-base font-medium"
                   style={{ color: theme.colors.text }}
                 >
-                  {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
+                  {formatTime(startTimeMs)} - {formatTime(endTimeMs)}
                 </Text>
                 <Text
                   className="text-sm"
@@ -287,14 +281,14 @@ export default function BookingDetailScreen() {
           >
             Timeline
           </Text>
-          {events === undefined ? (
+          {eventsLoading ? (
             <Text
               className="text-sm"
               style={{ color: theme.colors.textSecondary }}
             >
               Loading timeline...
             </Text>
-          ) : events.length === 0 ? (
+          ) : !events || events.length === 0 ? (
             <Text
               className="text-sm"
               style={{ color: theme.colors.textSecondary }}
@@ -304,11 +298,12 @@ export default function BookingDetailScreen() {
           ) : (
             <View className="gap-4">
               {events.map((event, index) => {
-                const eventColor = getEventColor(event.type, theme);
+                const eventColor = getEventColor(event.type, theme.colors);
                 const isLast = index === events.length - 1;
+                const meta = event.metadata as Record<string, unknown> | null;
 
                 return (
-                  <View key={event._id} className="flex-row">
+                  <View key={event.id} className="flex-row">
                     {/* Timeline Indicator */}
                     <View className="mr-3 items-center">
                       <View
@@ -337,14 +332,14 @@ export default function BookingDetailScreen() {
                         className="mt-0.5 text-xs"
                         style={{ color: theme.colors.textSecondary }}
                       >
-                        {event.actorName} -- {formatRelativeTime(event.timestamp)}
+                        {formatRelativeTime(new Date(event.timestamp).getTime())}
                       </Text>
-                      {event.metadata?.reason ? (
+                      {meta?.reason ? (
                         <Text
                           className="mt-1 text-xs italic"
                           style={{ color: theme.colors.textSecondary }}
                         >
-                          Reason: {event.metadata.reason}
+                          Reason: {String(meta.reason)}
                         </Text>
                       ) : null}
                     </View>

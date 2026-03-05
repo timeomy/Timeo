@@ -9,8 +9,6 @@ import {
   Users,
   UserCheck,
   TrendingUp,
-  TrendingDown,
-  Clock,
 } from "lucide-react-native";
 import { useTimeoAuth } from "@timeo/auth";
 import {
@@ -21,15 +19,21 @@ import {
   Row,
   Spacer,
   Skeleton,
-  Badge,
   BarChart,
   ProgressRing,
   useTheme,
 } from "@timeo/ui";
 import { formatPrice } from "@timeo/shared";
 import type { AnalyticsPeriod } from "@timeo/shared";
-import { api } from "@timeo/api";
-import { useQuery } from "convex/react";
+import {
+  useRevenueOverview,
+  useBookingAnalytics,
+  useOrderAnalytics,
+  useTopServices,
+  useTopProducts,
+  useCustomerAnalytics,
+  useStaffPerformance,
+} from "@timeo/api-client";
 
 const PERIOD_OPTIONS: { label: string; value: AnalyticsPeriod }[] = [
   { label: "Today", value: "day" },
@@ -46,39 +50,15 @@ export default function AnalyticsScreen() {
 
   const tenantId = activeTenantId as string;
 
-  const revenue = useQuery(
-    api.analytics.getRevenueOverview,
-    tenantId ? { tenantId: tenantId as any, period } : "skip"
-  );
-  const bookingStats = useQuery(
-    api.analytics.getBookingAnalytics,
-    tenantId ? { tenantId: tenantId as any, period } : "skip"
-  );
-  const orderStats = useQuery(
-    api.analytics.getOrderAnalytics,
-    tenantId ? { tenantId: tenantId as any, period } : "skip"
-  );
-  const topServices = useQuery(
-    api.analytics.getTopServices,
-    tenantId ? { tenantId: tenantId as any, period, limit: 10 } : "skip"
-  );
-  const topProducts = useQuery(
-    api.analytics.getTopProducts,
-    tenantId ? { tenantId: tenantId as any, period, limit: 10 } : "skip"
-  );
-  const customerStats = useQuery(
-    api.analytics.getCustomerAnalytics,
-    tenantId ? { tenantId: tenantId as any, period } : "skip"
-  );
-  const staffPerformance = useQuery(
-    api.analytics.getStaffPerformance,
-    tenantId ? { tenantId: tenantId as any, period } : "skip"
-  );
+  const { data: revenue, isLoading: revenueLoading } = useRevenueOverview(tenantId, period);
+  const { data: bookingStats, isLoading: bookingLoading } = useBookingAnalytics(tenantId, period);
+  const { data: orderStats, isLoading: orderLoading } = useOrderAnalytics(tenantId, period);
+  const { data: topServices } = useTopServices(tenantId);
+  const { data: topProducts } = useTopProducts(tenantId);
+  const { data: customerStats } = useCustomerAnalytics(tenantId);
+  const { data: staffPerformance } = useStaffPerformance(tenantId);
 
-  const isLoading =
-    revenue === undefined ||
-    bookingStats === undefined ||
-    orderStats === undefined;
+  const isLoading = revenueLoading || bookingLoading || orderLoading;
 
   return (
     <Screen scroll={false}>
@@ -143,11 +123,11 @@ export default function AnalyticsScreen() {
                       <DollarSign size={18} color={theme.colors.success} />
                     }
                     trend={
-                      revenue?.percentChange !== undefined
+                      revenue?.periodComparison !== undefined
                         ? {
-                            value: Math.abs(revenue.percentChange),
+                            value: Math.abs(revenue.periodComparison),
                             direction:
-                              revenue.percentChange >= 0 ? "up" : "down",
+                              revenue.periodComparison >= 0 ? "up" : "down",
                           }
                         : undefined
                     }
@@ -159,38 +139,25 @@ export default function AnalyticsScreen() {
                       className="text-xs font-medium"
                       style={{ color: theme.colors.textSecondary }}
                     >
-                      Breakdown
+                      By Payment Method
                     </Text>
                     <View className="mt-2">
-                      <Row justify="between">
-                        <Text
-                          className="text-sm"
-                          style={{ color: theme.colors.text }}
-                        >
-                          Bookings
-                        </Text>
-                        <Text
-                          className="text-sm font-semibold"
-                          style={{ color: theme.colors.text }}
-                        >
-                          {formatPrice(revenue?.bookingRevenue ?? 0)}
-                        </Text>
-                      </Row>
-                      <Spacer size={4} />
-                      <Row justify="between">
-                        <Text
-                          className="text-sm"
-                          style={{ color: theme.colors.text }}
-                        >
-                          Orders
-                        </Text>
-                        <Text
-                          className="text-sm font-semibold"
-                          style={{ color: theme.colors.text }}
-                        >
-                          {formatPrice(revenue?.orderRevenue ?? 0)}
-                        </Text>
-                      </Row>
+                      {(revenue?.byPaymentMethod ?? []).slice(0, 2).map((m) => (
+                        <Row key={m.method} justify="between">
+                          <Text
+                            className="text-sm capitalize"
+                            style={{ color: theme.colors.text }}
+                          >
+                            {m.method}
+                          </Text>
+                          <Text
+                            className="text-sm font-semibold"
+                            style={{ color: theme.colors.text }}
+                          >
+                            {formatPrice(m.amount)}
+                          </Text>
+                        </Row>
+                      ))}
                     </View>
                   </Card>
                 </View>
@@ -204,7 +171,7 @@ export default function AnalyticsScreen() {
                   Daily Revenue
                 </Text>
                 <BarChart
-                  data={(revenue?.revenueByDay ?? []).slice(-14).map((d) => ({
+                  data={(revenue?.byDay ?? []).slice(-14).map((d) => ({
                     label: d.date.slice(8),
                     value: d.amount,
                   }))}
@@ -218,7 +185,7 @@ export default function AnalyticsScreen() {
 
         {/* ── Bookings Section ────────────────────────────────────── */}
         <Section title="Bookings">
-          {bookingStats === undefined ? (
+          {bookingLoading ? (
             <Skeleton height={160} borderRadius={12} />
           ) : (
             <View>
@@ -226,7 +193,7 @@ export default function AnalyticsScreen() {
                 <View className="flex-1 min-w-[45%]">
                   <StatCard
                     label="Total"
-                    value={bookingStats.totalBookings}
+                    value={bookingStats?.totalBookings ?? 0}
                     icon={
                       <CalendarCheck size={18} color={theme.colors.primary} />
                     }
@@ -235,7 +202,7 @@ export default function AnalyticsScreen() {
                 <View className="flex-1 min-w-[45%]">
                   <View className="items-center rounded-2xl p-4" style={{ backgroundColor: theme.colors.surface }}>
                     <ProgressRing
-                      progress={bookingStats.completionRate}
+                      progress={bookingStats?.completionRate ?? 0}
                       size={64}
                       strokeWidth={6}
                       color={theme.colors.success}
@@ -245,32 +212,34 @@ export default function AnalyticsScreen() {
                 </View>
               </Row>
               <Spacer size={12} />
-              <Card>
-                <Text
-                  className="mb-2 text-sm font-medium"
-                  style={{ color: theme.colors.textSecondary }}
-                >
-                  By Status
-                </Text>
-                {Object.entries(bookingStats.bookingsByStatus).map(
-                  ([status, count]) => (
-                    <Row key={status} justify="between" className="mb-1">
-                      <Text
-                        className="text-sm capitalize"
-                        style={{ color: theme.colors.text }}
-                      >
-                        {status.replace("_", " ")}
-                      </Text>
-                      <Text
-                        className="text-sm font-semibold"
-                        style={{ color: theme.colors.text }}
-                      >
-                        {count as number}
-                      </Text>
-                    </Row>
-                  )
-                )}
-              </Card>
+              {bookingStats?.bookingsByStatus ? (
+                <Card>
+                  <Text
+                    className="mb-2 text-sm font-medium"
+                    style={{ color: theme.colors.textSecondary }}
+                  >
+                    By Status
+                  </Text>
+                  {Object.entries(bookingStats.bookingsByStatus).map(
+                    ([status, count]) => (
+                      <Row key={status} justify="between" className="mb-1">
+                        <Text
+                          className="text-sm capitalize"
+                          style={{ color: theme.colors.text }}
+                        >
+                          {status.replace("_", " ")}
+                        </Text>
+                        <Text
+                          className="text-sm font-semibold"
+                          style={{ color: theme.colors.text }}
+                        >
+                          {count as number}
+                        </Text>
+                      </Row>
+                    )
+                  )}
+                </Card>
+              ) : null}
               <Spacer size={12} />
               <Card>
                 <Text
@@ -280,7 +249,7 @@ export default function AnalyticsScreen() {
                   Daily Bookings
                 </Text>
                 <BarChart
-                  data={(bookingStats.bookingsByDay ?? []).slice(-14).map(
+                  data={(bookingStats?.byDay ?? []).slice(-14).map(
                     (d) => ({
                       label: d.date.slice(8),
                       value: d.count,
@@ -290,33 +259,13 @@ export default function AnalyticsScreen() {
                   barColor={theme.colors.info}
                 />
               </Card>
-              <Spacer size={12} />
-              <Card>
-                <Text
-                  className="mb-2 text-sm font-medium"
-                  style={{ color: theme.colors.textSecondary }}
-                >
-                  Peak Hours
-                </Text>
-                <BarChart
-                  data={(bookingStats.peakHours ?? [])
-                    .filter((h) => h.hour >= 6 && h.hour <= 22)
-                    .map((h) => ({
-                      label: `${h.hour}`,
-                      value: h.count,
-                    }))}
-                  height={60}
-                  barColor={theme.colors.warning}
-                  showLabels
-                />
-              </Card>
             </View>
           )}
         </Section>
 
         {/* ── Orders Section ──────────────────────────────────────── */}
         <Section title="Orders">
-          {orderStats === undefined ? (
+          {orderLoading ? (
             <Skeleton height={120} borderRadius={12} />
           ) : (
             <View>
@@ -324,7 +273,7 @@ export default function AnalyticsScreen() {
                 <View className="flex-1 min-w-[45%]">
                   <StatCard
                     label="Total Orders"
-                    value={orderStats.totalOrders}
+                    value={orderStats?.totalOrders ?? 0}
                     icon={
                       <ShoppingCart size={18} color={theme.colors.info} />
                     }
@@ -332,50 +281,54 @@ export default function AnalyticsScreen() {
                 </View>
                 <View className="flex-1 min-w-[45%]">
                   <StatCard
-                    label="Avg Order Value"
-                    value={formatPrice(orderStats.averageOrderValue)}
+                    label="Total Revenue"
+                    value={formatPrice(orderStats?.totalRevenue ?? 0)}
                     icon={
                       <DollarSign size={18} color={theme.colors.success} />
                     }
                   />
                 </View>
               </Row>
-              <Spacer size={12} />
-              <Card>
-                <Text
-                  className="mb-2 text-sm font-medium"
-                  style={{ color: theme.colors.textSecondary }}
-                >
-                  By Status
-                </Text>
-                {Object.entries(orderStats.ordersByStatus).map(
-                  ([status, count]) => (
-                    <Row key={status} justify="between" className="mb-1">
-                      <Text
-                        className="text-sm capitalize"
-                        style={{ color: theme.colors.text }}
-                      >
-                        {status.replace("_", " ")}
-                      </Text>
-                      <Text
-                        className="text-sm font-semibold"
-                        style={{ color: theme.colors.text }}
-                      >
-                        {count as number}
-                      </Text>
-                    </Row>
-                  )
-                )}
-              </Card>
+              {orderStats?.ordersByStatus ? (
+                <>
+                  <Spacer size={12} />
+                  <Card>
+                    <Text
+                      className="mb-2 text-sm font-medium"
+                      style={{ color: theme.colors.textSecondary }}
+                    >
+                      By Status
+                    </Text>
+                    {Object.entries(orderStats.ordersByStatus).map(
+                      ([status, count]) => (
+                        <Row key={status} justify="between" className="mb-1">
+                          <Text
+                            className="text-sm capitalize"
+                            style={{ color: theme.colors.text }}
+                          >
+                            {status.replace("_", " ")}
+                          </Text>
+                          <Text
+                            className="text-sm font-semibold"
+                            style={{ color: theme.colors.text }}
+                          >
+                            {count as number}
+                          </Text>
+                        </Row>
+                      )
+                    )}
+                  </Card>
+                </>
+              ) : null}
             </View>
           )}
         </Section>
 
         {/* ── Top Services Table ──────────────────────────────────── */}
         <Section title="Top Services">
-          {topServices === undefined ? (
+          {!topServices ? (
             <Skeleton height={100} borderRadius={12} />
-          ) : (topServices ?? []).length === 0 ? (
+          ) : topServices.length === 0 ? (
             <Card>
               <Text
                 className="text-center text-sm"
@@ -386,8 +339,8 @@ export default function AnalyticsScreen() {
             </Card>
           ) : (
             <View>
-              {(topServices ?? []).map((svc, i) => (
-                <Card key={svc.serviceId} className="mb-2">
+              {topServices.map((svc, i) => (
+                <Card key={svc.id} className="mb-2">
                   <Row justify="between" align="center">
                     <View className="flex-1 flex-row items-center">
                       <View
@@ -409,13 +362,13 @@ export default function AnalyticsScreen() {
                           style={{ color: theme.colors.text }}
                           numberOfLines={1}
                         >
-                          {svc.serviceName}
+                          {svc.name}
                         </Text>
                         <Text
                           className="text-xs"
                           style={{ color: theme.colors.textSecondary }}
                         >
-                          {svc.bookingCount} bookings
+                          {svc.count} bookings
                         </Text>
                       </View>
                     </View>
@@ -425,12 +378,6 @@ export default function AnalyticsScreen() {
                         style={{ color: theme.colors.text }}
                       >
                         {formatPrice(svc.revenue)}
-                      </Text>
-                      <Text
-                        className="text-xs"
-                        style={{ color: theme.colors.textSecondary }}
-                      >
-                        {svc.percentOfTotal}%
                       </Text>
                     </View>
                   </Row>
@@ -442,9 +389,9 @@ export default function AnalyticsScreen() {
 
         {/* ── Top Products Table ──────────────────────────────────── */}
         <Section title="Top Products">
-          {topProducts === undefined ? (
+          {!topProducts ? (
             <Skeleton height={100} borderRadius={12} />
-          ) : (topProducts ?? []).length === 0 ? (
+          ) : topProducts.length === 0 ? (
             <Card>
               <Text
                 className="text-center text-sm"
@@ -455,8 +402,8 @@ export default function AnalyticsScreen() {
             </Card>
           ) : (
             <View>
-              {(topProducts ?? []).map((prod, i) => (
-                <Card key={prod.productId} className="mb-2">
+              {topProducts.map((prod, i) => (
+                <Card key={prod.id} className="mb-2">
                   <Row justify="between" align="center">
                     <View className="flex-1 flex-row items-center">
                       <View
@@ -478,13 +425,13 @@ export default function AnalyticsScreen() {
                           style={{ color: theme.colors.text }}
                           numberOfLines={1}
                         >
-                          {prod.productName}
+                          {prod.name}
                         </Text>
                         <Text
                           className="text-xs"
                           style={{ color: theme.colors.textSecondary }}
                         >
-                          {prod.unitsSold} sold
+                          {prod.count} sold
                         </Text>
                       </View>
                     </View>
@@ -494,12 +441,6 @@ export default function AnalyticsScreen() {
                         style={{ color: theme.colors.text }}
                       >
                         {formatPrice(prod.revenue)}
-                      </Text>
-                      <Text
-                        className="text-xs"
-                        style={{ color: theme.colors.textSecondary }}
-                      >
-                        {prod.percentOfTotal}%
                       </Text>
                     </View>
                   </Row>
@@ -511,7 +452,7 @@ export default function AnalyticsScreen() {
 
         {/* ── Customer Insights ───────────────────────────────────── */}
         <Section title="Customers">
-          {customerStats === undefined ? (
+          {!customerStats ? (
             <Skeleton height={120} borderRadius={12} />
           ) : (
             <View>
@@ -542,7 +483,7 @@ export default function AnalyticsScreen() {
                   />
                 </View>
               </Row>
-              {(customerStats.topCustomers ?? []).length > 0 ? (
+              {(customerStats.topSpenders ?? []).length > 0 ? (
                 <View className="mt-3">
                   <Text
                     className="mb-2 text-sm font-medium"
@@ -550,8 +491,8 @@ export default function AnalyticsScreen() {
                   >
                     Top Customers
                   </Text>
-                  {customerStats.topCustomers.slice(0, 5).map((c) => (
-                    <Card key={c.customerId} className="mb-2">
+                  {customerStats.topSpenders.slice(0, 5).map((c) => (
+                    <Card key={c.userId} className="mb-2">
                       <Row justify="between" align="center">
                         <View className="flex-1">
                           <Text
@@ -572,7 +513,7 @@ export default function AnalyticsScreen() {
                           className="text-sm font-semibold"
                           style={{ color: theme.colors.success }}
                         >
-                          {formatPrice(c.totalSpent)}
+                          {formatPrice(c.totalSpend)}
                         </Text>
                       </Row>
                     </Card>
@@ -585,9 +526,9 @@ export default function AnalyticsScreen() {
 
         {/* ── Staff Performance ───────────────────────────────────── */}
         <Section title="Staff Performance">
-          {staffPerformance === undefined ? (
+          {!staffPerformance ? (
             <Skeleton height={100} borderRadius={12} />
-          ) : (staffPerformance ?? []).length === 0 ? (
+          ) : staffPerformance.length === 0 ? (
             <Card>
               <Text
                 className="text-center text-sm"
@@ -598,7 +539,7 @@ export default function AnalyticsScreen() {
             </Card>
           ) : (
             <View>
-              {(staffPerformance ?? []).map((staff) => (
+              {staffPerformance.map((staff) => (
                 <Card key={staff.staffId} className="mb-2">
                   <Row justify="between" align="center">
                     <View className="flex-1">
@@ -613,8 +554,7 @@ export default function AnalyticsScreen() {
                         className="text-xs"
                         style={{ color: theme.colors.textSecondary }}
                       >
-                        {staff.bookingsHandled} bookings |{" "}
-                        {staff.completionRate}% completion
+                        {staff.bookingsCompleted} bookings completed
                       </Text>
                     </View>
                     <Text

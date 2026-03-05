@@ -1,31 +1,47 @@
-import React, { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useRouter } from "expo-router";
 import { NotificationsScreen } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useQuery, useMutation } from "convex/react";
+import {
+  useNotifications,
+  useMarkNotificationRead,
+  useMarkAllNotificationsRead,
+} from "@timeo/api-client";
 
 export default function NotificationsPage() {
   const router = useRouter();
 
-  const result = useQuery(api.notifications.listByUser, { limit: 50 });
-  const markAsRead = useMutation(api.notifications.markAsRead);
-  const markAllAsRead = useMutation(api.notifications.markAllAsRead);
+  const { data: rawNotifications } = useNotifications(null);
+  const { mutate: markRead } = useMarkNotificationRead("");
+  const { mutate: markAllRead } = useMarkAllNotificationsRead("");
+
+  const notifications = useMemo(() => {
+    if (!rawNotifications) return undefined;
+    return rawNotifications.map((n) => ({
+      _id: n.id,
+      type: n.type,
+      title: n.title,
+      body: n.body,
+      read: n.isRead,
+      createdAt: new Date(n.createdAt).getTime(),
+      data: n.data,
+    }));
+  }, [rawNotifications]);
 
   const handleMarkAsRead = useCallback(
     (notificationId: string) => {
-      markAsRead({ notificationId: notificationId as any });
+      markRead(notificationId);
     },
-    [markAsRead]
+    [markRead]
   );
 
   const handleMarkAllAsRead = useCallback(() => {
-    markAllAsRead({});
-  }, [markAllAsRead]);
+    markAllRead();
+  }, [markAllRead]);
 
   return (
     <NotificationsScreen
-      notifications={result?.notifications}
-      hasMore={result?.hasMore}
+      notifications={notifications}
+      hasMore={false}
       onMarkAsRead={handleMarkAsRead}
       onMarkAllAsRead={handleMarkAllAsRead}
       onBack={() => router.back()}

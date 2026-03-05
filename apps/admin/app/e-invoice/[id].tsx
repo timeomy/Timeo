@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from "react";
-import { View, Text, ScrollView, Alert } from "react-native";
+import { View, Text, ScrollView } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTimeoAuth } from "@timeo/auth";
 import {
@@ -11,20 +11,24 @@ import {
   Input,
   Row,
   Spacer,
-  Separator,
   Modal,
   LoadingScreen,
   Toast,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useQuery, useMutation } from "convex/react";
+import {
+  useEInvoiceRequests,
+  useMarkEInvoiceSubmitted,
+  useMarkEInvoiceRejected,
+  useRevertEInvoiceToPending,
+} from "@timeo/api-client";
 
 function getStatusVariant(status: string): "success" | "warning" | "error" | "default" {
   switch (status) {
     case "pending":
       return "warning";
     case "submitted":
+    case "accepted":
       return "success";
     case "rejected":
       return "error";
@@ -33,29 +37,15 @@ function getStatusVariant(status: string): "success" | "warning" | "error" | "de
   }
 }
 
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString("en-MY", {
+function formatDate(dateStr: string | undefined): string {
+  if (!dateStr) return "";
+  return new Date(dateStr).toLocaleDateString("en-MY", {
     year: "numeric",
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function formatIdType(idType: string): string {
-  switch (idType) {
-    case "nric":
-      return "NRIC";
-    case "passport":
-      return "Passport";
-    case "brn":
-      return "BRN";
-    case "army":
-      return "Army ID";
-    default:
-      return idType;
-  }
 }
 
 export default function EInvoiceDetailScreen() {
@@ -66,14 +56,11 @@ export default function EInvoiceDetailScreen() {
 
   const tenantId = activeTenantId as string;
 
-  const requests = useQuery(
-    api.eInvoice.listByTenant,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
+  const { data: requests, isLoading } = useEInvoiceRequests(tenantId);
 
-  const markSubmitted = useMutation(api.eInvoice.markSubmitted);
-  const markRejected = useMutation(api.eInvoice.markRejected);
-  const revertToPending = useMutation(api.eInvoice.revertToPending);
+  const { mutateAsync: markSubmitted } = useMarkEInvoiceSubmitted(tenantId ?? "");
+  const { mutateAsync: markRejected } = useMarkEInvoiceRejected(tenantId ?? "");
+  const { mutateAsync: revertToPending } = useRevertEInvoiceToPending(tenantId ?? "");
 
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
@@ -87,13 +74,13 @@ export default function EInvoiceDetailScreen() {
 
   const request = useMemo(() => {
     if (!requests) return null;
-    return requests.find((r) => r._id === id) ?? null;
+    return requests.find((r) => r.id === id) ?? null;
   }, [requests, id]);
 
   const handleMarkSubmitted = useCallback(async () => {
     setLoading(true);
     try {
-      await markSubmitted({ requestId: id as any });
+      await markSubmitted({ requestId: id as string });
       setToast({
         message: "Marked as submitted",
         type: "success",
@@ -121,7 +108,7 @@ export default function EInvoiceDetailScreen() {
     setLoading(true);
     try {
       await markRejected({
-        requestId: id as any,
+        requestId: id as string,
         reason: rejectionReason.trim(),
       });
       setToast({
@@ -143,7 +130,7 @@ export default function EInvoiceDetailScreen() {
   const handleRevertToPending = useCallback(async () => {
     setLoading(true);
     try {
-      await revertToPending({ requestId: id as any });
+      await revertToPending({ requestId: id as string });
       setToast({
         message: "Reverted to pending",
         type: "success",
@@ -174,7 +161,7 @@ export default function EInvoiceDetailScreen() {
     );
   }
 
-  if (requests === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading request..." />;
   }
 
@@ -214,7 +201,7 @@ export default function EInvoiceDetailScreen() {
               className="text-lg font-bold"
               style={{ color: theme.colors.text }}
             >
-              {request.receiptNumber}
+              {request.receiptNumber ?? request.invoiceNumber}
             </Text>
           </View>
         </Card>
@@ -228,49 +215,53 @@ export default function EInvoiceDetailScreen() {
             Buyer Information
           </Text>
 
-          <Row justify="between" className="mb-2">
-            <Text
-              className="text-sm"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              Name
-            </Text>
-            <Text
-              className="text-sm font-medium"
-              style={{ color: theme.colors.text }}
-            >
-              {request.buyerName}
-            </Text>
-          </Row>
-
-          <Row justify="between" className="mb-2">
-            <Text
-              className="text-sm"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              Email
-            </Text>
-            <Text
-              className="text-sm"
-              style={{ color: theme.colors.text }}
-            >
-              {request.buyerEmail}
-            </Text>
-          </Row>
-
-          {request.buyerPhone ? (
+          {request.buyerName ? (
             <Row justify="between" className="mb-2">
               <Text
                 className="text-sm"
                 style={{ color: theme.colors.textSecondary }}
               >
-                Phone
+                Name
+              </Text>
+              <Text
+                className="text-sm font-medium"
+                style={{ color: theme.colors.text }}
+              >
+                {request.buyerName}
+              </Text>
+            </Row>
+          ) : null}
+
+          {request.buyerEmail ? (
+            <Row justify="between" className="mb-2">
+              <Text
+                className="text-sm"
+                style={{ color: theme.colors.textSecondary }}
+              >
+                Email
               </Text>
               <Text
                 className="text-sm"
                 style={{ color: theme.colors.text }}
               >
-                {request.buyerPhone}
+                {request.buyerEmail}
+              </Text>
+            </Row>
+          ) : null}
+
+          {request.buyerTin ? (
+            <Row justify="between" className="mb-2">
+              <Text
+                className="text-sm"
+                style={{ color: theme.colors.textSecondary }}
+              >
+                TIN
+              </Text>
+              <Text
+                className="text-sm font-medium"
+                style={{ color: theme.colors.text }}
+              >
+                {request.buyerTin}
               </Text>
             </Row>
           ) : null}
@@ -280,102 +271,16 @@ export default function EInvoiceDetailScreen() {
               className="text-sm"
               style={{ color: theme.colors.textSecondary }}
             >
-              TIN
+              Total Amount
             </Text>
             <Text
-              className="text-sm font-medium"
+              className="text-sm font-bold"
               style={{ color: theme.colors.text }}
             >
-              {request.buyerTin}
+              {request.currency} {(request.totalAmount / 100).toFixed(2)}
             </Text>
           </Row>
-
-          <Row justify="between" className="mb-2">
-            <Text
-              className="text-sm"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              ID Type
-            </Text>
-            <Text
-              className="text-sm"
-              style={{ color: theme.colors.text }}
-            >
-              {formatIdType(request.buyerIdType)}
-            </Text>
-          </Row>
-
-          <Row justify="between" className="mb-2">
-            <Text
-              className="text-sm"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              ID Value
-            </Text>
-            <Text
-              className="text-sm"
-              style={{ color: theme.colors.text }}
-            >
-              {request.buyerIdValue}
-            </Text>
-          </Row>
-
-          {request.buyerSstRegNo ? (
-            <Row justify="between" className="mb-2">
-              <Text
-                className="text-sm"
-                style={{ color: theme.colors.textSecondary }}
-              >
-                SST Reg No
-              </Text>
-              <Text
-                className="text-sm"
-                style={{ color: theme.colors.text }}
-              >
-                {request.buyerSstRegNo}
-              </Text>
-            </Row>
-          ) : null}
         </Card>
-
-        {/* Address */}
-        {request.buyerAddress ? (
-          <Card className="mb-4">
-            <Text
-              className="mb-3 text-base font-semibold"
-              style={{ color: theme.colors.text }}
-            >
-              Buyer Address
-            </Text>
-            <Text
-              className="text-sm"
-              style={{ color: theme.colors.text }}
-            >
-              {request.buyerAddress.line1}
-            </Text>
-            {request.buyerAddress.line2 ? (
-              <Text
-                className="text-sm"
-                style={{ color: theme.colors.text }}
-              >
-                {request.buyerAddress.line2}
-              </Text>
-            ) : null}
-            <Text
-              className="text-sm"
-              style={{ color: theme.colors.text }}
-            >
-              {request.buyerAddress.postcode} {request.buyerAddress.city},{" "}
-              {request.buyerAddress.state}
-            </Text>
-            <Text
-              className="text-sm"
-              style={{ color: theme.colors.text }}
-            >
-              {request.buyerAddress.country}
-            </Text>
-          </Card>
-        ) : null}
 
         {/* Dates */}
         <Card className="mb-4">
@@ -455,13 +360,7 @@ export default function EInvoiceDetailScreen() {
             </>
           )}
 
-          {request.status === "submitted" && (
-            <Button onPress={handleRevertToPending} loading={loading}>
-              Revert to Pending
-            </Button>
-          )}
-
-          {request.status === "rejected" && (
+          {(request.status === "submitted" || request.status === "rejected") && (
             <Button onPress={handleRevertToPending} loading={loading}>
               Revert to Pending
             </Button>

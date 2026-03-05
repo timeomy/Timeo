@@ -2,8 +2,7 @@ import { useState, useCallback } from "react";
 import { View, Text, FlatList, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { Package, Clock } from "lucide-react-native";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { useSessionCredits } from "@timeo/api-client";
 import { useTimeoAuth } from "@timeo/auth";
 import {
   Screen,
@@ -15,9 +14,9 @@ import {
   useTheme,
 } from "@timeo/ui";
 
-function formatDate(timestamp: number | undefined): string {
-  if (!timestamp) return "No expiry";
-  return new Date(timestamp).toLocaleDateString("en-MY", {
+function formatDate(dateStr: string | undefined): string {
+  if (!dateStr) return "No expiry";
+  return new Date(dateStr).toLocaleDateString("en-MY", {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -28,20 +27,16 @@ export default function PackagesScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as any;
   const [refreshing, setRefreshing] = useState(false);
+
+  const { data: credits, isLoading, refetch } = useSessionCredits(activeTenantId);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    refetch().finally(() => setRefreshing(false));
+  }, [refetch]);
 
-  const credits = useQuery(
-    api.sessionCredits.getByUser,
-    tenantId ? { tenantId } : "skip"
-  );
-
-  if (!tenantId) {
+  if (!activeTenantId) {
     return (
       <Screen>
         <Header title="My Packages" onBack={() => router.back()} />
@@ -54,7 +49,7 @@ export default function PackagesScreen() {
     );
   }
 
-  if (credits === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading packages..." />;
   }
 
@@ -64,7 +59,7 @@ export default function PackagesScreen() {
 
       <FlatList
         data={credits}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -84,10 +79,10 @@ export default function PackagesScreen() {
         renderItem={({ item }) => {
           const remaining = item.totalSessions - item.usedSessions;
           const progress =
-            item.totalSessions > 0
-              ? remaining / item.totalSessions
-              : 0;
-          const isExpired = item.expiresAt ? item.expiresAt < Date.now() : false;
+            item.totalSessions > 0 ? remaining / item.totalSessions : 0;
+          const isExpired = item.expiresAt
+            ? new Date(item.expiresAt).getTime() < Date.now()
+            : false;
           const isExhausted = remaining <= 0;
 
           return (
@@ -110,9 +105,12 @@ export default function PackagesScreen() {
                     className="text-base font-bold"
                     style={{ color: theme.colors.text }}
                   >
-                    {item.packageName}
+                    {item.packageName ?? "Package"}
                   </Text>
-                  <View className="mt-1 flex-row items-center" style={{ gap: 8 }}>
+                  <View
+                    className="mt-1 flex-row items-center"
+                    style={{ gap: 8 }}
+                  >
                     <Text
                       className="text-sm"
                       style={{ color: theme.colors.textSecondary }}
@@ -130,24 +128,28 @@ export default function PackagesScreen() {
                           : theme.colors.textSecondary,
                       }}
                     >
-                      {isExpired ? "Expired" : `Expires ${formatDate(item.expiresAt)}`}
+                      {isExpired
+                        ? "Expired"
+                        : `Expires ${formatDate(item.expiresAt)}`}
                     </Text>
                   </View>
                 </View>
                 <View
                   className="rounded-full px-2 py-1"
                   style={{
-                    backgroundColor: isExpired || isExhausted
-                      ? theme.colors.error + "15"
-                      : theme.colors.success + "15",
+                    backgroundColor:
+                      isExpired || isExhausted
+                        ? theme.colors.error + "15"
+                        : theme.colors.success + "15",
                   }}
                 >
                   <Text
                     className="text-xs font-semibold"
                     style={{
-                      color: isExpired || isExhausted
-                        ? theme.colors.error
-                        : theme.colors.success,
+                      color:
+                        isExpired || isExhausted
+                          ? theme.colors.error
+                          : theme.colors.success,
                     }}
                   >
                     {isExpired ? "Expired" : isExhausted ? "Used" : "Active"}

@@ -9,12 +9,10 @@ import {
   Input,
   Button,
   Spacer,
-  LoadingScreen,
   Toast,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useMutation } from "convex/react";
+import { useCreateGiftCard } from "@timeo/api-client";
 
 export default function CreateGiftCardScreen() {
   const theme = useTheme();
@@ -23,11 +21,10 @@ export default function CreateGiftCardScreen() {
 
   const tenantId = activeTenantId as string;
 
-  const createGiftCard = useMutation(api.giftCards.create);
+  const { mutateAsync: createGiftCard } = useCreateGiftCard(tenantId ?? "");
 
   const [amount, setAmount] = useState("");
   const [purchaserName, setPurchaserName] = useState("");
-  const [purchaserEmail, setPurchaserEmail] = useState("");
   const [recipientName, setRecipientName] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [message, setMessage] = useState("");
@@ -53,11 +50,8 @@ export default function CreateGiftCardScreen() {
     setSaving(true);
     try {
       const result = await createGiftCard({
-        tenantId: tenantId as any,
         initialBalance: Math.round(parsedAmount * 100),
-        currency: "MYR",
         purchaserName: purchaserName.trim() || undefined,
-        purchaserEmail: purchaserEmail.trim() || undefined,
         recipientName: recipientName.trim() || undefined,
         recipientEmail: recipientEmail.trim() || undefined,
         message: message.trim() || undefined,
@@ -83,11 +77,9 @@ export default function CreateGiftCardScreen() {
   }, [
     amount,
     purchaserName,
-    purchaserEmail,
     recipientName,
     recipientEmail,
     message,
-    tenantId,
     createGiftCard,
     router,
   ]);
@@ -127,16 +119,6 @@ export default function CreateGiftCardScreen() {
           value={purchaserName}
           onChangeText={setPurchaserName}
           placeholder="John Doe"
-          className="mb-4"
-        />
-
-        <Input
-          label="Purchaser Email"
-          value={purchaserEmail}
-          onChangeText={setPurchaserEmail}
-          placeholder="john@example.com"
-          keyboardType="email-address"
-          autoCapitalize="none"
           className="mb-4"
         />
 

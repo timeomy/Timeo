@@ -4,9 +4,6 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
 } from "react-native";
 import { Plus } from "lucide-react-native";
 import { useTimeoAuth } from "@timeo/auth";
@@ -28,9 +25,7 @@ import {
   Toast,
   useTheme,
 } from "@timeo/ui";
-import { formatPrice } from "@timeo/shared";
-import { api } from "@timeo/api";
-import { useQuery, useMutation } from "convex/react";
+import { useServices, useCreateService, useUpdateService } from "@timeo/api-client";
 
 interface ServiceFormData {
   name: string;
@@ -62,14 +57,9 @@ export default function ServicesScreen() {
 
   const tenantId = activeTenantId as string;
 
-  const services = useQuery(
-    api.services.list,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
-
-  const createService = useMutation(api.services.create);
-  const updateService = useMutation(api.services.update);
-  const toggleActive = useMutation(api.services.toggleActive);
+  const { data: services, isLoading } = useServices(tenantId);
+  const { mutateAsync: createService } = useCreateService(tenantId ?? "");
+  const { mutateAsync: updateService } = useUpdateService(tenantId ?? "");
 
   const filteredServices = useMemo(() => {
     if (!services) return [];
@@ -78,21 +68,21 @@ export default function ServicesScreen() {
     return services.filter(
       (s) =>
         s.name.toLowerCase().includes(q) ||
-        s.description.toLowerCase().includes(q)
+        (s.description ?? "").toLowerCase().includes(q)
     );
   }, [services, search]);
 
   const handleToggleActive = useCallback(
-    async (serviceId: string) => {
+    async (serviceId: string, currentIsActive: boolean) => {
       try {
-        await toggleActive({ serviceId: serviceId as any });
+        await updateService({ id: serviceId, isActive: !currentIsActive });
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Failed to toggle service";
         setToast({ message, type: "error", visible: true });
       }
     },
-    [toggleActive]
+    [updateService]
   );
 
   const openCreateModal = useCallback(() => {
@@ -105,11 +95,11 @@ export default function ServicesScreen() {
     (service: NonNullable<typeof services>[0]) => {
       setForm({
         name: service.name,
-        description: service.description,
+        description: service.description ?? "",
         durationMinutes: String(service.durationMinutes),
         price: String(service.price / 100),
       });
-      setEditingService(service._id);
+      setEditingService(service.id);
       setShowModal(true);
     },
     []
@@ -149,7 +139,7 @@ export default function ServicesScreen() {
     try {
       if (editingService) {
         await updateService({
-          serviceId: editingService as any,
+          id: editingService,
           name: form.name.trim(),
           description: form.description.trim(),
           durationMinutes: duration,
@@ -162,7 +152,6 @@ export default function ServicesScreen() {
         });
       } else {
         await createService({
-          tenantId: tenantId as any,
           name: form.name.trim(),
           description: form.description.trim(),
           durationMinutes: duration,
@@ -202,7 +191,7 @@ export default function ServicesScreen() {
     );
   }
 
-  if (services === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading services..." />;
   }
 
@@ -254,7 +243,7 @@ export default function ServicesScreen() {
         </View>
         <Switch
           value={item.isActive}
-          onValueChange={() => handleToggleActive(item._id)}
+          onValueChange={() => handleToggleActive(item.id, item.isActive)}
         />
       </Row>
     </Card>
@@ -284,7 +273,7 @@ export default function ServicesScreen() {
       </View>
       <FlatList
         data={filteredServices}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         renderItem={renderService}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}

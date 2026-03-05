@@ -6,6 +6,8 @@
 
 ## Project Overview
 
+This is a TypeScript monorepo (pnpm workspace) called Timeo with: Hono API server, Next.js web apps, Expo mobile apps (4 role-based), Drizzle ORM database package, TanStack Query api-client package, and Better Auth. Always use the correct import path aliases for each package — verify aliases in tsconfig.json before importing.
+
 You are helping me build **Timeo** (timeo.my), an all-in-one business operating system for service-based and retail businesses in Southeast Asia. It is a white-label, multi-tenant SaaS platform targeting gyms, cafes, salons, clinics, and retail stores — combining POS, ERP, CRM, SCM, appointment scheduling, and analytics capabilities (similar to China's Pospal).
 
 **Target market:** Malaysia first, then expand to Singapore, Thailand, Indonesia, Philippines.
@@ -18,6 +20,12 @@ Timeo includes a **C2 (Command & Control) dashboard** — a unified admin UI at 
 **C2 Modules:** Command Dashboard, Tenant Management, User Management, Subscription & Billing, Feature Flags, Platform Configuration, Analytics & Reports, Activity & Audit Log, System Health, Communication Center, API & Integrations, Data Management.
 
 **Key pattern:** Runtime config is stored in `platform_config` table (not .env) so it can be changed from C2 UI. Only infrastructure secrets (DATABASE_URL, REDIS_URL, RM_PRIVATE_KEY) stay in .env.
+
+---
+
+## Before Starting Work
+
+When implementing from a task spec or team-lead assignment, read the FULL spec carefully before starting. Cross-reference field names, function signatures, and return types against the actual codebase — never assume stale types are correct.
 
 ---
 
@@ -276,6 +284,12 @@ const payment = await rm.Payment.createWebPayment(accessToken, {
 
 ---
 
+## Quality Gates
+
+Always run `pnpm typecheck` (or equivalent) after making code changes and fix all errors before reporting task completion. Zero type errors is the standard.
+
+---
+
 ## Key Principles
 
 1. **Spec first, code second** — no feature without an approved spec
@@ -322,6 +336,18 @@ const payment = await rm.Payment.createWebPayment(accessToken, {
 ### Phase 3 — Appointments & Services
 ### Phase 4 — CRM & Inventory
 ### Phase 5 — Analytics & Polish
+
+---
+
+## Workflow Rules
+
+When a task is already completed, confirm it's done and do not redo work. If a duplicate task assignment arrives, respond with the status of the original completion.
+
+---
+
+## CI/CD
+
+After creating or editing CI workflow files (GitHub Actions), verify: correct action versions, all required flags/reporters, and artifact paths match the spec exactly before reporting completion.
 
 ---
 

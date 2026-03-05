@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, ScrollView, TouchableOpacity, Alert, Linking } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import {
   Building2,
@@ -11,9 +11,6 @@ import {
   CreditCard,
   LogOut,
   Banknote,
-  CheckCircle2,
-  AlertCircle,
-  ExternalLink,
   Gift,
   FileText,
   Ticket,
@@ -32,11 +29,15 @@ import {
   Separator,
   LoadingScreen,
   Toast,
-  ImageUploader,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useQuery, useMutation, useAction } from "convex/react";
+import {
+  useTenant,
+  useUpdateTenantSettings,
+  useUpdateTenantBranding,
+  useBusinessHours,
+  useUpdateBusinessHours,
+} from "@timeo/api-client";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -51,26 +52,15 @@ export default function SettingsScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId, signOut } = useTimeoAuth();
-  const { activeTenant } = useTenantSwitcher();
+  useTenantSwitcher();
 
   const tenantId = activeTenantId as string;
 
-  const tenant = useQuery(
-    api.tenants.getById,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
-
-  const businessHoursData = useQuery(
-    api.scheduling.getBusinessHours,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
-  const setBusinessHoursMutation = useMutation(api.scheduling.setBusinessHours);
-
-  const updateTenant = useMutation(api.tenants.update);
-  const updateBranding = useMutation(api.tenants.updateBranding);
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
-  const updateEntityImage = useMutation(api.files.updateEntityImage);
-  const saveFileMutation = useMutation(api.files.saveFile);
+  const { data: tenant, isLoading: tenantLoading } = useTenant(tenantId);
+  const { data: businessHoursData } = useBusinessHours(tenantId);
+  const { mutateAsync: updateBusinessHours } = useUpdateBusinessHours(tenantId ?? "");
+  const { mutateAsync: updateTenantSettings } = useUpdateTenantSettings(tenantId ?? "");
+  const { mutateAsync: updateBrandingSettings } = useUpdateTenantBranding(tenantId ?? "");
 
   // Business hours state
   const [hours, setHours] = useState<DayHours[]>([]);
@@ -83,15 +73,7 @@ export default function SettingsScreen() {
 
   // Branding state
   const [primaryColor, setPrimaryColor] = useState("");
-  const [secondaryColor, setSecondaryColor] = useState("");
   const [savingBranding, setSavingBranding] = useState(false);
-
-  // Notification preferences
-  const notifPrefs = useQuery(
-    api.notifications.getPreferences,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
-  const updateNotifPrefs = useMutation(api.notifications.updatePreferences);
 
   const [toast, setToast] = useState<{
     message: string;
@@ -107,19 +89,18 @@ export default function SettingsScreen() {
   useEffect(() => {
     if (tenant) {
       setBusinessName(tenant.name ?? "");
-      setBusinessDescription(tenant.branding?.businessName ?? "");
-      setPrimaryColor(tenant.branding?.primaryColor ?? "");
-      setSecondaryColor("");
+      setBusinessDescription((tenant.branding as Record<string, string> | undefined)?.businessName ?? "");
+      setPrimaryColor((tenant.branding as Record<string, string> | undefined)?.primaryColor ?? "");
     }
   }, [tenant]);
 
   useEffect(() => {
     if (businessHoursData && hours.length === 0) {
       setHours(
-        businessHoursData.map((h: any) => ({
+        businessHoursData.map((h) => ({
           dayOfWeek: h.dayOfWeek,
-          openTime: h.openTime,
-          closeTime: h.closeTime,
+          openTime: h.openTime ?? "09:00",
+          closeTime: h.closeTime ?? "17:00",
           isOpen: h.isOpen,
         }))
       );
@@ -127,7 +108,7 @@ export default function SettingsScreen() {
   }, [businessHoursData, hours.length]);
 
   const updateDayHours = useCallback(
-    (dayOfWeek: number, field: keyof DayHours, value: any) => {
+    (dayOfWeek: number, field: keyof DayHours, value: boolean | string) => {
       setHours((prev) =>
         prev.map((h) =>
           h.dayOfWeek === dayOfWeek ? { ...h, [field]: value } : h
@@ -141,9 +122,13 @@ export default function SettingsScreen() {
     if (!tenantId) return;
     setSavingHours(true);
     try {
-      await setBusinessHoursMutation({
-        tenantId: tenantId as any,
-        hours,
+      await updateBusinessHours({
+        hours: hours.map((h) => ({
+          dayOfWeek: h.dayOfWeek,
+          isOpen: h.isOpen,
+          openTime: h.openTime,
+          closeTime: h.closeTime,
+        })),
       });
       setToast({
         message: "Business hours saved",
@@ -157,7 +142,7 @@ export default function SettingsScreen() {
     } finally {
       setSavingHours(false);
     }
-  }, [tenantId, hours, setBusinessHoursMutation]);
+  }, [tenantId, hours, updateBusinessHours]);
 
   const handleSaveBusinessInfo = useCallback(async () => {
     if (!businessName.trim()) {
@@ -171,10 +156,7 @@ export default function SettingsScreen() {
 
     setSavingInfo(true);
     try {
-      await updateTenant({
-        tenantId: tenantId as any,
-        name: businessName.trim(),
-      });
+      await updateTenantSettings({ name: businessName.trim() });
       setToast({
         message: "Business info saved",
         type: "success",
@@ -187,49 +169,14 @@ export default function SettingsScreen() {
     } finally {
       setSavingInfo(false);
     }
-  }, [businessName, tenantId, updateTenant]);
-
-  const handleLogoUpload = useCallback(
-    async (storageId: string) => {
-      if (!tenantId) return;
-      try {
-        await saveFileMutation({
-          tenantId: tenantId as any,
-          filename: "tenant-logo",
-          mimeType: "image/jpeg",
-          size: 0,
-          type: "logo" as const,
-          entityId: tenantId,
-          storageId,
-        });
-        await updateEntityImage({
-          entityType: "tenant",
-          entityId: tenantId,
-          storageId,
-        });
-        setToast({
-          message: "Logo uploaded",
-          type: "success",
-          visible: true,
-        });
-      } catch {
-        setToast({
-          message: "Failed to upload logo",
-          type: "error",
-          visible: true,
-        });
-      }
-    },
-    [tenantId, saveFileMutation, updateEntityImage]
-  );
+  }, [businessName, updateTenantSettings]);
 
   const handleSaveBranding = useCallback(async () => {
     setSavingBranding(true);
     try {
-      await updateBranding({
-        tenantId: tenantId as any,
+      await updateBrandingSettings({
+        primaryColor: primaryColor.trim() || undefined,
         branding: {
-          primaryColor: primaryColor.trim() || undefined,
           businessName: businessDescription.trim() || undefined,
         },
       });
@@ -245,7 +192,7 @@ export default function SettingsScreen() {
     } finally {
       setSavingBranding(false);
     }
-  }, [primaryColor, businessDescription, tenantId, updateBranding]);
+  }, [primaryColor, businessDescription, updateBrandingSettings]);
 
   const handleSignOut = useCallback(() => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -281,7 +228,7 @@ export default function SettingsScreen() {
     );
   }
 
-  if (tenant === undefined) {
+  if (tenantLoading) {
     return <LoadingScreen message="Loading settings..." />;
   }
 
@@ -415,15 +362,6 @@ export default function SettingsScreen() {
 
         <Separator className="my-2" />
 
-        {/* Payment Settings Section */}
-        <StripeConnectSection
-          tenantId={tenantId}
-          theme={theme}
-          expandedSection={expandedSection}
-          toggleSection={toggleSection}
-          setToast={setToast}
-        />
-
         {/* Business Info Section */}
         <Section title="">
           <TouchableOpacity
@@ -480,7 +418,7 @@ export default function SettingsScreen() {
               />
               <Input
                 label="Slug"
-                value={tenant?.slug ?? ""}
+                value={(tenant as Record<string, string> | undefined)?.slug ?? ""}
                 editable={false}
                 placeholder="business-slug"
                 className="mb-3"
@@ -546,15 +484,6 @@ export default function SettingsScreen() {
           </TouchableOpacity>
           {expandedSection === "branding" && (
             <View className="mt-3">
-              <ImageUploader
-                label="Business Logo"
-                generateUploadUrl={generateUploadUrl}
-                currentImageUrl={tenant?.branding?.logoUrl}
-                onUpload={(storageId) => handleLogoUpload(storageId)}
-                onRemove={() => {}}
-                size={100}
-              />
-              <Spacer size={12} />
               <Input
                 label="Primary Color (hex)"
                 value={primaryColor}
@@ -707,10 +636,10 @@ export default function SettingsScreen() {
           )}
         </Section>
 
-        {/* Notifications Section */}
+        {/* Notifications placeholder */}
         <Section title="">
           <TouchableOpacity
-            onPress={() => toggleSection("notifications")}
+            onPress={() => router.push("/notifications" as any)}
             activeOpacity={0.7}
           >
             <Card>
@@ -733,98 +662,14 @@ export default function SettingsScreen() {
                       className="text-xs"
                       style={{ color: theme.colors.textSecondary }}
                     >
-                      Alerts and preferences
+                      View all notifications
                     </Text>
                   </View>
                 </Row>
-                <ChevronRight
-                  size={20}
-                  color={theme.colors.textSecondary}
-                  style={{
-                    transform: [
-                      {
-                        rotate:
-                          expandedSection === "notifications"
-                            ? "90deg"
-                            : "0deg",
-                      },
-                    ],
-                  }}
-                />
+                <ChevronRight size={20} color={theme.colors.textSecondary} />
               </Row>
             </Card>
           </TouchableOpacity>
-          {expandedSection === "notifications" && (
-            <View className="mt-3">
-              <Card>
-                <Switch
-                  label="Booking confirmation emails"
-                  value={notifPrefs?.emailBookingConfirm ?? true}
-                  onValueChange={(val: boolean) =>
-                    updateNotifPrefs({
-                      tenantId: tenantId as any,
-                      emailBookingConfirm: val,
-                    })
-                  }
-                  className="mb-4"
-                />
-                <Separator className="mb-4" />
-                <Switch
-                  label="Booking reminder emails"
-                  value={notifPrefs?.emailBookingReminder ?? true}
-                  onValueChange={(val: boolean) =>
-                    updateNotifPrefs({
-                      tenantId: tenantId as any,
-                      emailBookingReminder: val,
-                    })
-                  }
-                  className="mb-4"
-                />
-                <Separator className="mb-4" />
-                <Switch
-                  label="Order update emails"
-                  value={notifPrefs?.emailOrderUpdate ?? true}
-                  onValueChange={(val: boolean) =>
-                    updateNotifPrefs({
-                      tenantId: tenantId as any,
-                      emailOrderUpdate: val,
-                    })
-                  }
-                  className="mb-4"
-                />
-                <Separator className="mb-4" />
-                <Switch
-                  label="Push notifications"
-                  value={notifPrefs?.pushEnabled ?? true}
-                  onValueChange={(val: boolean) =>
-                    updateNotifPrefs({
-                      tenantId: tenantId as any,
-                      pushEnabled: val,
-                    })
-                  }
-                  className="mb-4"
-                />
-                <Separator className="mb-4" />
-                <Switch
-                  label="In-app notifications"
-                  value={notifPrefs?.inAppEnabled ?? true}
-                  onValueChange={(val: boolean) =>
-                    updateNotifPrefs({
-                      tenantId: tenantId as any,
-                      inAppEnabled: val,
-                    })
-                  }
-                />
-              </Card>
-              <Spacer size={8} />
-              <Text
-                className="text-center text-xs"
-                style={{ color: theme.colors.textSecondary }}
-              >
-                Changes are saved automatically.
-              </Text>
-            </View>
-          )}
         </Section>
 
         <Spacer size={24} />
@@ -857,202 +702,5 @@ export default function SettingsScreen() {
         onDismiss={() => setToast((t) => ({ ...t, visible: false }))}
       />
     </Screen>
-  );
-}
-
-// ─── Stripe Connect Section ───
-
-function StripeConnectSection({
-  tenantId,
-  theme,
-  expandedSection,
-  toggleSection,
-  setToast,
-}: {
-  tenantId: string;
-  theme: any;
-  expandedSection: string | null;
-  toggleSection: (s: string) => void;
-  setToast: (t: { message: string; type: "success" | "error"; visible: boolean }) => void;
-}) {
-  const [connecting, setConnecting] = useState(false);
-
-  const stripeAccount = useQuery(
-    api.payments.getStripeAccount,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
-
-  const createConnectAccount = useAction(api.payments.createConnectAccount);
-  const getOnboardingLink = useAction(api.payments.getConnectOnboardingLink);
-
-  const handleConnect = useCallback(async () => {
-    setConnecting(true);
-    try {
-      if (!stripeAccount) {
-        await createConnectAccount({ tenantId: tenantId as any });
-      }
-
-      const result = await getOnboardingLink({
-        tenantId: tenantId as any,
-        refreshUrl: "timeo://settings",
-        returnUrl: "timeo://settings",
-      });
-
-      if (result.url) {
-        await Linking.openURL(result.url);
-      }
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to connect Stripe";
-      setToast({ message, type: "error", visible: true });
-    } finally {
-      setConnecting(false);
-    }
-  }, [tenantId, stripeAccount, createConnectAccount, getOnboardingLink, setToast]);
-
-  const isConnected = stripeAccount?.status === "active" && stripeAccount?.chargesEnabled;
-
-  return (
-    <Section title="">
-      <TouchableOpacity
-        onPress={() => toggleSection("payments")}
-        activeOpacity={0.7}
-      >
-        <Card>
-          <Row justify="between" align="center">
-            <Row align="center" gap={12}>
-              <View
-                className="h-10 w-10 items-center justify-center rounded-xl"
-                style={{ backgroundColor: theme.colors.warning + "15" }}
-              >
-                <Banknote size={20} color={theme.colors.warning} />
-              </View>
-              <View>
-                <Text
-                  className="text-base font-semibold"
-                  style={{ color: theme.colors.text }}
-                >
-                  Payment Settings
-                </Text>
-                <Text
-                  className="text-xs"
-                  style={{ color: theme.colors.textSecondary }}
-                >
-                  Stripe Connect for payouts
-                </Text>
-              </View>
-            </Row>
-            <Row align="center" gap={8}>
-              {isConnected && (
-                <CheckCircle2 size={16} color={theme.colors.success} />
-              )}
-              <ChevronRight
-                size={20}
-                color={theme.colors.textSecondary}
-                style={{
-                  transform: [
-                    {
-                      rotate:
-                        expandedSection === "payments" ? "90deg" : "0deg",
-                    },
-                  ],
-                }}
-              />
-            </Row>
-          </Row>
-        </Card>
-      </TouchableOpacity>
-      {expandedSection === "payments" && (
-        <View className="mt-3">
-          <Card>
-            {stripeAccount ? (
-              <View>
-                <Row align="center" gap={8} className="mb-3">
-                  {isConnected ? (
-                    <CheckCircle2 size={18} color={theme.colors.success} />
-                  ) : (
-                    <AlertCircle size={18} color={theme.colors.warning} />
-                  )}
-                  <Text
-                    className="text-base font-semibold"
-                    style={{ color: theme.colors.text }}
-                  >
-                    {isConnected ? "Stripe Connected" : "Setup Incomplete"}
-                  </Text>
-                </Row>
-                <View className="mb-3 rounded-lg p-3" style={{ backgroundColor: theme.colors.background }}>
-                  <Row justify="between" className="mb-1">
-                    <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>
-                      Status
-                    </Text>
-                    <Text
-                      className="text-xs font-medium capitalize"
-                      style={{
-                        color: isConnected
-                          ? theme.colors.success
-                          : theme.colors.warning,
-                      }}
-                    >
-                      {stripeAccount.status}
-                    </Text>
-                  </Row>
-                  <Row justify="between" className="mb-1">
-                    <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>
-                      Charges
-                    </Text>
-                    <Text className="text-xs font-medium" style={{ color: theme.colors.text }}>
-                      {stripeAccount.chargesEnabled ? "Enabled" : "Disabled"}
-                    </Text>
-                  </Row>
-                  <Row justify="between">
-                    <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>
-                      Payouts
-                    </Text>
-                    <Text className="text-xs font-medium" style={{ color: theme.colors.text }}>
-                      {stripeAccount.payoutsEnabled ? "Enabled" : "Disabled"}
-                    </Text>
-                  </Row>
-                </View>
-                {!isConnected && (
-                  <Button
-                    onPress={handleConnect}
-                    loading={connecting}
-                  >
-                    <Row align="center" gap={8}>
-                      <ExternalLink size={16} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
-                      <Text className="text-sm font-semibold" style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}>
-                        Complete Setup
-                      </Text>
-                    </Row>
-                  </Button>
-                )}
-              </View>
-            ) : (
-              <View>
-                <Text
-                  className="mb-2 text-sm"
-                  style={{ color: theme.colors.textSecondary }}
-                >
-                  Connect a Stripe account to accept payments and receive payouts
-                  directly to your bank account.
-                </Text>
-                <Spacer size={8} />
-                <Button
-                  onPress={handleConnect}
-                  loading={connecting}
-                >
-                  <Row align="center" gap={8}>
-                    <Banknote size={16} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
-                    <Text className="text-sm font-semibold" style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}>
-                      Connect Stripe Account
-                    </Text>
-                  </Row>
-                </Button>
-              </View>
-            )}
-          </Card>
-        </View>
-      )}
-    </Section>
   );
 }

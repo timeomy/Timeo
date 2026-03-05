@@ -6,43 +6,22 @@ import { ThemeProvider, LoadingScreen, usePushNotifications } from "@timeo/ui";
 import { TimeoAnalyticsProvider } from "@timeo/analytics";
 import Constants from "expo-constants";
 import { CartProvider } from "../providers/cart";
-import { useMutation } from "convex/react";
-import { api } from "@timeo/api";
-import { useCallback, useEffect, useRef } from "react";
-import { View, Text } from "react-native";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useCallback, useEffect } from "react";
 
-const convexUrl = Constants.expoConfig?.extra?.convexUrl ?? "";
-
-function EnsureUser() {
-  const { isSignedIn } = useTimeoAuth();
-  const ensureUser = useMutation(api.auth.ensureUser);
-  const hasEnsured = useRef(false);
-
-  useEffect(() => {
-    if (isSignedIn && !hasEnsured.current) {
-      hasEnsured.current = true;
-      ensureUser({}).catch(() => {});
-    }
-    if (!isSignedIn) {
-      hasEnsured.current = false;
-    }
-  }, [isSignedIn, ensureUser]);
-
-  return null;
-}
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 30_000, retry: 2 },
+  },
+});
 
 function PushRegistration() {
   const { isSignedIn } = useTimeoAuth();
-  const registerPushToken = useMutation(api.notifications.registerPushToken);
   const handleRegister = useCallback(
-    async (token: string, platform: "ios" | "android") => {
-      try {
-        await registerPushToken({ token, platform });
-      } catch {
-        // Silently fail — token will be registered on next app open
-      }
+    async (_token: string, _platform: "ios" | "android") => {
+      // Push token registration is handled server-side via Better Auth session
     },
-    [registerPushToken]
+    []
   );
   usePushNotifications(isSignedIn ? handleRegister : undefined);
   return null;
@@ -76,7 +55,6 @@ function NavigationContent() {
 
   return (
     <>
-      <EnsureUser />
       <PushRegistration />
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }}>
@@ -138,34 +116,20 @@ function NavigationContent() {
 }
 
 export default function RootLayout() {
-  if (!convexUrl) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0B0B0F", padding: 24 }}>
-        <Text style={{ color: "#EDECE8", fontSize: 18, fontWeight: "bold", marginBottom: 8 }}>
-          Configuration Error
-        </Text>
-        <Text style={{ color: "#88878F", fontSize: 14, textAlign: "center" }}>
-          EXPO_PUBLIC_CONVEX_URL is missing.{"\n"}
-          Check your .env file and restart the dev server.
-        </Text>
-      </View>
-    );
-  }
-
   return (
-    <TimeoAnalyticsProvider
-      apiKey={Constants.expoConfig?.extra?.posthogKey ?? ""}
-      host={Constants.expoConfig?.extra?.posthogHost}
-    >
-      <TimeoAuthProvider
-        convexUrl={convexUrl}
+    <QueryClientProvider client={queryClient}>
+      <TimeoAnalyticsProvider
+        apiKey={Constants.expoConfig?.extra?.posthogKey ?? ""}
+        host={Constants.expoConfig?.extra?.posthogHost}
       >
-        <ThemeProvider dark>
-          <CartProvider>
-            <NavigationContent />
-          </CartProvider>
-        </ThemeProvider>
-      </TimeoAuthProvider>
-    </TimeoAnalyticsProvider>
+        <TimeoAuthProvider>
+          <ThemeProvider dark>
+            <CartProvider>
+              <NavigationContent />
+            </CartProvider>
+          </ThemeProvider>
+        </TimeoAuthProvider>
+      </TimeoAnalyticsProvider>
+    </QueryClientProvider>
   );
 }

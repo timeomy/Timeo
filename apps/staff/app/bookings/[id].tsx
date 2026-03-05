@@ -8,8 +8,15 @@ import {
   FileText,
   UserCheck,
 } from "lucide-react-native";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
+import { useTimeoAuth } from "@timeo/auth";
+import {
+  useBooking,
+  useBookingEvents,
+  useConfirmBooking,
+  useCancelBooking,
+  useCompleteBooking,
+  useMarkNoShow,
+} from "@timeo/api-client";
 import {
   Screen,
   Header,
@@ -33,19 +40,21 @@ export default function BookingDetailScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const bookingId = id as any;
+  const { activeTenantId } = useTimeoAuth();
+  const tenantId = activeTenantId as string;
+  const bookingId = id as string;
 
-  const booking = useQuery(api.bookings.getById, { bookingId });
-  const events = useQuery(api.bookingEvents.listByBooking, { bookingId });
+  const { data: booking, isLoading } = useBooking(tenantId, bookingId);
+  const { data: events } = useBookingEvents(tenantId, bookingId);
 
-  const confirmBooking = useMutation(api.bookings.confirm);
-  const cancelBooking = useMutation(api.bookings.cancel);
-  const completeBooking = useMutation(api.bookings.complete);
-  const markNoShow = useMutation(api.bookings.markNoShow);
+  const { mutateAsync: confirmBooking } = useConfirmBooking(tenantId ?? "");
+  const { mutateAsync: cancelBooking } = useCancelBooking(tenantId ?? "");
+  const { mutateAsync: completeBooking } = useCompleteBooking(tenantId ?? "");
+  const { mutateAsync: markNoShow } = useMarkNoShow(tenantId ?? "");
 
   const handleConfirm = useCallback(async () => {
     try {
-      await confirmBooking({ bookingId });
+      await confirmBooking(bookingId);
     } catch (err) {
       Alert.alert(
         "Error",
@@ -82,7 +91,7 @@ export default function BookingDetailScreen() {
 
   const handleComplete = useCallback(async () => {
     try {
-      await completeBooking({ bookingId });
+      await completeBooking(bookingId);
     } catch (err) {
       Alert.alert(
         "Error",
@@ -102,7 +111,7 @@ export default function BookingDetailScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await markNoShow({ bookingId });
+              await markNoShow(bookingId);
             } catch (err) {
               Alert.alert(
                 "Error",
@@ -117,11 +126,11 @@ export default function BookingDetailScreen() {
     );
   }, [markNoShow, bookingId]);
 
-  if (booking === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading booking..." />;
   }
 
-  if (booking === null) {
+  if (!booking) {
     return (
       <ErrorScreen
         title="Booking not found"
@@ -131,9 +140,9 @@ export default function BookingDetailScreen() {
     );
   }
 
-  const durationMinutes = Math.round(
-    (booking.endTime - booking.startTime) / (60 * 1000)
-  );
+  const startTime = new Date(booking.startTime).getTime();
+  const endTime = new Date(booking.endTime).getTime();
+  const durationMinutes = Math.round((endTime - startTime) / (60 * 1000));
 
   return (
     <Screen padded={false}>
@@ -151,7 +160,7 @@ export default function BookingDetailScreen() {
             className="mt-3 text-xl font-bold"
             style={{ color: theme.colors.text }}
           >
-            {booking.serviceName}
+            {booking.serviceName ?? ""}
           </Text>
           {booking.servicePrice != null && (
             <View className="mt-1">
@@ -172,13 +181,13 @@ export default function BookingDetailScreen() {
             style={{ backgroundColor: theme.colors.surface }}
           >
             <View className="flex-row items-center">
-              <Avatar fallback={booking.customerName} size="md" />
+              <Avatar fallback={booking.customerName ?? ""} size="md" />
               <View className="ml-3 flex-1">
                 <Text
                   className="text-base font-semibold"
                   style={{ color: theme.colors.text }}
                 >
-                  {booking.customerName}
+                  {booking.customerName ?? ""}
                 </Text>
                 {booking.customerEmail && (
                   <View className="mt-1 flex-row items-center">
@@ -215,7 +224,7 @@ export default function BookingDetailScreen() {
                   className="text-sm font-medium"
                   style={{ color: theme.colors.text }}
                 >
-                  {formatDate(booking.startTime)}
+                  {formatDate(startTime)}
                 </Text>
               </View>
 
@@ -231,8 +240,8 @@ export default function BookingDetailScreen() {
                   className="text-sm font-medium"
                   style={{ color: theme.colors.text }}
                 >
-                  {formatTime(booking.startTime)} -{" "}
-                  {formatTime(booking.endTime)}
+                  {formatTime(startTime)} -{" "}
+                  {formatTime(endTime)}
                 </Text>
               </View>
 
@@ -307,9 +316,8 @@ export default function BookingDetailScreen() {
               style={{ backgroundColor: theme.colors.surface }}
             >
               {events.map((event, index) => (
-                <View key={event._id}>
+                <View key={event.id}>
                   <View className="flex-row">
-                    {/* Timeline dot and line */}
                     <View className="mr-3 items-center" style={{ width: 20 }}>
                       <View
                         className="h-3 w-3 rounded-full"
@@ -330,7 +338,6 @@ export default function BookingDetailScreen() {
                         />
                       )}
                     </View>
-                    {/* Event content */}
                     <View className="flex-1 pb-4">
                       <Text
                         className="text-sm font-medium capitalize"
@@ -342,17 +349,8 @@ export default function BookingDetailScreen() {
                         className="mt-0.5 text-xs"
                         style={{ color: theme.colors.textSecondary }}
                       >
-                        by {event.actorName} --{" "}
-                        {formatRelativeTime(event.timestamp)}
+                        {formatRelativeTime(new Date(event.timestamp).getTime())}
                       </Text>
-                      {event.metadata?.reason && (
-                        <Text
-                          className="mt-1 text-xs italic"
-                          style={{ color: theme.colors.textSecondary }}
-                        >
-                          Reason: {event.metadata.reason}
-                        </Text>
-                      )}
                     </View>
                   </View>
                 </View>

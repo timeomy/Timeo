@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { View, Text, FlatList, RefreshControl, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { CalendarDays } from "lucide-react-native";
@@ -12,8 +12,7 @@ import {
   useTheme,
 } from "@timeo/ui";
 import { useTimeoAuth } from "@timeo/auth";
-import { api } from "@timeo/api";
-import { useQuery } from "convex/react";
+import { useMyBookings } from "@timeo/api-client";
 
 type TabType = "upcoming" | "past";
 
@@ -24,10 +23,7 @@ export default function BookingsScreen() {
   const [activeTab, setActiveTab] = useState<TabType>("upcoming");
   const [refreshing, setRefreshing] = useState(false);
 
-  const bookings = useQuery(
-    api.bookings.listByCustomer,
-    activeTenantId ? { tenantId: activeTenantId as any } : "skip"
-  );
+  const { data: bookings, isLoading, refetch } = useMyBookings(activeTenantId);
 
   const now = Date.now();
 
@@ -35,7 +31,7 @@ export default function BookingsScreen() {
     if (!bookings) return [];
     return bookings.filter(
       (b) =>
-        b.startTime >= now &&
+        new Date(b.startTime).getTime() >= now &&
         (b.status === "pending" || b.status === "confirmed")
     );
   }, [bookings, now]);
@@ -44,7 +40,7 @@ export default function BookingsScreen() {
     if (!bookings) return [];
     return bookings.filter(
       (b) =>
-        b.startTime < now ||
+        new Date(b.startTime).getTime() < now ||
         b.status === "completed" ||
         b.status === "cancelled" ||
         b.status === "no_show"
@@ -55,10 +51,10 @@ export default function BookingsScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 800);
-  }, []);
+    refetch().finally(() => setRefreshing(false));
+  }, [refetch]);
 
-  if (bookings === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading bookings..." />;
   }
 
@@ -139,7 +135,7 @@ export default function BookingsScreen() {
       ) : (
         <FlatList
           data={activeBookings}
-          keyExtractor={(item) => item._id}
+          keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
           ItemSeparatorComponent={() => <Spacer size={12} />}
           showsVerticalScrollIndicator={false}
@@ -152,12 +148,12 @@ export default function BookingsScreen() {
           }
           renderItem={({ item }) => (
             <BookingCard
-              serviceName={item.serviceName}
+              serviceName={item.serviceName ?? ""}
               staffName={item.staffName}
               status={item.status}
-              startTime={item.startTime}
+              startTime={new Date(item.startTime).getTime()}
               duration={item.serviceDuration ?? 0}
-              onPress={() => router.push(`/bookings/${item._id}` as any)}
+              onPress={() => router.push(`/bookings/${item.id}` as any)}
             />
           )}
         />

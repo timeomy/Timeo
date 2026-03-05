@@ -15,6 +15,8 @@ export interface PlatformTenant {
   createdAt: string;
   updatedAt: string;
   memberCount: number;
+  mrr: number;
+  revenue: number;
 }
 
 export interface TenantMember {
@@ -35,6 +37,8 @@ export interface PlatformUser {
   avatarUrl: string | null;
   createdAt: string;
   tenantCount: number;
+  role: string;
+  status: string;
 }
 
 export interface PlatformUserDetail extends PlatformUser {
@@ -66,8 +70,10 @@ export interface FeatureFlag {
   name: string;
   description: string | null;
   defaultEnabled: boolean;
+  enabled: boolean;
   phase: string | null;
   createdAt: string;
+  updatedAt: string;
   overrides: Array<{ tenantId: string; enabled: boolean }>;
 }
 
@@ -148,6 +154,30 @@ export interface AnalyticsOverview {
 export interface TenantGrowthPoint {
   date: string;
   count: number;
+}
+
+export interface PlatformStats {
+  totalTenants: number;
+  activeTenants30d: number;
+  newTenants30d: number;
+  mrr: number;
+  arr: number;
+  churnRate30d: number;
+}
+
+export interface PlatformLogEntry {
+  id: string;
+  actorId: string;
+  actorEmail: string;
+  actorRole: string;
+  tenantId: string | null;
+  targetName: string;
+  action: string;
+  resourceType: string;
+  resourceId: string | null;
+  details: Record<string, unknown>;
+  ipAddress: string | null;
+  createdAt: string;
 }
 
 // ─── MODULE 1: Tenants ───────────────────────────────────────────────────────
@@ -233,6 +263,18 @@ export function useImpersonateTenant() {
       api.post<{ token: string; expiresIn: number; tenantId: string }>(
         `/api/platform/tenants/${id}/impersonate`,
       ),
+  });
+}
+
+export function useUpdatePlatformTenant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string; plan?: string; status?: string } & Record<string, unknown>) =>
+      api.patch<PlatformTenant>(`/api/platform/tenants/${id}`, data),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.platform.tenant(vars.id) });
+      qc.invalidateQueries({ queryKey: queryKeys.platform.tenants() });
+    },
   });
 }
 
@@ -354,14 +396,20 @@ export function useUpdatePlatformFlag() {
   return useMutation({
     mutationFn: ({
       id,
+      key,
       ...data
     }: {
-      id: string;
+      id?: string;
+      key?: string;
       name?: string;
       description?: string;
       default_enabled?: boolean;
+      enabled?: boolean;
       phase?: string;
-    }) => api.put(`/api/platform/feature-flags/${id}`, data),
+    }) => {
+      const flagId = id ?? key ?? "";
+      return api.put(`/api/platform/feature-flags/${flagId}`, data);
+    },
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: queryKeys.platform.flags() }),
   });
@@ -623,6 +671,45 @@ export function usePlatformTenantGrowth(days = 30) {
         `/api/platform/analytics/tenants?days=${days}`,
       ),
     staleTime: 60_000,
+  });
+}
+
+export function usePlatformStats() {
+  return useQuery({
+    queryKey: queryKeys.platform.analyticsOverview(),
+    queryFn: () => api.get<PlatformStats>("/api/platform/analytics/stats"),
+    staleTime: 30_000,
+  });
+}
+
+export function usePlatformLogs(params?: {
+  tenantId?: string;
+  actorId?: string;
+  action?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params?.tenantId) searchParams.set("tenantId", params.tenantId);
+  if (params?.actorId) searchParams.set("actorId", params.actorId);
+  if (params?.action) searchParams.set("action", params.action);
+  if (params?.from) searchParams.set("from", params.from);
+  if (params?.to) searchParams.set("to", params.to);
+  if (params?.limit) searchParams.set("limit", String(params.limit));
+  if (params?.offset) searchParams.set("offset", String(params.offset));
+
+  const qs = searchParams.toString();
+  return useQuery({
+    queryKey: queryKeys.platform.auditLogs(
+      params as Record<string, string> | undefined,
+    ),
+    queryFn: () =>
+      api.get<PlatformLogEntry[]>(
+        `/api/platform/logs${qs ? `?${qs}` : ""}`,
+      ),
+    staleTime: 15_000,
   });
 }
 

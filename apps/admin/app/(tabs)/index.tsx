@@ -5,7 +5,6 @@ import {
   CalendarCheck,
   DollarSign,
   Briefcase,
-  Package,
   TrendingUp,
   TrendingDown,
   BarChart3,
@@ -27,8 +26,11 @@ import {
 } from "@timeo/ui";
 import { formatPrice } from "@timeo/shared";
 import type { AnalyticsPeriod } from "@timeo/shared";
-import { api } from "@timeo/api";
-import { useQuery } from "convex/react";
+import {
+  useRevenueOverview,
+  useBookingAnalytics,
+  useTopServices,
+} from "@timeo/api-client";
 
 const PERIOD_OPTIONS: { label: string; value: AnalyticsPeriod }[] = [
   { label: "Today", value: "day" },
@@ -47,28 +49,20 @@ export default function AdminDashboard() {
 
   const tenantId = activeTenantId as string;
 
-  const revenue = useQuery(
-    api.analytics.getRevenueOverview,
-    tenantId ? { tenantId: tenantId as any, period } : "skip"
-  );
-  const bookingStats = useQuery(
-    api.analytics.getBookingAnalytics,
-    tenantId ? { tenantId: tenantId as any, period } : "skip"
-  );
-  const topServices = useQuery(
-    api.analytics.getTopServices,
-    tenantId ? { tenantId: tenantId as any, period, limit: 5 } : "skip"
-  );
+  const { data: revenue, isLoading: revenueLoading, refetch: refetchRevenue } = useRevenueOverview(tenantId, period);
+  const { data: bookingStats, isLoading: bookingLoading, refetch: refetchBooking } = useBookingAnalytics(tenantId, period);
+  const { data: topServices, isLoading: topServicesLoading, refetch: refetchTopServices } = useTopServices(tenantId);
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    try {
+      await Promise.all([refetchRevenue(), refetchBooking(), refetchTopServices()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchRevenue, refetchBooking, refetchTopServices]);
 
-  const isLoading =
-    revenue === undefined ||
-    bookingStats === undefined ||
-    topServices === undefined;
+  const isLoading = revenueLoading || bookingLoading || topServicesLoading;
 
   if (!tenantId) {
     return (
@@ -162,11 +156,11 @@ export default function AdminDashboard() {
                     <DollarSign size={20} color={theme.colors.success} />
                   }
                   trend={
-                    revenue?.percentChange !== undefined
+                    revenue?.periodComparison !== undefined
                       ? {
-                          value: Math.abs(revenue.percentChange),
+                          value: Math.abs(revenue.periodComparison),
                           direction:
-                            revenue.percentChange >= 0 ? "up" : "down",
+                            revenue.periodComparison >= 0 ? "up" : "down",
                         }
                       : undefined
                   }
@@ -199,8 +193,8 @@ export default function AdminDashboard() {
               </View>
               <View className="flex-1 min-w-[45%]">
                 <StatCard
-                  label="Avg/Day"
-                  value={bookingStats?.averageBookingsPerDay ?? 0}
+                  label="Completed"
+                  value={bookingStats?.completedBookings ?? 0}
                   icon={
                     <Briefcase size={20} color={theme.colors.warning} />
                   }
@@ -222,24 +216,18 @@ export default function AdminDashboard() {
                     className="text-xs"
                     style={{ color: theme.colors.textSecondary }}
                   >
-                    Bookings: {formatPrice(revenue?.bookingRevenue ?? 0)}
-                  </Text>
-                  <Text
-                    className="text-xs"
-                    style={{ color: theme.colors.textSecondary }}
-                  >
-                    Orders: {formatPrice(revenue?.orderRevenue ?? 0)}
+                    Total: {formatPrice(revenue?.totalRevenue ?? 0)}
                   </Text>
                 </View>
-                {revenue?.percentChange !== undefined ? (
+                {revenue?.periodComparison !== undefined ? (
                   <Badge
-                    label={`${revenue.percentChange >= 0 ? "+" : ""}${revenue.percentChange}%`}
-                    variant={revenue.percentChange >= 0 ? "success" : "error"}
+                    label={`${revenue.periodComparison >= 0 ? "+" : ""}${revenue.periodComparison}%`}
+                    variant={revenue.periodComparison >= 0 ? "success" : "error"}
                   />
                 ) : null}
               </Row>
               <BarChart
-                data={(revenue?.revenueByDay ?? []).slice(-14).map((d) => ({
+                data={(revenue?.byDay ?? []).slice(-14).map((d) => ({
                   label: d.date.slice(5),
                   value: d.amount,
                 }))}
@@ -272,7 +260,7 @@ export default function AdminDashboard() {
           ) : (
             <View>
               {(topServices ?? []).map((service, index) => (
-                <Card key={service.serviceId} className="mb-2">
+                <Card key={service.id} className="mb-2">
                   <Row justify="between" align="center">
                     <View className="flex-1 flex-row items-center">
                       <View
@@ -294,18 +282,18 @@ export default function AdminDashboard() {
                           style={{ color: theme.colors.text }}
                           numberOfLines={1}
                         >
-                          {service.serviceName}
+                          {service.name}
                         </Text>
                         <Text
                           className="text-xs"
                           style={{ color: theme.colors.textSecondary }}
                         >
-                          {formatPrice(service.revenue)} ({service.percentOfTotal}%)
+                          {formatPrice(service.revenue)}
                         </Text>
                       </View>
                     </View>
                     <Badge
-                      label={`${service.bookingCount} bookings`}
+                      label={`${service.count} bookings`}
                       variant="default"
                     />
                   </Row>

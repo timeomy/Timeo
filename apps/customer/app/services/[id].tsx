@@ -1,12 +1,7 @@
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import {
-  Clock,
-  DollarSign,
-  CheckCircle,
-  User,
-} from "lucide-react-native";
+import { Clock, DollarSign, CheckCircle } from "lucide-react-native";
 import {
   Screen,
   Header,
@@ -21,24 +16,22 @@ import {
 } from "@timeo/ui";
 import { useTimeoAuth } from "@timeo/auth";
 import { useTrackEvent } from "@timeo/analytics";
-import { api } from "@timeo/api";
-import { useQuery, useMutation } from "convex/react";
+import { useService, useAvailableSlots, useCreateBooking } from "@timeo/api-client";
 import { formatDate, formatTime } from "@timeo/shared";
 
-function getNext7Days(): number[] {
-  const days: number[] = [];
+function getNext14Days(): string[] {
+  const days: string[] = [];
   const now = new Date();
   for (let i = 0; i < 14; i++) {
     const d = new Date(now);
     d.setDate(now.getDate() + i);
-    d.setHours(12, 0, 0, 0); // noon to avoid DST issues
-    days.push(d.getTime());
+    days.push(d.toISOString().slice(0, 10)); // "YYYY-MM-DD"
   }
   return days;
 }
 
-function formatSlotTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], {
+function formatSlotTime(isoStr: string): string {
+  return new Date(isoStr).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -50,40 +43,28 @@ export default function ServiceDetailScreen() {
   const theme = useTheme();
   const { activeTenantId } = useTimeoAuth();
 
-  const [selectedDate, setSelectedDate] = useState<number>(getNext7Days()[0]);
-  const [selectedSlot, setSelectedSlot] = useState<{
-    startTime: number;
-    endTime: number;
-    staffId: string;
-    staffName: string;
-  } | null>(null);
+  const dates = useMemo(() => getNext14Days(), []);
+  const [selectedDate, setSelectedDate] = useState<string>(dates[0]);
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [isBooking, setIsBooking] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
 
-  const service = useQuery(
-    api.services.getById,
-    id ? { serviceId: id as any } : "skip"
+  const { data: service, isLoading: serviceLoading } = useService(activeTenantId, id);
+  const { data: slotsData, isLoading: slotsLoading } = useAvailableSlots(
+    activeTenantId,
+    id,
+    selectedDate
   );
-
-  const availableSlots = useQuery(
-    api.scheduling.getAvailableSlots,
-    service && activeTenantId
-      ? {
-          tenantId: activeTenantId as any,
-          serviceId: service._id as any,
-          date: selectedDate,
-        }
-      : "skip"
-  );
-
-  const createBooking = useMutation(api.bookings.create);
+  const { mutateAsync: createBooking } = useCreateBooking(activeTenantId ?? "");
   const track = useTrackEvent();
+
+  const slots = slotsData?.slots ?? [];
 
   // Track service view
   useEffect(() => {
     if (service && activeTenantId) {
       track("service_viewed", {
-        service_id: service._id,
+        service_id: service.id,
         service_name: service.name,
         price: service.price,
         currency: service.currency,
@@ -91,36 +72,14 @@ export default function ServiceDetailScreen() {
         tenant_id: activeTenantId,
       });
     }
-  }, [service?._id, activeTenantId]);
-
-  const dates = useMemo(() => getNext7Days(), []);
-
-  // Group slots by time (merge staff options for same time)
-  const groupedSlots = useMemo(() => {
-    if (!availableSlots) return [];
-    const map = new Map<
-      number,
-      Array<{ startTime: number; endTime: number; staffId: string; staffName: string }>
-    >();
-    for (const slot of availableSlots) {
-      const existing = map.get(slot.startTime);
-      if (existing) {
-        existing.push(slot);
-      } else {
-        map.set(slot.startTime, [slot]);
-      }
-    }
-    return Array.from(map.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([time, slots]) => ({ time, slots }));
-  }, [availableSlots]);
+  }, [service?.id, activeTenantId]);
 
   const handleBook = useCallback(async () => {
     if (!selectedSlot || !service || !activeTenantId) return;
 
     Alert.alert(
       "Confirm Booking",
-      `Book "${service.name}" on ${formatDate(selectedSlot.startTime)} at ${formatTime(selectedSlot.startTime)} with ${selectedSlot.staffName}?`,
+      `Book "${service.name}" on ${formatDate(new Date(selectedSlot).getTime())} at ${formatTime(new Date(selectedSlot).getTime())}?`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -129,16 +88,13 @@ export default function ServiceDetailScreen() {
             try {
               setIsBooking(true);
               const bookingResult = await createBooking({
-                tenantId: activeTenantId as any,
-                serviceId: service._id as any,
-                startTime: selectedSlot.startTime,
-                staffId: selectedSlot.staffId as any,
+                serviceId: service.id,
+                startTime: selectedSlot,
               });
               track("booking_created", {
-                booking_id: bookingResult as unknown as string,
-                service_id: service._id,
+                booking_id: bookingResult.bookingId,
+                service_id: service.id,
                 service_name: service.name,
-                staff_id: selectedSlot.staffId,
                 price: service.price,
                 currency: service.currency,
                 tenant_id: activeTenantId,
@@ -148,10 +104,12 @@ export default function ServiceDetailScreen() {
                 setBookingSuccess(false);
                 router.push("/(tabs)/bookings");
               }, 1500);
-            } catch (error: any) {
+            } catch (error: unknown) {
               Alert.alert(
                 "Booking Failed",
-                error?.message ?? "Unable to create booking. Please try again."
+                error instanceof Error
+                  ? error.message
+                  : "Unable to create booking. Please try again."
               );
             } finally {
               setIsBooking(false);
@@ -160,19 +118,19 @@ export default function ServiceDetailScreen() {
         },
       ]
     );
-  }, [selectedSlot, service, activeTenantId, createBooking, router]);
+  }, [selectedSlot, service, activeTenantId, createBooking, router, track]);
 
   // Reset selected slot when date changes
-  const handleDateSelect = useCallback((date: number) => {
+  const handleDateSelect = useCallback((date: string) => {
     setSelectedDate(date);
     setSelectedSlot(null);
   }, []);
 
-  if (service === undefined) {
+  if (serviceLoading) {
     return <LoadingScreen message="Loading service..." />;
   }
 
-  if (service === null) {
+  if (!service) {
     return (
       <ErrorScreen
         title="Service not found"
@@ -249,10 +207,8 @@ export default function ServiceDetailScreen() {
             contentContainerStyle={{ gap: 8 }}
           >
             {dates.map((date) => {
-              const isSelected =
-                new Date(date).toDateString() ===
-                new Date(selectedDate).toDateString();
-              const d = new Date(date);
+              const isSelected = date === selectedDate;
+              const d = new Date(date + "T12:00:00");
               return (
                 <TouchableOpacity
                   key={date}
@@ -269,7 +225,11 @@ export default function ServiceDetailScreen() {
                   <Text
                     className="text-xs font-medium"
                     style={{
-                      color: isSelected ? (theme.dark ? "#0B0B0F" : "#FFFFFF") : theme.colors.textSecondary,
+                      color: isSelected
+                        ? theme.dark
+                          ? "#0B0B0F"
+                          : "#FFFFFF"
+                        : theme.colors.textSecondary,
                     }}
                   >
                     {d.toLocaleDateString("en-US", { weekday: "short" })}
@@ -277,7 +237,11 @@ export default function ServiceDetailScreen() {
                   <Text
                     className="mt-1 text-lg font-bold"
                     style={{
-                      color: isSelected ? (theme.dark ? "#0B0B0F" : "#FFFFFF") : theme.colors.text,
+                      color: isSelected
+                        ? theme.dark
+                          ? "#0B0B0F"
+                          : "#FFFFFF"
+                        : theme.colors.text,
                     }}
                   >
                     {d.getDate()}
@@ -285,7 +249,11 @@ export default function ServiceDetailScreen() {
                   <Text
                     className="text-xs"
                     style={{
-                      color: isSelected ? (theme.dark ? "#0B0B0F" : "#FFFFFF") : theme.colors.textSecondary,
+                      color: isSelected
+                        ? theme.dark
+                          ? "#0B0B0F"
+                          : "#FFFFFF"
+                        : theme.colors.textSecondary,
                     }}
                   >
                     {d.toLocaleDateString("en-US", { month: "short" })}
@@ -307,7 +275,7 @@ export default function ServiceDetailScreen() {
             Available Times
           </Text>
 
-          {availableSlots === undefined ? (
+          {slotsLoading ? (
             <Card>
               <View className="items-center py-6">
                 <Text
@@ -318,7 +286,7 @@ export default function ServiceDetailScreen() {
                 </Text>
               </View>
             </Card>
-          ) : groupedSlots.length === 0 ? (
+          ) : slots.length === 0 ? (
             <Card>
               <View className="items-center py-6">
                 <Clock size={32} color={theme.colors.textSecondary} />
@@ -339,16 +307,12 @@ export default function ServiceDetailScreen() {
             </Card>
           ) : (
             <View className="flex-row flex-wrap gap-2">
-              {groupedSlots.map(({ time, slots }) => {
-                // Pick the first available staff for display; user picks time
-                const slot = slots[0];
-                const isSelected =
-                  selectedSlot?.startTime === slot.startTime &&
-                  selectedSlot?.staffId === slot.staffId;
+              {slots.map((slot) => {
+                const isSelected = selectedSlot === slot.startTime;
                 return (
                   <TouchableOpacity
-                    key={`${time}-${slot.staffId}`}
-                    onPress={() => setSelectedSlot(slot)}
+                    key={slot.startTime}
+                    onPress={() => setSelectedSlot(slot.startTime)}
                     className="items-center rounded-xl px-4 py-3"
                     style={{
                       backgroundColor: isSelected
@@ -365,103 +329,35 @@ export default function ServiceDetailScreen() {
                     <Text
                       className="text-sm font-semibold"
                       style={{
-                        color: isSelected ? (theme.dark ? "#0B0B0F" : "#FFFFFF") : theme.colors.text,
+                        color: isSelected
+                          ? theme.dark
+                            ? "#0B0B0F"
+                            : "#FFFFFF"
+                          : theme.colors.text,
                       }}
                     >
                       {formatSlotTime(slot.startTime)}
                     </Text>
-                    {slots.length > 1 ? (
+                    {slot.availableStaffCount > 1 ? (
                       <Text
                         className="mt-0.5 text-xs"
                         style={{
                           color: isSelected
-                            ? (theme.dark ? "#0B0B0F" : "#FFFFFF")
+                            ? theme.dark
+                              ? "#0B0B0F"
+                              : "#FFFFFF"
                             : theme.colors.textSecondary,
                         }}
                       >
-                        {slots.length} staff
+                        {slot.availableStaffCount} staff
                       </Text>
-                    ) : (
-                      <Text
-                        className="mt-0.5 text-xs"
-                        style={{
-                          color: isSelected
-                            ? (theme.dark ? "#0B0B0F" : "#FFFFFF")
-                            : theme.colors.textSecondary,
-                        }}
-                      >
-                        {slot.staffName}
-                      </Text>
-                    )}
+                    ) : null}
                   </TouchableOpacity>
                 );
               })}
             </View>
           )}
         </View>
-
-        {/* Staff selection if multiple for same time */}
-        {selectedSlot && groupedSlots.length > 0 && (() => {
-          const group = groupedSlots.find(
-            (g) => g.time === selectedSlot.startTime
-          );
-          if (!group || group.slots.length <= 1) return null;
-          return (
-            <>
-              <Spacer size={16} />
-              <View className="px-4">
-                <Text
-                  className="mb-2 text-sm font-semibold"
-                  style={{ color: theme.colors.text }}
-                >
-                  Select Staff
-                </Text>
-                <View className="gap-2">
-                  {group.slots.map((slot) => {
-                    const isStaffSelected =
-                      selectedSlot.staffId === slot.staffId;
-                    return (
-                      <TouchableOpacity
-                        key={slot.staffId}
-                        onPress={() => setSelectedSlot(slot)}
-                        className="flex-row items-center rounded-xl px-4 py-3"
-                        style={{
-                          backgroundColor: isStaffSelected
-                            ? theme.colors.primary + "15"
-                            : theme.colors.surface,
-                          borderWidth: 1,
-                          borderColor: isStaffSelected
-                            ? theme.colors.primary
-                            : theme.colors.border,
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <User
-                          size={16}
-                          color={
-                            isStaffSelected
-                              ? theme.colors.primary
-                              : theme.colors.textSecondary
-                          }
-                        />
-                        <Text
-                          className="ml-2 text-sm font-medium"
-                          style={{
-                            color: isStaffSelected
-                              ? theme.colors.primary
-                              : theme.colors.text,
-                          }}
-                        >
-                          {slot.staffName}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            </>
-          );
-        })()}
       </ScrollView>
 
       {/* Sticky Book Button */}
@@ -493,7 +389,7 @@ export default function ServiceDetailScreen() {
                 style={{ color: theme.colors.textSecondary }}
               >
                 {selectedSlot
-                  ? `${formatSlotTime(selectedSlot.startTime)} · ${selectedSlot.staffName}`
+                  ? formatSlotTime(selectedSlot)
                   : "Select a time slot"}
               </Text>
               <PriceDisplay

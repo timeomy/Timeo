@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { ScrollView, Alert, KeyboardAvoidingView, Platform } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
 import { useTimeoAuth } from "@timeo/auth";
+import {
+  useProduct,
+  useCreateProduct,
+  useUpdateProduct,
+} from "@timeo/api-client";
 import {
   Screen,
   Header,
@@ -12,32 +15,24 @@ import {
   Switch,
   Spacer,
   LoadingScreen,
-  ImageUploader,
 } from "@timeo/ui";
+
 export default function ProductEditScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as any | null;
+  const tenantId = activeTenantId as string;
 
   const isNew = id === "new";
-  const productId = isNew ? null : (id as any);
+  const productId = isNew ? null : id;
 
-  const existingProduct = useQuery(
-    api.products.getById,
-    productId ? { productId } : "skip"
-  );
-
-  const createProduct = useMutation(api.products.create);
-  const updateProduct = useMutation(api.products.update);
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
-  const updateEntityImage = useMutation(api.files.updateEntityImage);
-  const saveFile = useMutation(api.files.saveFile);
+  const { data: existingProduct, isLoading } = useProduct(tenantId, productId);
+  const { mutateAsync: createProduct } = useCreateProduct(tenantId ?? "");
+  const { mutateAsync: updateProduct } = useUpdateProduct(tenantId ?? "");
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
   const [initialized, setInitialized] = useState(isNew);
@@ -46,38 +41,12 @@ export default function ProductEditScreen() {
   useEffect(() => {
     if (existingProduct && !initialized) {
       setName(existingProduct.name);
-      setDescription(existingProduct.description);
+      setDescription(existingProduct.description ?? "");
       setPrice((existingProduct.price / 100).toFixed(2));
       setIsActive(existingProduct.isActive);
-      setImageUrl(existingProduct.imageUrl ?? null);
       setInitialized(true);
     }
   }, [existingProduct, initialized]);
-
-  const handleImageUpload = useCallback(
-    async (storageId: string) => {
-      if (!productId || isNew) return;
-      try {
-        await saveFile({
-          tenantId: tenantId ?? undefined,
-          filename: "product-image",
-          mimeType: "image/jpeg",
-          size: 0,
-          type: "product_image",
-          entityId: productId,
-          storageId,
-        });
-        await updateEntityImage({
-          entityType: "product",
-          entityId: productId,
-          storageId,
-        });
-      } catch {
-        Alert.alert("Error", "Failed to save image.");
-      }
-    },
-    [productId, isNew, tenantId, saveFile, updateEntityImage]
-  );
 
   const validate = useCallback((): string | null => {
     if (!name.trim()) return "Product name is required.";
@@ -105,17 +74,17 @@ export default function ProductEditScreen() {
 
       if (isNew) {
         await createProduct({
-          tenantId,
           name: name.trim(),
           description: description.trim(),
           price: priceInCents,
         });
       } else if (productId) {
         await updateProduct({
-          productId,
+          id: productId,
           name: name.trim(),
           description: description.trim(),
           price: priceInCents,
+          isActive,
         });
       }
 
@@ -135,6 +104,7 @@ export default function ProductEditScreen() {
     name,
     description,
     price,
+    isActive,
     createProduct,
     updateProduct,
     productId,
@@ -142,7 +112,7 @@ export default function ProductEditScreen() {
   ]);
 
   // Loading state for existing product
-  if (!isNew && existingProduct === undefined) {
+  if (!isNew && isLoading) {
     return <LoadingScreen message="Loading product..." />;
   }
 
@@ -164,19 +134,6 @@ export default function ProductEditScreen() {
           contentContainerStyle={{ paddingBottom: 40 }}
         >
           <Spacer size={8} />
-
-          <ImageUploader
-            label="Product Image"
-            generateUploadUrl={generateUploadUrl}
-            currentImageUrl={imageUrl}
-            onUpload={(storageId, url) => {
-              setImageUrl(url);
-              handleImageUpload(storageId);
-            }}
-            onRemove={() => setImageUrl(null)}
-          />
-
-          <Spacer size={16} />
 
           <Input
             label="Product Name"

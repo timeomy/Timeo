@@ -9,9 +9,8 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { ClipboardList } from "lucide-react-native";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
 import { useTimeoAuth } from "@timeo/auth";
+import { useOrders, useUpdateOrderStatus } from "@timeo/api-client";
 import {
   Screen,
   Header,
@@ -42,7 +41,6 @@ const TAB_TO_STATUS: Record<StatusTab, string | null> = {
   Completed: OrderStatus.COMPLETED,
 };
 
-// Next valid status for progression
 const NEXT_STATUS: Record<string, string | null> = {
   pending: "confirmed",
   confirmed: "preparing",
@@ -63,42 +61,37 @@ export default function OrdersScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as any | null;
+  const tenantId = activeTenantId as string;
 
   const [activeTab, setActiveTab] = useState<StatusTab>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
-  const orders = useQuery(
-    api.orders.listByTenant,
-    tenantId ? { tenantId } : "skip"
-  );
+  const { data: orders, isLoading, refetch } = useOrders(tenantId);
+  const { mutateAsync: updateStatus } = useUpdateOrderStatus(tenantId ?? "");
 
-  const updateStatus = useMutation(api.orders.updateStatus);
-
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const filteredOrders = useMemo(() => {
     if (!orders) return [];
 
     let filtered = orders;
 
-    // Filter by status tab
     const statusFilter = TAB_TO_STATUS[activeTab];
     if (statusFilter) {
       filtered = filtered.filter((o) => o.status === statusFilter);
     }
 
-    // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (o) =>
-          o.customerName.toLowerCase().includes(query) ||
-          o._id.toLowerCase().includes(query)
+          (o.customerName ?? "").toLowerCase().includes(query) ||
+          o.id.toLowerCase().includes(query)
       );
     }
 
@@ -106,21 +99,12 @@ export default function OrdersScreen() {
   }, [orders, activeTab, searchQuery]);
 
   const handleAdvanceStatus = useCallback(
-    async (orderId: any, currentStatus: string) => {
+    async (orderId: string, currentStatus: string) => {
       const nextStatus = NEXT_STATUS[currentStatus];
       if (!nextStatus) return;
 
       try {
-        await updateStatus({
-          orderId,
-          status: nextStatus as
-            | "pending"
-            | "confirmed"
-            | "preparing"
-            | "ready"
-            | "completed"
-            | "cancelled",
-        });
+        await updateStatus({ orderId, status: nextStatus });
       } catch (err) {
         Alert.alert(
           "Error",
@@ -132,7 +116,7 @@ export default function OrdersScreen() {
   );
 
   const handleCancelOrder = useCallback(
-    (orderId: any) => {
+    (orderId: string) => {
       Alert.alert(
         "Cancel Order",
         "Are you sure you want to cancel this order?",
@@ -143,10 +127,7 @@ export default function OrdersScreen() {
             style: "destructive",
             onPress: async () => {
               try {
-                await updateStatus({
-                  orderId,
-                  status: "cancelled",
-                });
+                await updateStatus({ orderId, status: "cancelled" });
               } catch (err) {
                 Alert.alert(
                   "Error",
@@ -174,7 +155,7 @@ export default function OrdersScreen() {
     );
   }
 
-  if (orders === undefined) {
+  if (isLoading && !orders) {
     return <LoadingScreen message="Loading orders..." />;
   }
 
@@ -228,7 +209,7 @@ export default function OrdersScreen() {
       {/* Order List */}
       <FlatList
         data={filteredOrders}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24, gap: 10 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -254,27 +235,21 @@ export default function OrdersScreen() {
           return (
             <View>
               <OrderCard
-                orderNumber={item._id.slice(-6).toUpperCase()}
+                orderNumber={item.id.slice(-6).toUpperCase()}
                 status={item.status}
                 totalAmount={item.totalAmount}
                 currency={item.currency}
-                itemCount={item.itemCount}
-                createdAt={item.createdAt}
-                onPress={() => router.push(`/orders/${item._id}`)}
+                itemCount={item.itemCount ?? 0}
+                createdAt={new Date(item.createdAt).getTime()}
+                onPress={() => router.push(`/orders/${item.id}`)}
               />
-              {/* Action buttons */}
               {(nextStatusLabel || canCancel) && (
                 <View className="mt-1 flex-row px-1" style={{ gap: 8 }}>
                   {nextStatusLabel && (
                     <Button
                       size="sm"
                       className="flex-1"
-                      onPress={() =>
-                        handleAdvanceStatus(
-                          item._id as any,
-                          item.status
-                        )
-                      }
+                      onPress={() => handleAdvanceStatus(item.id, item.status)}
                     >
                       {nextStatusLabel}
                     </Button>
@@ -284,9 +259,7 @@ export default function OrdersScreen() {
                       variant="destructive"
                       size="sm"
                       className="flex-1"
-                      onPress={() =>
-                        handleCancelOrder(item._id as any)
-                      }
+                      onPress={() => handleCancelOrder(item.id)}
                     >
                       Cancel
                     </Button>

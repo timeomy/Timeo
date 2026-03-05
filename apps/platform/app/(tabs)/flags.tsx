@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { View, Text, FlatList, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { Flag, ChevronRight } from "lucide-react-native";
@@ -13,24 +13,17 @@ import {
   Spacer,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useQuery, useMutation } from "convex/react";
+import { usePlatformFlags, useUpdatePlatformFlag } from "@timeo/api-client";
 
 export default function FlagsScreen() {
   const router = useRouter();
   const theme = useTheme();
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-  const [togglingKeys, setTogglingKeys] = useState<Set<string>>(new Set());
+  const { data: flagsData, isLoading, refetch } = usePlatformFlags();
+  const { mutateAsync: updateFlag } = useUpdatePlatformFlag();
 
-  const flags = useQuery(api.platform.listFeatureFlags, {});
-  const setFeatureFlag = useMutation(api.platform.setFeatureFlag);
-
-  // Filter to only show global flags (tenantId undefined)
-  const globalFlags = useMemo(() => {
-    if (!flags) return [];
-    return flags.filter((f) => !f.tenantId);
-  }, [flags]);
+  const globalFlags = useMemo(() => flagsData ?? [], [flagsData]);
 
   const filteredFlags = useMemo(() => {
     if (!search.trim()) return globalFlags;
@@ -38,35 +31,27 @@ export default function FlagsScreen() {
     return globalFlags.filter(
       (f) =>
         f.key.toLowerCase().includes(query) ||
-        (f.metadata?.description &&
-          String(f.metadata.description).toLowerCase().includes(query))
+        (f.description && f.description.toLowerCase().includes(query))
     );
   }, [globalFlags, search]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    refetch().finally(() => setRefreshing(false));
+  }, [refetch]);
 
   const handleToggle = useCallback(
     async (key: string, enabled: boolean) => {
-      setTogglingKeys((prev) => new Set(prev).add(key));
       try {
-        await setFeatureFlag({ key, enabled });
+        await updateFlag({ key, enabled });
       } catch (error) {
         console.error("Failed to toggle feature flag:", error);
-      } finally {
-        setTogglingKeys((prev) => {
-          const next = new Set(prev);
-          next.delete(key);
-          return next;
-        });
       }
     },
-    [setFeatureFlag]
+    [updateFlag]
   );
 
-  if (flags === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading feature flags..." />;
   }
 
@@ -84,7 +69,7 @@ export default function FlagsScreen() {
 
       <FlatList
         data={filteredFlags}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -133,13 +118,13 @@ export default function FlagsScreen() {
                     {flag.key}
                   </Text>
                 </View>
-                {flag.metadata?.description ? (
+                {flag.description ? (
                   <Text
                     className="mt-1 text-sm"
                     style={{ color: theme.colors.textSecondary }}
                     numberOfLines={2}
                   >
-                    {String(flag.metadata.description)}
+                    {flag.description}
                   </Text>
                 ) : null}
               </View>

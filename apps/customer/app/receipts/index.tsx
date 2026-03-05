@@ -8,8 +8,7 @@ import {
   QrCode,
   Building2,
 } from "lucide-react-native";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { usePosTransactions } from "@timeo/api-client";
 import { useTimeoAuth } from "@timeo/auth";
 import {
   Screen,
@@ -17,20 +16,19 @@ import {
   Card,
   LoadingScreen,
   EmptyState,
-  Spacer,
   useTheme,
 } from "@timeo/ui";
 
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString("en-MY", {
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-MY", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
 }
 
-function formatTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString("en-MY", {
+function formatTime(dateStr: string): string {
+  return new Date(dateStr).toLocaleTimeString("en-MY", {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -76,20 +74,16 @@ export default function ReceiptsScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as any;
   const [refreshing, setRefreshing] = useState(false);
+
+  const { data: transactions, isLoading, refetch } = usePosTransactions(activeTenantId);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    refetch().finally(() => setRefreshing(false));
+  }, [refetch]);
 
-  const transactions = useQuery(
-    api.pos.listByCustomer,
-    tenantId ? { tenantId } : "skip"
-  );
-
-  if (!tenantId) {
+  if (!activeTenantId) {
     return (
       <Screen>
         <Header title="Receipts" onBack={() => router.back()} />
@@ -102,7 +96,7 @@ export default function ReceiptsScreen() {
     );
   }
 
-  if (transactions === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading receipts..." />;
   }
 
@@ -112,7 +106,7 @@ export default function ReceiptsScreen() {
 
       <FlatList
         data={transactions}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -146,13 +140,13 @@ export default function ReceiptsScreen() {
                     style={{ color: theme.colors.text }}
                     numberOfLines={1}
                   >
-                    {item.receiptNumber}
+                    {item.receiptNumber ?? item.id.slice(0, 8).toUpperCase()}
                   </Text>
                   <Text
                     className="text-base font-bold"
                     style={{ color: theme.colors.text }}
                   >
-                    RM {(item.total / 100).toFixed(2)}
+                    RM {((item.total ?? item.amount) / 100).toFixed(2)}
                   </Text>
                 </View>
 
@@ -217,17 +211,7 @@ export default function ReceiptsScreen() {
                   >
                     {item.items.length} item{item.items.length !== 1 ? "s" : ""}
                     {" — "}
-                    {item.items.map((i: any) => i.name).join(", ")}
-                  </Text>
-                ) : null}
-
-                {/* Staff */}
-                {item.staffName ? (
-                  <Text
-                    className="mt-1 text-xs"
-                    style={{ color: theme.colors.textSecondary }}
-                  >
-                    Served by {item.staffName}
+                    {item.items.map((i) => i.name).join(", ")}
                   </Text>
                 ) : null}
               </View>

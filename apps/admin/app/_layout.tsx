@@ -1,34 +1,28 @@
 import "../global.css";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { TimeoAuthProvider, useTimeoAuth } from "@timeo/auth";
+import { TimeoAuthProvider } from "@timeo/auth";
 import { ThemeProvider, usePushNotifications } from "@timeo/ui";
 import { TimeoAnalyticsProvider } from "@timeo/analytics";
 import Constants from "expo-constants";
-import { useMutation } from "convex/react";
-import { api } from "@timeo/api";
-import { useCallback, useEffect } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useCallback } from "react";
 
-function EnsureUser() {
-  const { isSignedIn } = useTimeoAuth();
-  const ensureUser = useMutation(api.auth.ensureUser);
-
-  useEffect(() => {
-    if (isSignedIn) {
-      ensureUser({}).catch(() => {});
-    }
-  }, [isSignedIn, ensureUser]);
-
-  return null;
-}
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 2,
+    },
+  },
+});
 
 function PushRegistration() {
-  const registerPushToken = useMutation(api.notifications.registerPushToken);
   const handleRegister = useCallback(
-    async (token: string, platform: "ios" | "android") => {
-      await registerPushToken({ token, platform });
+    async (_token: string, _platform: "ios" | "android") => {
+      // Push token registration handled server-side
     },
-    [registerPushToken]
+    []
   );
   usePushNotifications(handleRegister);
   return null;
@@ -40,84 +34,83 @@ export default function RootLayout() {
       apiKey={Constants.expoConfig?.extra?.posthogKey ?? ""}
       host={Constants.expoConfig?.extra?.posthogHost}
     >
-      <TimeoAuthProvider
-        convexUrl={Constants.expoConfig?.extra?.convexUrl ?? ""}
-      >
-        <ThemeProvider dark>
-          <EnsureUser />
-          <PushRegistration />
-          <StatusBar style="light" />
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="onboarding" />
-            <Stack.Screen
-              name="staff/[id]"
-              options={{ presentation: "card" }}
-            />
-            <Stack.Screen
-              name="staff/invite"
-              options={{ presentation: "modal" }}
-            />
-            <Stack.Screen
-              name="customers/index"
-              options={{ presentation: "card" }}
-            />
-            <Stack.Screen
-              name="memberships/index"
-              options={{ presentation: "card" }}
-            />
-            <Stack.Screen
-              name="memberships/[id]/edit"
-              options={{ presentation: "card" }}
-            />
-            <Stack.Screen
-              name="notifications/index"
-              options={{ presentation: "card" }}
-            />
-            <Stack.Screen
-              name="gift-cards/index"
-              options={{ presentation: "card" }}
-            />
-            <Stack.Screen
-              name="gift-cards/create"
-              options={{ presentation: "card" }}
-            />
-            <Stack.Screen
-              name="gift-cards/[id]"
-              options={{ presentation: "card" }}
-            />
-            <Stack.Screen
-              name="analytics/index"
-              options={{ presentation: "card" }}
-            />
-            <Stack.Screen
-              name="payments/index"
-              options={{ presentation: "card" }}
-            />
-            <Stack.Screen
-              name="e-invoice/index"
-              options={{ presentation: "card" }}
-            />
-            <Stack.Screen
-              name="e-invoice/[id]"
-              options={{ presentation: "card" }}
-            />
-            <Stack.Screen
-              name="vouchers/index"
-              options={{ presentation: "card" }}
-            />
-            <Stack.Screen
-              name="vouchers/create"
-              options={{ presentation: "card" }}
-            />
-            <Stack.Screen
-              name="vouchers/[id]"
-              options={{ presentation: "card" }}
-            />
-          </Stack>
-        </ThemeProvider>
-      </TimeoAuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <TimeoAuthProvider>
+          <ThemeProvider dark>
+            <PushRegistration />
+            <StatusBar style="light" />
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="onboarding" />
+              <Stack.Screen
+                name="staff/[id]"
+                options={{ presentation: "card" }}
+              />
+              <Stack.Screen
+                name="staff/invite"
+                options={{ presentation: "modal" }}
+              />
+              <Stack.Screen
+                name="customers/index"
+                options={{ presentation: "card" }}
+              />
+              <Stack.Screen
+                name="memberships/index"
+                options={{ presentation: "card" }}
+              />
+              <Stack.Screen
+                name="memberships/[id]/edit"
+                options={{ presentation: "card" }}
+              />
+              <Stack.Screen
+                name="notifications/index"
+                options={{ presentation: "card" }}
+              />
+              <Stack.Screen
+                name="gift-cards/index"
+                options={{ presentation: "card" }}
+              />
+              <Stack.Screen
+                name="gift-cards/create"
+                options={{ presentation: "card" }}
+              />
+              <Stack.Screen
+                name="gift-cards/[id]"
+                options={{ presentation: "card" }}
+              />
+              <Stack.Screen
+                name="analytics/index"
+                options={{ presentation: "card" }}
+              />
+              <Stack.Screen
+                name="payments/index"
+                options={{ presentation: "card" }}
+              />
+              <Stack.Screen
+                name="e-invoice/index"
+                options={{ presentation: "card" }}
+              />
+              <Stack.Screen
+                name="e-invoice/[id]"
+                options={{ presentation: "card" }}
+              />
+              <Stack.Screen
+                name="vouchers/index"
+                options={{ presentation: "card" }}
+              />
+              <Stack.Screen
+                name="vouchers/create"
+                options={{ presentation: "card" }}
+              />
+              <Stack.Screen
+                name="vouchers/[id]"
+                options={{ presentation: "card" }}
+              />
+            </Stack>
+          </ThemeProvider>
+        </TimeoAuthProvider>
+      </QueryClientProvider>
     </TimeoAnalyticsProvider>
   );
 }

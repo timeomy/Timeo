@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { View, FlatList, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { Briefcase } from "lucide-react-native";
@@ -13,8 +13,7 @@ import {
   useTheme,
 } from "@timeo/ui";
 import { useTimeoAuth } from "@timeo/auth";
-import { api } from "@timeo/api";
-import { useQuery } from "convex/react";
+import { useServices } from "@timeo/api-client";
 
 export default function ServicesScreen() {
   const router = useRouter();
@@ -23,10 +22,7 @@ export default function ServicesScreen() {
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
-  const services = useQuery(
-    api.services.list,
-    activeTenantId ? { tenantId: activeTenantId as any } : "skip"
-  );
+  const { data: services, isLoading, refetch } = useServices(activeTenantId);
 
   const filteredServices = useMemo(() => {
     if (!services) return [];
@@ -35,17 +31,16 @@ export default function ServicesScreen() {
     return services.filter(
       (s) =>
         s.name.toLowerCase().includes(query) ||
-        s.description.toLowerCase().includes(query)
+        (s.description ?? "").toLowerCase().includes(query)
     );
   }, [services, search]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    // Convex queries are reactive; the small delay simulates pull-to-refresh feedback
-    setTimeout(() => setRefreshing(false), 800);
-  }, []);
+    refetch().finally(() => setRefreshing(false));
+  }, [refetch]);
 
-  if (services === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading services..." />;
   }
 
@@ -78,7 +73,7 @@ export default function ServicesScreen() {
       ) : (
         <FlatList
           data={filteredServices}
-          keyExtractor={(item) => item._id}
+          keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
           ItemSeparatorComponent={() => <Spacer size={12} />}
           showsVerticalScrollIndicator={false}
@@ -96,8 +91,8 @@ export default function ServicesScreen() {
               duration={item.durationMinutes}
               price={item.price}
               currency={item.currency}
-              onPress={() => router.push(`/services/${item._id}` as any)}
-              onBook={() => router.push(`/services/${item._id}` as any)}
+              onPress={() => router.push(`/services/${item.id}` as any)}
+              onBook={() => router.push(`/services/${item.id}` as any)}
             />
           )}
         />

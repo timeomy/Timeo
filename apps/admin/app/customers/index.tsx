@@ -7,7 +7,6 @@ import {
   Screen,
   Header,
   SearchInput,
-  Avatar,
   Badge,
   Card,
   Row,
@@ -16,9 +15,8 @@ import {
   EmptyState,
   useTheme,
 } from "@timeo/ui";
-import { getInitials, formatRelativeTime } from "@timeo/shared";
-import { api } from "@timeo/api";
-import { useQuery } from "convex/react";
+import { formatPrice } from "@timeo/shared";
+import { useCustomers } from "@timeo/api-client";
 
 export default function CustomersScreen() {
   const theme = useTheme();
@@ -28,63 +26,16 @@ export default function CustomersScreen() {
 
   const tenantId = activeTenantId as string;
 
-  const members = useQuery(
-    api.tenantMemberships.listByTenant,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
-
-  const bookings = useQuery(
-    api.bookings.listByTenant,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
-
-  const orders = useQuery(
-    api.orders.listByTenant,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
-
-  const customers = useMemo(() => {
-    if (!members) return [];
-
-    // Only include customers
-    const customerMembers = members.filter((m) => m.role === "customer");
-
-    // Count bookings and orders per customer
-    const bookingCounts = new Map<string, number>();
-    const orderCounts = new Map<string, number>();
-
-    if (bookings) {
-      for (const b of bookings) {
-        bookingCounts.set(
-          b.customerId,
-          (bookingCounts.get(b.customerId) ?? 0) + 1
-        );
-      }
-    }
-
-    if (orders) {
-      for (const o of orders) {
-        orderCounts.set(
-          o.customerId,
-          (orderCounts.get(o.customerId) ?? 0) + 1
-        );
-      }
-    }
-
-    return customerMembers.map((m) => ({
-      ...m,
-      bookingCount: bookingCounts.get(m.userId) ?? 0,
-      orderCount: orderCounts.get(m.userId) ?? 0,
-    }));
-  }, [members, bookings, orders]);
+  const { data: customers, isLoading } = useCustomers(tenantId);
 
   const filteredCustomers = useMemo(() => {
-    if (!search) return customers;
+    if (!customers) return [];
     const q = search.toLowerCase();
+    if (!q) return customers;
     return customers.filter(
       (c) =>
-        c.userName.toLowerCase().includes(q) ||
-        c.userEmail.toLowerCase().includes(q)
+        c.name.toLowerCase().includes(q) ||
+        c.email.toLowerCase().includes(q)
     );
   }, [customers, search]);
 
@@ -104,36 +55,31 @@ export default function CustomersScreen() {
     );
   }
 
-  if (members === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading customers..." />;
   }
 
   const renderCustomer = ({
     item,
   }: {
-    item: (typeof filteredCustomers)[0];
+    item: NonNullable<typeof customers>[0];
   }) => (
     <Card className="mb-3">
       <Row align="center">
-        <Avatar
-          src={item.userAvatarUrl}
-          fallback={getInitials(item.userName)}
-          size="md"
-        />
         <View className="ml-3 flex-1">
           <Text
             className="text-base font-semibold"
             style={{ color: theme.colors.text }}
             numberOfLines={1}
           >
-            {item.userName}
+            {item.name}
           </Text>
           <Text
             className="text-sm"
             style={{ color: theme.colors.textSecondary }}
             numberOfLines={1}
           >
-            {item.userEmail}
+            {item.email}
           </Text>
         </View>
         <View className="items-end">
@@ -143,9 +89,9 @@ export default function CustomersScreen() {
               variant="default"
             />
           </Row>
-          {item.orderCount > 0 && (
+          {item.totalSpend > 0 && (
             <Badge
-              label={`${item.orderCount} orders`}
+              label={formatPrice(item.totalSpend)}
               variant="success"
               className="mt-1"
             />
@@ -176,7 +122,7 @@ export default function CustomersScreen() {
       </View>
       <FlatList
         data={filteredCustomers}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         renderItem={renderCustomer}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}

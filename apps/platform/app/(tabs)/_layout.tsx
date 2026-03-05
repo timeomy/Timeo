@@ -11,24 +11,18 @@ import {
 } from "lucide-react-native";
 import { AuthGuard, useTimeoAuth } from "@timeo/auth";
 import { LoadingScreen, useTheme } from "@timeo/ui";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { usePlatformStats } from "@timeo/api-client";
 
 function PlatformAdminGate({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
-  const { isSignedIn, signOut } = useTimeoAuth();
-  const isPlatformAdmin = useQuery(
-    api.platform.amIPlatformAdmin,
-    isSignedIn ? {} : "skip"
-  );
+  const { signOut } = useTimeoAuth();
+  const { isLoading, isError } = usePlatformStats();
 
-  // Still loading
-  if (isPlatformAdmin === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Verifying access..." />;
   }
 
-  // Not a platform admin
-  if (!isPlatformAdmin) {
+  if (isError) {
     return (
       <View
         className="flex-1 items-center justify-center px-8"

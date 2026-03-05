@@ -2,8 +2,7 @@ import { useState } from "react";
 import { View, Text } from "react-native";
 import { useRouter } from "expo-router";
 import { CreditCard, Search, CheckCircle, XCircle } from "lucide-react-native";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { useGiftCardByCode } from "@timeo/api-client";
 import { useTimeoAuth } from "@timeo/auth";
 import {
   Screen,
@@ -20,13 +19,13 @@ export default function GiftCardsScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as any;
+  const tenantId = activeTenantId;
   const [code, setCode] = useState("");
   const [searchCode, setSearchCode] = useState("");
 
-  const result = useQuery(
-    api.giftCards.validateCode,
-    tenantId && searchCode ? { tenantId, code: searchCode } : "skip"
+  const { data: result, isFetched } = useGiftCardByCode(
+    tenantId && searchCode ? tenantId : null,
+    searchCode || null
   );
 
   const handleCheckBalance = () => {
@@ -90,10 +89,10 @@ export default function GiftCardsScreen() {
       </Card>
 
       {/* Result Section */}
-      {result !== undefined && searchCode ? (
+      {isFetched && searchCode ? (
         <>
           <Spacer size={16} />
-          {result.valid && result.card ? (
+          {result && result.isActive ? (
             <Card>
               <View className="items-center py-4">
                 <View
@@ -107,20 +106,20 @@ export default function GiftCardsScreen() {
                   className="text-sm font-mono font-semibold"
                   style={{ color: theme.colors.textSecondary }}
                 >
-                  {result.card.code}
+                  {result.code}
                 </Text>
                 <Spacer size={8} />
                 <Text
                   className="text-3xl font-bold"
                   style={{ color: theme.colors.success }}
                 >
-                  RM {(result.card.currentBalance / 100).toFixed(2)}
+                  RM {(result.currentBalance / 100).toFixed(2)}
                 </Text>
                 <Text
                   className="mt-1 text-sm"
                   style={{ color: theme.colors.textSecondary }}
                 >
-                  Available Balance ({result.card.currency ?? "MYR"})
+                  Available Balance ({result.currency ?? "MYR"})
                 </Text>
                 <Spacer size={12} />
                 <View
@@ -157,7 +156,7 @@ export default function GiftCardsScreen() {
                   className="text-sm text-center"
                   style={{ color: theme.colors.textSecondary }}
                 >
-                  {result.reason ?? "Gift card not found"}
+                  Gift card not found or inactive
                 </Text>
               </View>
             </Card>

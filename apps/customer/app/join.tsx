@@ -8,24 +8,28 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Building2, Search, CheckCircle } from "lucide-react-native";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@timeo/api";
+import { useMutation } from "@tanstack/react-query";
+import { useTenantBySlug, api } from "@timeo/api-client";
 import { Screen, Card, Input, Button, Spacer, useTheme } from "@timeo/ui";
 
 export default function JoinBusinessScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const joinAsCustomer = useMutation(api.tenants.joinAsCustomer);
 
   const [slug, setSlug] = useState("");
   const [searchSlug, setSearchSlug] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [joined, setJoined] = useState<{ name: string } | null>(null);
 
-  const tenant = useQuery(
-    api.tenants.getBySlug,
-    searchSlug ? { slug: searchSlug } : "skip"
-  );
+  const { data: tenant, isLoading: tenantLoading } = useTenantBySlug(searchSlug);
+
+  const { mutateAsync: joinTenant } = useMutation({
+    mutationFn: (tenantSlug: string) =>
+      api.post<{ alreadyMember: boolean; name: string; tenantId: string }>(
+        "/api/tenants/join",
+        { slug: tenantSlug }
+      ),
+  });
 
   const handleSearch = useCallback(() => {
     const trimmed = slug
@@ -44,7 +48,7 @@ export default function JoinBusinessScreen() {
 
     setJoining(true);
     try {
-      const result = await joinAsCustomer({ tenantSlug: searchSlug });
+      const result = await joinTenant(searchSlug);
       if (result.alreadyMember) {
         Alert.alert(
           "Already a Member",
@@ -61,7 +65,7 @@ export default function JoinBusinessScreen() {
     } finally {
       setJoining(false);
     }
-  }, [searchSlug, joinAsCustomer, router]);
+  }, [searchSlug, joinTenant, router]);
 
   const handleGoHome = useCallback(() => {
     router.replace("/(tabs)");
@@ -173,7 +177,7 @@ export default function JoinBusinessScreen() {
                 </Text>
               </View>
             </Button>
-          ) : tenant === undefined ? (
+          ) : tenantLoading ? (
             <View className="items-center py-4">
               <Text
                 className="text-sm"
@@ -182,7 +186,7 @@ export default function JoinBusinessScreen() {
                 Searching...
               </Text>
             </View>
-          ) : tenant === null ? (
+          ) : !tenant ? (
             <View>
               <View
                 className="rounded-xl p-4"

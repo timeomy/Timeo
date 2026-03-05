@@ -15,6 +15,7 @@
     "@expo/metro-runtime": "~55.0.6",
     "@timeo/analytics": "workspace:*",
     "@timeo/api": "workspace:*",
+    "@timeo/api-client": "workspace:*",
     "@timeo/auth": "workspace:*",
     "@timeo/shared": "workspace:*",
     "@timeo/ui": "workspace:*",

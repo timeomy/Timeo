@@ -1,10 +1,9 @@
 import { useState, useCallback } from "react";
-import { View, Text, TouchableOpacity, Alert } from "react-native";
+import { View, Text, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { QrCode, RefreshCw, User, Sun, Clock } from "lucide-react-native";
 import QRCode from "react-native-qrcode-svg";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
+import { useMemberQrCode, useGenerateQrCode, useCheckIns } from "@timeo/api-client";
 import { useTimeoAuth } from "@timeo/auth";
 import {
   Screen,
@@ -21,27 +20,18 @@ export default function QrCodeScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId, user } = useTimeoAuth();
-  const tenantId = activeTenantId as any;
 
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const qrCode = useQuery(
-    api.checkIns.getMyQrCode,
-    tenantId ? { tenantId } : "skip"
-  );
-
-  const recentCheckIns = useQuery(
-    api.checkIns.listByUser,
-    tenantId ? { tenantId } : "skip"
-  );
-
-  const generateQrCode = useMutation(api.checkIns.generateQrCode);
+  const { data: qrCode, isLoading } = useMemberQrCode(activeTenantId);
+  const { data: recentCheckIns } = useCheckIns(activeTenantId);
+  const { mutateAsync: generateQrCode } = useGenerateQrCode(activeTenantId ?? "");
 
   const handleGenerate = useCallback(async () => {
-    if (!tenantId) return;
+    if (!activeTenantId) return;
     setIsGenerating(true);
     try {
-      await generateQrCode({ tenantId });
+      await generateQrCode(undefined);
     } catch (err) {
       Alert.alert(
         "Error",
@@ -50,12 +40,11 @@ export default function QrCodeScreen() {
     } finally {
       setIsGenerating(false);
     }
-  }, [tenantId, generateQrCode]);
+  }, [activeTenantId, generateQrCode]);
 
-  const displayName =
-    user?.name || "Member";
+  const displayName = user?.name || "Member";
 
-  if (!tenantId) {
+  if (!activeTenantId) {
     return (
       <Screen>
         <Header title="My QR Code" onBack={() => router.back()} />
@@ -68,7 +57,7 @@ export default function QrCodeScreen() {
     );
   }
 
-  if (qrCode === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading QR code..." />;
   }
 
@@ -224,15 +213,15 @@ export default function QrCodeScreen() {
                 Recent Check-ins
               </Text>
             </View>
-            {recentCheckIns.slice(0, 5).map((checkIn: any, index: number) => (
-              <View key={checkIn._id}>
+            {recentCheckIns.slice(0, 5).map((checkIn, index) => (
+              <View key={checkIn.id}>
                 {index > 0 && <Separator />}
                 <View className="flex-row items-center justify-between py-2.5">
                   <Text
                     className="text-sm"
                     style={{ color: theme.colors.text }}
                   >
-                    {new Date(checkIn.timestamp).toLocaleDateString("en-MY", {
+                    {new Date(checkIn.checkedInAt).toLocaleDateString("en-MY", {
                       weekday: "short",
                       day: "numeric",
                       month: "short",
@@ -242,7 +231,7 @@ export default function QrCodeScreen() {
                     className="text-sm"
                     style={{ color: theme.colors.textSecondary }}
                   >
-                    {new Date(checkIn.timestamp).toLocaleTimeString([], {
+                    {new Date(checkIn.checkedInAt).toLocaleTimeString([], {
                       hour: "2-digit",
                       minute: "2-digit",
                     })}

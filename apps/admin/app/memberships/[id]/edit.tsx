@@ -16,8 +16,11 @@ import {
   Toast,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useQuery, useMutation } from "convex/react";
+import {
+  useMemberships,
+  useCreateMembership,
+  useUpdateMembership,
+} from "@timeo/api-client";
 
 const INTERVAL_OPTIONS = [
   { label: "Monthly", value: "monthly" },
@@ -51,17 +54,14 @@ export default function MembershipEditorScreen() {
   const tenantId = activeTenantId as string;
   const isNew = id === "new";
 
-  const memberships = useQuery(
-    api.memberships.listByTenant,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
+  const { data: memberships, isLoading } = useMemberships(tenantId);
 
-  const createMembership = useMutation(api.memberships.create);
-  const updateMembership = useMutation(api.memberships.update);
+  const { mutateAsync: createMembership } = useCreateMembership(tenantId ?? "");
+  const { mutateAsync: updateMembership } = useUpdateMembership(tenantId ?? "");
 
   const existingPlan = useMemo(() => {
     if (isNew || !memberships) return null;
-    return memberships.find((m) => m._id === id) ?? null;
+    return memberships.find((m) => m.id === id) ?? null;
   }, [isNew, memberships, id]);
 
   const [form, setForm] = useState<MembershipFormData>(EMPTY_FORM);
@@ -78,10 +78,10 @@ export default function MembershipEditorScreen() {
     if (existingPlan && !initialized) {
       setForm({
         name: existingPlan.name,
-        description: existingPlan.description,
+        description: existingPlan.description ?? "",
         price: String(existingPlan.price / 100),
-        interval: existingPlan.interval,
-        features: existingPlan.features.join("\n"),
+        interval: existingPlan.billingInterval,
+        features: existingPlan.benefits.join("\n"),
         isActive: existingPlan.isActive,
       });
       setInitialized(true);
@@ -121,7 +121,7 @@ export default function MembershipEditorScreen() {
       return;
     }
 
-    const features = form.features
+    const benefits = form.features
       .split("\n")
       .map((f) => f.trim())
       .filter(Boolean);
@@ -130,28 +130,26 @@ export default function MembershipEditorScreen() {
     try {
       if (isNew) {
         await createMembership({
-          tenantId: tenantId as any,
           name: form.name.trim(),
-          description: form.description.trim(),
+          description: form.description.trim() || undefined,
           price: Math.round(price * 100),
-          interval: form.interval as any,
-          features,
+          billingInterval: form.interval as "monthly" | "yearly",
+          benefits,
         });
         setToast({
           message: "Membership plan created",
           type: "success",
           visible: true,
         });
-        // Navigate back after a brief delay so toast is visible
         setTimeout(() => router.back(), 1200);
       } else {
         await updateMembership({
-          membershipId: id as any,
+          membershipId: id as string,
           name: form.name.trim(),
-          description: form.description.trim(),
+          description: form.description.trim() || undefined,
           price: Math.round(price * 100),
-          interval: form.interval as any,
-          features,
+          benefits,
+          isActive: form.isActive,
         });
         setToast({
           message: "Membership plan updated",
@@ -166,7 +164,7 @@ export default function MembershipEditorScreen() {
     } finally {
       setSaving(false);
     }
-  }, [form, isNew, id, tenantId, createMembership, updateMembership, router]);
+  }, [form, isNew, id, createMembership, updateMembership, router]);
 
   if (!tenantId) {
     return (
@@ -187,7 +185,7 @@ export default function MembershipEditorScreen() {
     );
   }
 
-  if (!isNew && memberships === undefined) {
+  if (!isNew && isLoading) {
     return <LoadingScreen message="Loading plan..." />;
   }
 

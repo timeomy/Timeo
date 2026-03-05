@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useEffect } from "react";
-import { View, Text, Image, ScrollView, Alert } from "react-native";
+import { useState, useCallback, useEffect } from "react";
+import { View, Text, Image, ScrollView } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ShoppingBag, CheckCircle } from "lucide-react-native";
 import {
@@ -17,8 +17,7 @@ import {
 } from "@timeo/ui";
 import { useTimeoAuth } from "@timeo/auth";
 import { useTrackEvent } from "@timeo/analytics";
-import { api } from "@timeo/api";
-import { useQuery } from "convex/react";
+import { useProduct } from "@timeo/api-client";
 import { useCart } from "../../providers/cart";
 
 export default function ProductDetailScreen() {
@@ -33,39 +32,36 @@ export default function ProductDetailScreen() {
   const [quantity, setQuantity] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
 
-  const product = useQuery(
-    api.products.getById,
-    id ? { productId: id as any } : "skip"
-  );
+  const { data: product, isLoading } = useProduct(activeTenantId, id);
 
   // Track product view
   useEffect(() => {
     if (product && activeTenantId) {
       track("product_viewed", {
-        product_id: product._id,
+        product_id: product.id,
         product_name: product.name,
         price: product.price,
         currency: product.currency,
         tenant_id: activeTenantId,
       });
     }
-  }, [product?._id, activeTenantId]);
+  }, [product?.id, activeTenantId]);
 
   const handleAddToCart = useCallback(() => {
     if (!product) return;
 
     addItem({
-      productId: product._id,
+      productId: product.id,
       name: product.name,
       price: product.price,
-      image: product.imageUrl,
+      image: product.imageUrl ?? undefined,
       currency: product.currency,
       quantity,
     });
 
     if (activeTenantId) {
       track("add_to_cart", {
-        product_id: product._id,
+        product_id: product.id,
         product_name: product.name,
         price: product.price,
         currency: product.currency,
@@ -78,11 +74,11 @@ export default function ProductDetailScreen() {
     setTimeout(() => setAddedToCart(false), 2000);
   }, [product, quantity, addItem, activeTenantId, track]);
 
-  if (product === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading product..." />;
   }
 
-  if (product === null) {
+  if (!product) {
     return (
       <ErrorScreen
         title="Product not found"
@@ -156,7 +152,7 @@ export default function ProductDetailScreen() {
               className="text-base leading-6"
               style={{ color: theme.colors.text }}
             >
-              {product.description}
+              {product.description ?? "No description available."}
             </Text>
           </Card>
 
@@ -237,7 +233,10 @@ export default function ProductDetailScreen() {
               className="min-w-[160px]"
             >
               <View className="flex-row items-center">
-                <ShoppingBag size={18} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
+                <ShoppingBag
+                  size={18}
+                  color={theme.dark ? "#0B0B0F" : "#FFFFFF"}
+                />
                 <Text
                   className="ml-2 text-base font-semibold"
                   style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}

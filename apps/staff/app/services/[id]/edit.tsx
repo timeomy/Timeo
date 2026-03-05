@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { ScrollView, Alert, KeyboardAvoidingView, Platform } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
 import { useTimeoAuth } from "@timeo/auth";
+import {
+  useService,
+  useCreateService,
+  useUpdateService,
+} from "@timeo/api-client";
 import {
   Screen,
   Header,
@@ -12,33 +15,25 @@ import {
   Switch,
   Spacer,
   LoadingScreen,
-  ImageUploader,
 } from "@timeo/ui";
+
 export default function ServiceEditScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as any | null;
+  const tenantId = activeTenantId as string;
 
   const isNew = id === "new";
-  const serviceId = isNew ? null : (id as any);
+  const serviceId = isNew ? null : id;
 
-  const existingService = useQuery(
-    api.services.getById,
-    serviceId ? { serviceId } : "skip"
-  );
-
-  const createService = useMutation(api.services.create);
-  const updateService = useMutation(api.services.update);
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
-  const updateEntityImage = useMutation(api.files.updateEntityImage);
-  const saveFile = useMutation(api.files.saveFile);
+  const { data: existingService, isLoading } = useService(tenantId, serviceId);
+  const { mutateAsync: createService } = useCreateService(tenantId ?? "");
+  const { mutateAsync: updateService } = useUpdateService(tenantId ?? "");
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [duration, setDuration] = useState("");
   const [price, setPrice] = useState("");
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
   const [initialized, setInitialized] = useState(isNew);
@@ -47,39 +42,13 @@ export default function ServiceEditScreen() {
   useEffect(() => {
     if (existingService && !initialized) {
       setName(existingService.name);
-      setDescription(existingService.description);
+      setDescription(existingService.description ?? "");
       setDuration(String(existingService.durationMinutes));
       setPrice((existingService.price / 100).toFixed(2));
       setIsActive(existingService.isActive);
-      setImageUrl((existingService as any).imageUrl ?? null);
       setInitialized(true);
     }
   }, [existingService, initialized]);
-
-  const handleImageUpload = useCallback(
-    async (storageId: string) => {
-      if (!serviceId || isNew) return;
-      try {
-        await saveFile({
-          tenantId: tenantId ?? undefined,
-          filename: "service-image",
-          mimeType: "image/jpeg",
-          size: 0,
-          type: "service_image",
-          entityId: serviceId,
-          storageId,
-        });
-        await updateEntityImage({
-          entityType: "service",
-          entityId: serviceId,
-          storageId,
-        });
-      } catch {
-        Alert.alert("Error", "Failed to save image.");
-      }
-    },
-    [serviceId, isNew, tenantId, saveFile, updateEntityImage]
-  );
 
   const validate = useCallback((): string | null => {
     if (!name.trim()) return "Service name is required.";
@@ -112,7 +81,6 @@ export default function ServiceEditScreen() {
 
       if (isNew) {
         await createService({
-          tenantId,
           name: name.trim(),
           description: description.trim(),
           durationMinutes,
@@ -120,11 +88,12 @@ export default function ServiceEditScreen() {
         });
       } else if (serviceId) {
         await updateService({
-          serviceId,
+          id: serviceId,
           name: name.trim(),
           description: description.trim(),
           durationMinutes,
           price: priceInCents,
+          isActive,
         });
       }
 
@@ -145,6 +114,7 @@ export default function ServiceEditScreen() {
     description,
     duration,
     price,
+    isActive,
     createService,
     updateService,
     serviceId,
@@ -152,7 +122,7 @@ export default function ServiceEditScreen() {
   ]);
 
   // Loading state for existing service
-  if (!isNew && existingService === undefined) {
+  if (!isNew && isLoading) {
     return <LoadingScreen message="Loading service..." />;
   }
 
@@ -174,19 +144,6 @@ export default function ServiceEditScreen() {
           contentContainerStyle={{ paddingBottom: 40 }}
         >
           <Spacer size={8} />
-
-          <ImageUploader
-            label="Service Image"
-            generateUploadUrl={generateUploadUrl}
-            currentImageUrl={imageUrl}
-            onUpload={(storageId, url) => {
-              setImageUrl(url);
-              handleImageUpload(storageId);
-            }}
-            onRemove={() => setImageUrl(null)}
-          />
-
-          <Spacer size={16} />
 
           <Input
             label="Service Name"

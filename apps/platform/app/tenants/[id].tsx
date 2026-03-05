@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { View, Text, ScrollView, Alert } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import {
@@ -7,7 +7,6 @@ import {
   Users,
   ShieldCheck,
   Globe,
-  Camera,
 } from "lucide-react-native";
 import {
   Screen,
@@ -26,8 +25,17 @@ import {
   ErrorScreen,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useQuery, useMutation } from "convex/react";
+import {
+  usePlatformTenant,
+  usePlatformTenantMembers,
+  usePlatformFlags,
+  useUpdatePlatformTenant,
+  useSuspendPlatformTenant,
+  useActivatePlatformTenant,
+  useSetFlagOverride,
+  type FeatureFlag,
+  type TenantMember,
+} from "@timeo/api-client";
 import { formatDate } from "@timeo/shared";
 
 const PLAN_OPTIONS = [
@@ -97,40 +105,36 @@ export default function TenantDetailScreen() {
   const [addingFlag, setAddingFlag] = useState(false);
   const [, setTogglingFlagKey] = useState<string | null>(null);
 
-  const tenant = useQuery(
-    api.tenants.getById,
-    id ? { tenantId: id as any } : "skip"
-  );
+  const { data: tenant, isLoading: tenantLoading, isError: tenantError } =
+    usePlatformTenant(id ?? "");
+  const { data: memberships, isLoading: membershipsLoading } =
+    usePlatformTenantMembers(id ?? "");
+  const { data: allFlags } = usePlatformFlags();
 
-  const updateTenant = useMutation(api.tenants.update);
-  const updateTenantSettings = useMutation(api.platform.updateTenantSettings);
-  const setFeatureFlag = useMutation(api.platform.setFeatureFlag);
+  const tenantFlags: FeatureFlag[] =
+    allFlags?.filter((flag) =>
+      flag.overrides.some((o) => o.tenantId === id)
+    ) ?? [];
 
-  const memberships = useQuery(
-    api.tenantMemberships.listByTenant,
-    id ? { tenantId: id as any } : "skip"
-  );
-
-  const tenantFlags = useQuery(
-    api.platform.listFeatureFlags,
-    id ? { tenantId: id as any } : "skip"
-  );
+  const { mutateAsync: updateTenant } = useUpdatePlatformTenant();
+  const { mutateAsync: suspendTenant } = useSuspendPlatformTenant();
+  const { mutateAsync: activateTenant } = useActivatePlatformTenant();
+  const { mutateAsync: setFlagOverride } = useSetFlagOverride();
 
   // Initialize settings from tenant data
   useEffect(() => {
     if (tenant && !settingsInitialized) {
-      setTimezone(tenant.settings?.timezone ?? "");
-      setAutoConfirmBookings(tenant.settings?.autoConfirmBookings ?? false);
-      setBookingBuffer(
-        tenant.settings?.bookingBuffer != null
-          ? String(tenant.settings.bookingBuffer)
-          : ""
+      setTimezone((tenant.settings as Record<string, string>)?.timezone ?? "");
+      setAutoConfirmBookings(
+        (tenant.settings as Record<string, boolean>)?.autoConfirmBookings ?? false
       );
-      const cam = tenant.settings?.doorCamera;
-      setDoorIp(cam?.ip ?? "");
+      const buf = (tenant.settings as Record<string, number>)?.bookingBuffer;
+      setBookingBuffer(buf != null ? String(buf) : "");
+      const cam = (tenant.settings as Record<string, Record<string, unknown>>)?.doorCamera;
+      setDoorIp((cam?.ip as string) ?? "");
       setDoorPort(cam?.port != null ? String(cam.port) : "");
       setDoorGpioPort(cam?.gpioPort != null ? String(cam.gpioPort) : "");
-      setDoorDeviceSn(cam?.deviceSn ?? "");
+      setDoorDeviceSn((cam?.deviceSn as string) ?? "");
       setSettingsInitialized(true);
     }
   }, [tenant, settingsInitialized]);
@@ -140,8 +144,8 @@ export default function TenantDetailScreen() {
     setSavingSettings(true);
     try {
       const bufferNum = bookingBuffer.trim() ? parseInt(bookingBuffer, 10) : undefined;
-      await updateTenantSettings({
-        tenantId: id as any,
+      await updateTenant({
+        id,
         settings: {
           timezone: timezone.trim() || undefined,
           autoConfirmBookings,
@@ -157,14 +161,14 @@ export default function TenantDetailScreen() {
     } finally {
       setSavingSettings(false);
     }
-  }, [id, timezone, autoConfirmBookings, bookingBuffer, updateTenantSettings]);
+  }, [id, timezone, autoConfirmBookings, bookingBuffer, updateTenant]);
 
   const handleToggleFlag = useCallback(
-    async (key: string, enabled: boolean) => {
+    async (flagId: string, enabled: boolean) => {
       if (!id) return;
-      setTogglingFlagKey(key);
+      setTogglingFlagKey(flagId);
       try {
-        await setFeatureFlag({ key, enabled, tenantId: id as any });
+        await setFlagOverride({ flagId, tenantId: id, enabled });
       } catch (error) {
         Alert.alert(
           "Error",
@@ -174,17 +178,22 @@ export default function TenantDetailScreen() {
         setTogglingFlagKey(null);
       }
     },
-    [id, setFeatureFlag]
+    [id, setFlagOverride]
   );
 
   const handleAddFlag = useCallback(async () => {
     if (!newFlagKey.trim() || !id) return;
+    const flagToAdd = allFlags?.find((f) => f.key === newFlagKey.trim());
+    if (!flagToAdd) {
+      Alert.alert("Error", "Flag not found. Create the flag first in Platform Settings.");
+      return;
+    }
     setAddingFlag(true);
     try {
-      await setFeatureFlag({
-        key: newFlagKey.trim(),
+      await setFlagOverride({
+        flagId: flagToAdd.id,
+        tenantId: id,
         enabled: newFlagEnabled,
-        tenantId: id as any,
       });
       setNewFlagKey("");
       setNewFlagEnabled(true);
@@ -197,7 +206,7 @@ export default function TenantDetailScreen() {
     } finally {
       setAddingFlag(false);
     }
-  }, [newFlagKey, newFlagEnabled, id, setFeatureFlag]);
+  }, [newFlagKey, newFlagEnabled, id, allFlags, setFlagOverride]);
 
   const handleSaveDoorCamera = useCallback(async () => {
     if (!id) return;
@@ -205,8 +214,8 @@ export default function TenantDetailScreen() {
     try {
       const portNum = doorPort.trim() ? parseInt(doorPort, 10) : undefined;
       const gpioNum = doorGpioPort.trim() ? parseInt(doorGpioPort, 10) : undefined;
-      await updateTenantSettings({
-        tenantId: id as any,
+      await updateTenant({
+        id,
         settings: {
           doorCamera: doorIp.trim()
             ? {
@@ -227,16 +236,13 @@ export default function TenantDetailScreen() {
     } finally {
       setSavingDoor(false);
     }
-  }, [id, doorIp, doorPort, doorGpioPort, doorDeviceSn, updateTenantSettings]);
+  }, [id, doorIp, doorPort, doorGpioPort, doorDeviceSn, updateTenant]);
 
   const handleChangePlan = useCallback(async () => {
     if (!selectedPlan || !id) return;
     setUpdatingPlan(true);
     try {
-      await updateTenant({
-        tenantId: id as any,
-        plan: selectedPlan as any,
-      });
+      await updateTenant({ id, plan: selectedPlan });
       setSelectedPlan(null);
       Alert.alert("Success", "Tenant plan has been updated.");
     } catch (error) {
@@ -253,8 +259,7 @@ export default function TenantDetailScreen() {
     if (!tenant || !id) return;
 
     const newStatus = tenant.status === "active" ? "suspended" : "active";
-    const actionLabel =
-      newStatus === "suspended" ? "suspend" : "activate";
+    const actionLabel = newStatus === "suspended" ? "suspend" : "activate";
 
     Alert.alert(
       `${actionLabel.charAt(0).toUpperCase() + actionLabel.slice(1)} Tenant`,
@@ -267,10 +272,11 @@ export default function TenantDetailScreen() {
           onPress: async () => {
             setTogglingStatus(true);
             try {
-              await updateTenant({
-                tenantId: id as any,
-                status: newStatus as any,
-              });
+              if (newStatus === "suspended") {
+                await suspendTenant(id);
+              } else {
+                await activateTenant(id);
+              }
             } catch (error) {
               Alert.alert(
                 "Error",
@@ -283,17 +289,17 @@ export default function TenantDetailScreen() {
         },
       ]
     );
-  }, [tenant, id, updateTenant]);
+  }, [tenant, id, suspendTenant, activateTenant]);
 
   if (!id) {
     return <ErrorScreen title="Invalid Tenant" message="No tenant ID provided." />;
   }
 
-  if (tenant === undefined) {
+  if (tenantLoading) {
     return <LoadingScreen message="Loading tenant..." />;
   }
 
-  if (tenant === null) {
+  if (tenantError || !tenant) {
     return (
       <ErrorScreen
         title="Tenant Not Found"
@@ -388,7 +394,7 @@ export default function TenantDetailScreen() {
                 className="text-sm font-semibold"
                 style={{ color: theme.colors.text }}
               >
-                {memberships === undefined ? "..." : memberCount}
+                {membershipsLoading ? "..." : memberCount}
               </Text>
             </View>
 
@@ -424,7 +430,7 @@ export default function TenantDetailScreen() {
                 className="text-sm font-semibold"
                 style={{ color: theme.colors.text }}
               >
-                {tenant.settings?.timezone ?? "Not set"}
+                {(tenant.settings as Record<string, string>)?.timezone ?? "Not set"}
               </Text>
             </View>
           </Card>
@@ -480,8 +486,8 @@ export default function TenantDetailScreen() {
         {memberships && memberships.length > 0 ? (
           <Section title="Members">
             <Card>
-              {memberships.slice(0, 5).map((member, index) => (
-                <View key={member._id}>
+              {memberships.slice(0, 5).map((member: TenantMember, index: number) => (
+                <View key={member.id}>
                   <View className="flex-row items-center justify-between py-2">
                     <View className="flex-1">
                       <Text
@@ -554,7 +560,7 @@ export default function TenantDetailScreen() {
               className="mb-3 text-xs"
               style={{ color: theme.colors.textSecondary }}
             >
-              Configure the HA SDK face-recognition camera that controls door access. The camera must be reachable from Convex servers.
+              Configure the HA SDK face-recognition camera that controls door access.
             </Text>
             <Input
               label="Camera IP Address"
@@ -605,9 +611,9 @@ export default function TenantDetailScreen() {
           seeAll={{ label: "+ Add", onPress: () => setShowAddFlagModal(true) }}
         >
           <Card>
-            {tenantFlags && tenantFlags.length > 0 ? (
-              tenantFlags.map((flag, index) => (
-                <View key={flag._id}>
+            {tenantFlags.length > 0 ? (
+              tenantFlags.map((flag: FeatureFlag, index: number) => (
+                <View key={flag.id}>
                   <View className="flex-row items-center justify-between py-2">
                     <Text
                       className="flex-1 text-sm font-medium"
@@ -616,9 +622,12 @@ export default function TenantDetailScreen() {
                       {flag.key}
                     </Text>
                     <Switch
-                      value={flag.enabled}
-                      onValueChange={(enabled) =>
-                        handleToggleFlag(flag.key, enabled)
+                      value={
+                        flag.overrides.find((o) => o.tenantId === id)?.enabled ??
+                        flag.enabled
+                      }
+                      onValueChange={(enabled: boolean) =>
+                        handleToggleFlag(flag.id, enabled)
                       }
                     />
                   </View>

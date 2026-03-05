@@ -21,9 +21,8 @@ import {
   Separator,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useQuery } from "convex/react";
-import { formatRelativeTime, formatDate, formatTime } from "@timeo/shared";
+import { usePlatformLogs, type PlatformLogEntry } from "@timeo/api-client";
+import { formatRelativeTime, formatDate } from "@timeo/shared";
 
 const ACTION_FILTER_OPTIONS = [
   { label: "All Actions", value: "all" },
@@ -57,46 +56,14 @@ export default function AuditLogsScreen() {
   const theme = useTheme();
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState("all");
-  const [refreshing, setRefreshing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Since there is no dedicated listAuditLogs query, we query tenants to build
-  // context. Audit logs in the DB are written by mutations; we simulate reading
-  // them via platform queries where available. In a full implementation, you
-  // would have a `platform.listAuditLogs` query. For now, we use the system
-  // health query as a proxy and show a UI-ready audit log screen.
-  //
-  // Real integration would be:
-  // const logs = useQuery(api.platform.listAuditLogs, { filter, cursor });
-  //
-  // For the complete UI, we'll show the screen structure with placeholder data
-  // that matches the AuditLog schema shape.
-  const systemHealth = useQuery(api.platform.getSystemHealth);
-  const tenants = useQuery(api.tenants.list);
-
-  // Build synthetic audit-like entries from available data for UI demonstration.
-  // In production, replace this with real audit log query data.
-  const auditEntries = useMemo(() => {
-    if (!tenants) return undefined;
-
-    const entries = tenants.map((tenant) => ({
-      _id: `audit_${tenant._id}`,
-      action: "platform.tenant_created",
-      resource: "tenants",
-      resourceId: tenant._id,
-      actorName: "Platform Admin",
-      targetName: tenant.name,
-      timestamp: tenant.createdAt,
-      metadata: { plan: tenant.plan },
-    }));
-
-    return entries.sort((a, b) => b.timestamp - a.timestamp);
-  }, [tenants]);
+  const { data: logs, isLoading, refetch, isRefetching } = usePlatformLogs();
 
   const filteredEntries = useMemo(() => {
-    if (!auditEntries) return [];
+    if (!logs) return [];
 
-    let filtered = auditEntries;
+    let filtered: PlatformLogEntry[] = logs;
 
     if (actionFilter !== "all") {
       filtered = filtered.filter((e) => e.action === actionFilter);
@@ -106,22 +73,21 @@ export default function AuditLogsScreen() {
       const query = search.toLowerCase().trim();
       filtered = filtered.filter(
         (e) =>
-          e.actorName.toLowerCase().includes(query) ||
+          e.actorEmail.toLowerCase().includes(query) ||
           e.targetName.toLowerCase().includes(query) ||
           e.action.toLowerCase().includes(query) ||
-          e.resource.toLowerCase().includes(query)
+          e.resourceType.toLowerCase().includes(query)
       );
     }
 
     return filtered;
-  }, [auditEntries, actionFilter, search]);
+  }, [logs, actionFilter, search]);
 
   const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    refetch();
+  }, [refetch]);
 
-  if (auditEntries === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading audit logs..." />;
   }
 
@@ -185,12 +151,12 @@ export default function AuditLogsScreen() {
       {/* Log List */}
       <FlatList
         data={filteredEntries}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={isRefetching}
             onRefresh={onRefresh}
             tintColor={theme.colors.primary}
           />
@@ -226,7 +192,7 @@ export default function AuditLogsScreen() {
                     className="ml-1.5 text-sm font-medium"
                     style={{ color: theme.colors.text }}
                   >
-                    {entry.actorName}
+                    {entry.actorEmail}
                   </Text>
                 </View>
 
@@ -234,18 +200,18 @@ export default function AuditLogsScreen() {
                   className="mt-1 text-sm"
                   style={{ color: theme.colors.textSecondary }}
                 >
-                  {entry.resource}:{" "}
+                  {entry.resourceType}:{" "}
                   <Text style={{ color: theme.colors.text }}>
                     {entry.targetName}
                   </Text>
                 </Text>
 
-                {entry.metadata ? (
+                {entry.details && Object.keys(entry.details).length > 0 ? (
                   <Text
                     className="mt-1 text-xs"
                     style={{ color: theme.colors.textSecondary }}
                   >
-                    {Object.entries(entry.metadata)
+                    {Object.entries(entry.details)
                       .map(([k, v]) => `${k}: ${v}`)
                       .join(", ")}
                   </Text>
@@ -259,14 +225,14 @@ export default function AuditLogsScreen() {
                     className="ml-1 text-xs"
                     style={{ color: theme.colors.textSecondary }}
                   >
-                    {formatRelativeTime(entry.timestamp)}
+                    {formatRelativeTime(entry.createdAt)}
                   </Text>
                 </View>
                 <Text
                   className="mt-0.5 text-xs"
                   style={{ color: theme.colors.textSecondary }}
                 >
-                  {formatDate(entry.timestamp)}
+                  {formatDate(entry.createdAt)}
                 </Text>
               </View>
             </View>

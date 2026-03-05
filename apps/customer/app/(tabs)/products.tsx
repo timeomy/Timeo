@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { View, FlatList, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { ShoppingBag } from "lucide-react-native";
@@ -12,8 +12,7 @@ import {
   useTheme,
 } from "@timeo/ui";
 import { useTimeoAuth } from "@timeo/auth";
-import { api } from "@timeo/api";
-import { useQuery } from "convex/react";
+import { useProducts } from "@timeo/api-client";
 import { useCart } from "../../providers/cart";
 
 export default function ProductsScreen() {
@@ -24,10 +23,7 @@ export default function ProductsScreen() {
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
-  const products = useQuery(
-    api.products.list,
-    activeTenantId ? { tenantId: activeTenantId as any } : "skip"
-  );
+  const { data: products, isLoading, refetch } = useProducts(activeTenantId);
 
   const filteredProducts = useMemo(() => {
     if (!products) return [];
@@ -36,16 +32,16 @@ export default function ProductsScreen() {
     return products.filter(
       (p) =>
         p.name.toLowerCase().includes(query) ||
-        p.description.toLowerCase().includes(query)
+        (p.description ?? "").toLowerCase().includes(query)
     );
   }, [products, search]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 800);
-  }, []);
+    refetch().finally(() => setRefreshing(false));
+  }, [refetch]);
 
-  if (products === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading products..." />;
   }
 
@@ -78,7 +74,7 @@ export default function ProductsScreen() {
       ) : (
         <FlatList
           data={filteredProducts}
-          keyExtractor={(item) => item._id}
+          keyExtractor={(item) => item.id}
           numColumns={2}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
           columnWrapperStyle={{ gap: 12 }}
@@ -99,10 +95,10 @@ export default function ProductsScreen() {
                 price={item.price}
                 currency={item.currency}
                 image={item.imageUrl}
-                onPress={() => router.push(`/products/${item._id}` as any)}
+                onPress={() => router.push(`/products/${item.id}` as any)}
                 onAddToCart={() =>
                   addItem({
-                    productId: item._id,
+                    productId: item.id,
                     name: item.name,
                     price: item.price,
                     image: item.imageUrl,

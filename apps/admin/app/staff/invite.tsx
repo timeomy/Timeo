@@ -14,8 +14,7 @@ import {
   Toast,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useMutation } from "convex/react";
+import { useInviteStaff } from "@timeo/api-client";
 
 const ROLE_OPTIONS = [
   { label: "Staff", value: "staff" },
@@ -29,7 +28,7 @@ export default function InviteStaffScreen() {
 
   const tenantId = activeTenantId as string;
 
-  const inviteByEmail = useMutation(api.tenantMemberships.inviteByEmail);
+  const { mutateAsync: inviteByEmail } = useInviteStaff(tenantId ?? "");
 
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("staff");
@@ -63,9 +62,8 @@ export default function InviteStaffScreen() {
     setLoading(true);
     try {
       await inviteByEmail({
-        tenantId: tenantId as any,
         email: email.trim().toLowerCase(),
-        role: role as any,
+        role,
       });
       setSuccess(true);
     } catch (err) {

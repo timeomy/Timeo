@@ -6,17 +6,15 @@ import {
   User,
   Calendar,
   CreditCard,
-  Tag,
   XCircle,
 } from "lucide-react-native";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
+import { useTimeoAuth } from "@timeo/auth";
+import { usePosTransaction, useVoidPosTransaction } from "@timeo/api-client";
 import {
   Screen,
   Header,
   Card,
   Button,
-  Badge,
   Separator,
   Spacer,
   LoadingScreen,
@@ -66,17 +64,16 @@ function formatItemType(type: string): string {
 export default function TransactionDetailScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { activeTenantId } = useTimeoAuth();
+  const tenantId = activeTenantId as string;
+
   const [voidReason, setVoidReason] = useState("");
   const [showVoidInput, setShowVoidInput] = useState(false);
   const [voiding, setVoiding] = useState(false);
 
-  const receipt = useQuery(
-    api.pos.getReceipt,
-    id ? { transactionId: id as any } : "skip"
-  );
-
-  const voidTransaction = useMutation(api.pos.voidTransaction);
+  const { data: transaction, isLoading } = usePosTransaction(tenantId, id);
+  const { mutateAsync: voidTransaction } = useVoidPosTransaction(tenantId ?? "");
 
   const handleVoid = useCallback(async () => {
     if (!id) return;
@@ -98,7 +95,7 @@ export default function TransactionDetailScreen() {
             setVoiding(true);
             try {
               await voidTransaction({
-                transactionId: id as any,
+                transactionId: id,
                 reason: voidReason.trim() || undefined,
               });
               Alert.alert("Success", "Transaction has been voided.", [
@@ -128,11 +125,11 @@ export default function TransactionDetailScreen() {
     );
   }
 
-  if (receipt === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading receipt..." />;
   }
 
-  if (!receipt) {
+  if (!transaction) {
     return (
       <Screen>
         <Header title="Transaction" onBack={() => router.back()} />
@@ -146,11 +143,19 @@ export default function TransactionDetailScreen() {
   }
 
   const statusColor =
-    receipt.status === "completed"
+    transaction.status === "completed"
       ? theme.colors.success
-      : receipt.status === "voided"
+      : transaction.status === "voided"
         ? theme.colors.error
         : theme.colors.warning;
+
+  const total = transaction.total ?? transaction.amount;
+  const items = transaction.items ?? [];
+  const subtotal = items.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
+  const discount = Math.max(0, subtotal - total);
 
   return (
     <Screen padded={false}>
@@ -169,16 +174,8 @@ export default function TransactionDetailScreen() {
               className="text-lg font-bold"
               style={{ color: theme.colors.text }}
             >
-              {receipt.receiptNumber}
+              {transaction.receiptNumber ?? id.slice(-6).toUpperCase()}
             </Text>
-            {receipt.tenantName && (
-              <Text
-                className="text-sm"
-                style={{ color: theme.colors.textSecondary }}
-              >
-                {receipt.tenantName}
-              </Text>
-            )}
             <Spacer size={8} />
             <View
               className="rounded-full px-3 py-1"
@@ -188,8 +185,8 @@ export default function TransactionDetailScreen() {
                 className="text-sm font-semibold"
                 style={{ color: statusColor }}
               >
-                {receipt.status.charAt(0).toUpperCase() +
-                  receipt.status.slice(1)}
+                {transaction.status.charAt(0).toUpperCase() +
+                  transaction.status.slice(1)}
               </Text>
             </View>
           </View>
@@ -205,30 +202,26 @@ export default function TransactionDetailScreen() {
               className="ml-2 text-sm"
               style={{ color: theme.colors.textSecondary }}
             >
-              {formatDate(receipt.createdAt)}
+              {formatDate(new Date(transaction.createdAt).getTime())}
             </Text>
           </View>
-          <Spacer size={8} />
-          <View className="flex-row items-center">
-            <User size={14} color={theme.colors.textSecondary} />
-            <Text
-              className="ml-2 text-sm"
-              style={{ color: theme.colors.text }}
-            >
-              {receipt.customerName}
-              {receipt.customerEmail ? ` (${receipt.customerEmail})` : ""}
-            </Text>
-          </View>
-          <Spacer size={8} />
-          <View className="flex-row items-center">
-            <User size={14} color={theme.colors.textSecondary} />
-            <Text
-              className="ml-2 text-sm"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              Staff: {receipt.staffName}
-            </Text>
-          </View>
+          {transaction.customerName && (
+            <>
+              <Spacer size={8} />
+              <View className="flex-row items-center">
+                <User size={14} color={theme.colors.textSecondary} />
+                <Text
+                  className="ml-2 text-sm"
+                  style={{ color: theme.colors.text }}
+                >
+                  {transaction.customerName}
+                  {transaction.customerEmail
+                    ? ` (${transaction.customerEmail})`
+                    : ""}
+                </Text>
+              </View>
+            </>
+          )}
           <Spacer size={8} />
           <View className="flex-row items-center">
             <CreditCard size={14} color={theme.colors.textSecondary} />
@@ -236,111 +229,108 @@ export default function TransactionDetailScreen() {
               className="ml-2 text-sm"
               style={{ color: theme.colors.text }}
             >
-              {formatPaymentMethod(receipt.paymentMethod)}
+              {formatPaymentMethod(transaction.paymentMethod)}
             </Text>
           </View>
-          {receipt.voucherCode && (
-            <>
-              <Spacer size={8} />
-              <View className="flex-row items-center">
-                <Tag size={14} color={theme.colors.success} />
-                <Text
-                  className="ml-2 text-sm"
-                  style={{ color: theme.colors.success }}
-                >
-                  Voucher: {receipt.voucherCode}
-                </Text>
-              </View>
-            </>
-          )}
         </Card>
 
-        <Spacer size={12} />
+        {items.length > 0 && (
+          <>
+            <Spacer size={12} />
 
-        {/* Items */}
-        <Card>
-          <Text
-            className="mb-3 text-sm font-semibold uppercase tracking-wide"
-            style={{ color: theme.colors.textSecondary }}
-          >
-            Items
-          </Text>
-          {receipt.items.map((item, index) => (
-            <View key={index}>
-              {index > 0 && <Separator className="my-2" />}
-              <View className="flex-row items-start justify-between">
-                <View className="flex-1">
-                  <Text
-                    className="text-sm font-medium"
-                    style={{ color: theme.colors.text }}
-                  >
-                    {item.name}
-                  </Text>
-                  <Text
-                    className="text-xs"
-                    style={{ color: theme.colors.textSecondary }}
-                  >
-                    {formatItemType(item.type)} x{item.quantity}
-                  </Text>
+            {/* Items */}
+            <Card>
+              <Text
+                className="mb-3 text-sm font-semibold uppercase tracking-wide"
+                style={{ color: theme.colors.textSecondary }}
+              >
+                Items
+              </Text>
+              {items.map((item, index) => (
+                <View key={index}>
+                  {index > 0 && <Separator className="my-2" />}
+                  <View className="flex-row items-start justify-between">
+                    <View className="flex-1">
+                      <Text
+                        className="text-sm font-medium"
+                        style={{ color: theme.colors.text }}
+                      >
+                        {item.name}
+                      </Text>
+                      <Text
+                        className="text-xs"
+                        style={{ color: theme.colors.textSecondary }}
+                      >
+                        {formatItemType(item.type)} x{item.quantity}
+                      </Text>
+                    </View>
+                    <Text
+                      className="text-sm font-medium"
+                      style={{ color: theme.colors.text }}
+                    >
+                      RM {((item.price * item.quantity) / 100).toFixed(2)}
+                    </Text>
+                  </View>
                 </View>
+              ))}
+
+              <Separator className="my-3" />
+
+              {/* Totals */}
+              {subtotal !== total && (
+                <>
+                  <View className="flex-row items-center justify-between">
+                    <Text
+                      className="text-sm"
+                      style={{ color: theme.colors.textSecondary }}
+                    >
+                      Subtotal
+                    </Text>
+                    <Text
+                      className="text-sm"
+                      style={{ color: theme.colors.text }}
+                    >
+                      RM {(subtotal / 100).toFixed(2)}
+                    </Text>
+                  </View>
+                  {discount > 0 && (
+                    <View className="mt-1 flex-row items-center justify-between">
+                      <Text
+                        className="text-sm"
+                        style={{ color: theme.colors.success }}
+                      >
+                        Discount
+                      </Text>
+                      <Text
+                        className="text-sm"
+                        style={{ color: theme.colors.success }}
+                      >
+                        -RM {(discount / 100).toFixed(2)}
+                      </Text>
+                    </View>
+                  )}
+                  <Separator className="my-2" />
+                </>
+              )}
+              <View className="flex-row items-center justify-between">
                 <Text
-                  className="text-sm font-medium"
+                  className="text-lg font-bold"
                   style={{ color: theme.colors.text }}
                 >
-                  RM {((item.price * item.quantity) / 100).toFixed(2)}
+                  Total
+                </Text>
+                <Text
+                  className="text-lg font-bold"
+                  style={{ color: theme.colors.primary }}
+                >
+                  RM {(total / 100).toFixed(2)}
                 </Text>
               </View>
-            </View>
-          ))}
+            </Card>
+          </>
+        )}
 
-          <Separator className="my-3" />
-
-          {/* Totals */}
-          <View className="flex-row items-center justify-between">
-            <Text
-              className="text-sm"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              Subtotal
-            </Text>
-            <Text className="text-sm" style={{ color: theme.colors.text }}>
-              RM {(receipt.subtotal / 100).toFixed(2)}
-            </Text>
-          </View>
-          {receipt.discount > 0 && (
-            <View className="mt-1 flex-row items-center justify-between">
-              <Text
-                className="text-sm"
-                style={{ color: theme.colors.success }}
-              >
-                Discount
-              </Text>
-              <Text
-                className="text-sm"
-                style={{ color: theme.colors.success }}
-              >
-                -RM {(receipt.discount / 100).toFixed(2)}
-              </Text>
-            </View>
-          )}
-          <Separator className="my-2" />
-          <View className="flex-row items-center justify-between">
-            <Text
-              className="text-lg font-bold"
-              style={{ color: theme.colors.text }}
-            >
-              Total
-            </Text>
-            <Text
-              className="text-lg font-bold"
-              style={{ color: theme.colors.primary }}
-            >
-              RM {(receipt.total / 100).toFixed(2)}
-            </Text>
-          </View>
-        </Card>
-
-        {receipt.notes && (
+        {transaction.notes && (
           <>
             <Spacer size={12} />
             <Card>
@@ -350,11 +340,8 @@ export default function TransactionDetailScreen() {
               >
                 Notes
               </Text>
-              <Text
-                className="text-sm"
-                style={{ color: theme.colors.text }}
-              >
-                {receipt.notes}
+              <Text className="text-sm" style={{ color: theme.colors.text }}>
+                {transaction.notes}
               </Text>
             </Card>
           </>
@@ -363,7 +350,7 @@ export default function TransactionDetailScreen() {
         <Spacer size={24} />
 
         {/* Void Button */}
-        {receipt.status === "completed" && (
+        {transaction.status === "completed" && (
           <>
             {showVoidInput && (
               <Card>

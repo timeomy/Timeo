@@ -1,15 +1,15 @@
 import { useState, useCallback, useMemo } from "react";
-import { View, Text, FlatList, TouchableOpacity, RefreshControl } from "react-native";
-import { useRouter } from "expo-router";
 import {
-  Dumbbell,
-  User,
-  Calendar,
-  Plus,
-} from "lucide-react-native";
-import { useQuery } from "convex/react";
-import { api } from "@timeo/api";
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  RefreshControl,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { Dumbbell, User, Calendar, Plus } from "lucide-react-native";
 import { useTimeoAuth } from "@timeo/auth";
+import { useSessionLogs } from "@timeo/api-client";
 import {
   Screen,
   Header,
@@ -37,19 +37,17 @@ export default function SessionLogsScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as any;
+  const tenantId = activeTenantId as string;
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+  const { data: sessionLogs, isLoading, refetch } = useSessionLogs(tenantId);
 
-  const sessionLogs = useQuery(
-    api.sessionLogs.listByTenant,
-    tenantId ? { tenantId } : "skip"
-  );
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const filteredLogs = useMemo(() => {
     if (!sessionLogs) return [];
@@ -57,8 +55,8 @@ export default function SessionLogsScreen() {
     const q = searchQuery.toLowerCase();
     return sessionLogs.filter(
       (log) =>
-        log.clientName.toLowerCase().includes(q) ||
-        log.coachName.toLowerCase().includes(q)
+        (log.clientName ?? "").toLowerCase().includes(q) ||
+        (log.coachName ?? "").toLowerCase().includes(q)
     );
   }, [sessionLogs, searchQuery]);
 
@@ -75,7 +73,7 @@ export default function SessionLogsScreen() {
     );
   }
 
-  if (sessionLogs === undefined) {
+  if (isLoading && !sessionLogs) {
     return <LoadingScreen message="Loading session logs..." />;
   }
 
@@ -102,7 +100,7 @@ export default function SessionLogsScreen() {
 
       <FlatList
         data={filteredLogs}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -130,7 +128,7 @@ export default function SessionLogsScreen() {
                   className="text-sm font-bold"
                   style={{ color: theme.colors.primary }}
                 >
-                  {item.clientName.charAt(0).toUpperCase()}
+                  {(item.clientName ?? "?").charAt(0).toUpperCase()}
                 </Text>
               </View>
               <View className="flex-1">
@@ -138,28 +136,38 @@ export default function SessionLogsScreen() {
                   className="text-base font-semibold"
                   style={{ color: theme.colors.text }}
                 >
-                  {item.clientName}
+                  {item.clientName ?? "Unknown"}
                 </Text>
-                <View className="mt-1 flex-row items-center" style={{ gap: 8 }}>
-                  <Badge label={formatSessionType(item.sessionType)} />
-                </View>
-                <View className="mt-2 flex-row items-center" style={{ gap: 12 }}>
-                  <View className="flex-row items-center">
-                    <User size={12} color={theme.colors.textSecondary} />
-                    <Text
-                      className="ml-1 text-xs"
-                      style={{ color: theme.colors.textSecondary }}
-                    >
-                      {item.coachName}
-                    </Text>
+                {item.sessionType && (
+                  <View
+                    className="mt-1 flex-row items-center"
+                    style={{ gap: 8 }}
+                  >
+                    <Badge label={formatSessionType(item.sessionType)} />
                   </View>
+                )}
+                <View
+                  className="mt-2 flex-row items-center"
+                  style={{ gap: 12 }}
+                >
+                  {item.coachName && (
+                    <View className="flex-row items-center">
+                      <User size={12} color={theme.colors.textSecondary} />
+                      <Text
+                        className="ml-1 text-xs"
+                        style={{ color: theme.colors.textSecondary }}
+                      >
+                        {item.coachName}
+                      </Text>
+                    </View>
+                  )}
                   <View className="flex-row items-center">
                     <Calendar size={12} color={theme.colors.textSecondary} />
                     <Text
                       className="ml-1 text-xs"
                       style={{ color: theme.colors.textSecondary }}
                     >
-                      {formatSessionDate(item.createdAt)}
+                      {formatSessionDate(new Date(item.createdAt).getTime())}
                     </Text>
                   </View>
                 </View>

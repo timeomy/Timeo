@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from "react";
-import { View, Text, FlatList, Alert } from "react-native";
+import { View, Text, Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTimeoAuth } from "@timeo/auth";
 import {
@@ -17,17 +17,21 @@ import {
   Toast,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useQuery, useMutation } from "convex/react";
+import {
+  useGiftCards,
+  useTopupGiftCard,
+  useCancelGiftCard,
+  useReactivateGiftCard,
+  useDeleteGiftCard,
+} from "@timeo/api-client";
 
-function getStatusVariant(status: string): "success" | "warning" | "error" | "default" {
+function getStatusVariant(status: string | undefined): "success" | "warning" | "error" | "default" {
   switch (status) {
     case "active":
       return "success";
-    case "depleted":
+    case "fully_used":
       return "warning";
     case "expired":
-      return "error";
     case "cancelled":
       return "error";
     default:
@@ -35,43 +39,15 @@ function getStatusVariant(status: string): "success" | "warning" | "error" | "de
   }
 }
 
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString("en-MY", {
+function formatDate(dateStr: string | undefined): string {
+  if (!dateStr) return "";
+  return new Date(dateStr).toLocaleDateString("en-MY", {
     year: "numeric",
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function getTransactionTypeLabel(type: string): string {
-  switch (type) {
-    case "purchase":
-      return "Purchased";
-    case "redemption":
-      return "Redeemed";
-    case "topup":
-      return "Top Up";
-    case "refund":
-      return "Refund";
-    default:
-      return type;
-  }
-}
-
-function getTransactionColor(type: string, theme: any): string {
-  switch (type) {
-    case "purchase":
-    case "topup":
-      return theme.colors.success;
-    case "redemption":
-      return theme.colors.warning;
-    case "refund":
-      return theme.colors.info;
-    default:
-      return theme.colors.textSecondary;
-  }
 }
 
 export default function GiftCardDetailScreen() {
@@ -82,20 +58,12 @@ export default function GiftCardDetailScreen() {
 
   const tenantId = activeTenantId as string;
 
-  const giftCards = useQuery(
-    api.giftCards.listByTenant,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
+  const { data: giftCards, isLoading } = useGiftCards(tenantId);
 
-  const transactions = useQuery(
-    api.giftCards.getTransactions,
-    id ? { giftCardId: id as any } : "skip"
-  );
-
-  const topupMutation = useMutation(api.giftCards.topup);
-  const cancelMutation = useMutation(api.giftCards.cancel);
-  const reactivateMutation = useMutation(api.giftCards.reactivate);
-  const removeMutation = useMutation(api.giftCards.remove);
+  const { mutateAsync: topupMutation } = useTopupGiftCard(tenantId ?? "");
+  const { mutateAsync: cancelMutation } = useCancelGiftCard(tenantId ?? "");
+  const { mutateAsync: reactivateMutation } = useReactivateGiftCard(tenantId ?? "");
+  const { mutateAsync: removeMutation } = useDeleteGiftCard(tenantId ?? "");
 
   const [topupModalVisible, setTopupModalVisible] = useState(false);
   const [topupAmount, setTopupAmount] = useState("");
@@ -109,7 +77,7 @@ export default function GiftCardDetailScreen() {
 
   const card = useMemo(() => {
     if (!giftCards) return null;
-    return giftCards.find((c) => c._id === id) ?? null;
+    return giftCards.find((c) => c.id === id) ?? null;
   }, [giftCards, id]);
 
   const handleTopup = useCallback(async () => {
@@ -126,7 +94,7 @@ export default function GiftCardDetailScreen() {
     setLoading(true);
     try {
       await topupMutation({
-        giftCardId: id as any,
+        giftCardId: id as string,
         amount: Math.round(parsedAmount * 100),
       });
       setToast({
@@ -157,7 +125,7 @@ export default function GiftCardDetailScreen() {
           onPress: async () => {
             setLoading(true);
             try {
-              await cancelMutation({ giftCardId: id as any });
+              await cancelMutation(id as string);
               setToast({
                 message: "Gift card cancelled",
                 type: "success",
@@ -179,7 +147,7 @@ export default function GiftCardDetailScreen() {
   const handleReactivate = useCallback(async () => {
     setLoading(true);
     try {
-      await reactivateMutation({ giftCardId: id as any });
+      await reactivateMutation(id as string);
       setToast({
         message: "Gift card reactivated",
         type: "success",
@@ -197,7 +165,7 @@ export default function GiftCardDetailScreen() {
   const handleDelete = useCallback(() => {
     Alert.alert(
       "Delete Gift Card",
-      "Are you sure you want to permanently delete this gift card and all its transactions? This cannot be undone.",
+      "Are you sure you want to permanently delete this gift card? This cannot be undone.",
       [
         { text: "No", style: "cancel" },
         {
@@ -206,7 +174,7 @@ export default function GiftCardDetailScreen() {
           onPress: async () => {
             setLoading(true);
             try {
-              await removeMutation({ giftCardId: id as any });
+              await removeMutation(id as string);
               setToast({
                 message: "Gift card deleted",
                 type: "success",
@@ -241,7 +209,7 @@ export default function GiftCardDetailScreen() {
     );
   }
 
-  if (giftCards === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading gift card..." />;
   }
 
@@ -261,266 +229,189 @@ export default function GiftCardDetailScreen() {
     );
   }
 
-  const renderTransaction = ({ item }: { item: any }) => (
-    <Card className="mb-2">
-      <Row justify="between" align="center">
-        <View>
-          <Text
-            className="text-sm font-semibold"
-            style={{ color: getTransactionColor(item.type, theme) }}
-          >
-            {getTransactionTypeLabel(item.type)}
-          </Text>
-          <Text
-            className="text-xs"
-            style={{ color: theme.colors.textSecondary }}
-          >
-            {formatDate(item.createdAt)}
-          </Text>
-          {item.note ? (
-            <Text
-              className="mt-1 text-xs"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              {item.note}
-            </Text>
-          ) : null}
-        </View>
-        <View className="items-end">
-          <Text
-            className="text-sm font-bold"
-            style={{
-              color:
-                item.type === "redemption"
-                  ? theme.colors.error
-                  : theme.colors.success,
-            }}
-          >
-            {item.type === "redemption" ? "-" : "+"}RM{" "}
-            {(item.amount / 100).toFixed(2)}
-          </Text>
-          <Text
-            className="text-xs"
-            style={{ color: theme.colors.textSecondary }}
-          >
-            Bal: RM {(item.balanceAfter / 100).toFixed(2)}
-          </Text>
-        </View>
-      </Row>
-    </Card>
-  );
+  const cardStatus = card.status ?? (card.isActive ? "active" : "cancelled");
 
   return (
-    <Screen scroll={false}>
+    <Screen scroll>
       <Header title="Gift Card Details" onBack={() => router.back()} />
 
-      <FlatList
-        data={transactions ?? []}
-        keyExtractor={(item) => item._id}
-        renderItem={renderTransaction}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <View>
-            {/* Card Info */}
-            <Card className="mb-4">
-              <View className="items-center py-2">
-                <Text
-                  className="text-xl font-bold"
-                  style={{ color: theme.colors.text, fontFamily: "monospace" }}
-                >
-                  {card.code}
-                </Text>
-                <Spacer size={8} />
-                <Badge
-                  label={card.status}
-                  variant={getStatusVariant(card.status)}
-                />
-              </View>
+      {/* Card Info */}
+      <Card className="mb-4">
+        <View className="items-center py-2">
+          <Text
+            className="text-xl font-bold"
+            style={{ color: theme.colors.text, fontFamily: "monospace" }}
+          >
+            {card.code}
+          </Text>
+          <Spacer size={8} />
+          <Badge
+            label={cardStatus}
+            variant={getStatusVariant(cardStatus)}
+          />
+        </View>
 
-              <Separator className="my-3" />
+        <Separator className="my-3" />
 
-              <Row justify="between" className="mb-2">
-                <Text
-                  className="text-sm"
-                  style={{ color: theme.colors.textSecondary }}
-                >
-                  Current Balance
-                </Text>
-                <Text
-                  className="text-base font-bold"
-                  style={{ color: theme.colors.text }}
-                >
-                  RM {(card.currentBalance / 100).toFixed(2)}
-                </Text>
-              </Row>
+        <Row justify="between" className="mb-2">
+          <Text
+            className="text-sm"
+            style={{ color: theme.colors.textSecondary }}
+          >
+            Current Balance
+          </Text>
+          <Text
+            className="text-base font-bold"
+            style={{ color: theme.colors.text }}
+          >
+            RM {(card.currentBalance / 100).toFixed(2)}
+          </Text>
+        </Row>
 
-              <Row justify="between" className="mb-2">
-                <Text
-                  className="text-sm"
-                  style={{ color: theme.colors.textSecondary }}
-                >
-                  Initial Balance
-                </Text>
-                <Text
-                  className="text-sm"
-                  style={{ color: theme.colors.text }}
-                >
-                  RM {(card.initialBalance / 100).toFixed(2)}
-                </Text>
-              </Row>
+        <Row justify="between" className="mb-2">
+          <Text
+            className="text-sm"
+            style={{ color: theme.colors.textSecondary }}
+          >
+            Initial Balance
+          </Text>
+          <Text
+            className="text-sm"
+            style={{ color: theme.colors.text }}
+          >
+            RM {(card.initialBalance / 100).toFixed(2)}
+          </Text>
+        </Row>
 
-              <Row justify="between" className="mb-2">
-                <Text
-                  className="text-sm"
-                  style={{ color: theme.colors.textSecondary }}
-                >
-                  Currency
-                </Text>
-                <Text
-                  className="text-sm"
-                  style={{ color: theme.colors.text }}
-                >
-                  {card.currency}
-                </Text>
-              </Row>
+        <Row justify="between" className="mb-2">
+          <Text
+            className="text-sm"
+            style={{ color: theme.colors.textSecondary }}
+          >
+            Currency
+          </Text>
+          <Text
+            className="text-sm"
+            style={{ color: theme.colors.text }}
+          >
+            {card.currency}
+          </Text>
+        </Row>
 
-              <Row justify="between" className="mb-2">
-                <Text
-                  className="text-sm"
-                  style={{ color: theme.colors.textSecondary }}
-                >
-                  Created
-                </Text>
-                <Text
-                  className="text-sm"
-                  style={{ color: theme.colors.text }}
-                >
-                  {formatDate(card.createdAt)}
-                </Text>
-              </Row>
+        <Row justify="between" className="mb-2">
+          <Text
+            className="text-sm"
+            style={{ color: theme.colors.textSecondary }}
+          >
+            Created
+          </Text>
+          <Text
+            className="text-sm"
+            style={{ color: theme.colors.text }}
+          >
+            {formatDate(card.createdAt)}
+          </Text>
+        </Row>
 
-              {card.expiresAt ? (
-                <Row justify="between" className="mb-2">
-                  <Text
-                    className="text-sm"
-                    style={{ color: theme.colors.textSecondary }}
-                  >
-                    Expires
-                  </Text>
-                  <Text
-                    className="text-sm"
-                    style={{ color: theme.colors.text }}
-                  >
-                    {formatDate(card.expiresAt)}
-                  </Text>
-                </Row>
-              ) : null}
-
-              {card.purchaserName ? (
-                <Row justify="between" className="mb-2">
-                  <Text
-                    className="text-sm"
-                    style={{ color: theme.colors.textSecondary }}
-                  >
-                    Purchaser
-                  </Text>
-                  <Text
-                    className="text-sm"
-                    style={{ color: theme.colors.text }}
-                  >
-                    {card.purchaserName}
-                  </Text>
-                </Row>
-              ) : null}
-
-              {card.recipientName ? (
-                <Row justify="between" className="mb-2">
-                  <Text
-                    className="text-sm"
-                    style={{ color: theme.colors.textSecondary }}
-                  >
-                    Recipient
-                  </Text>
-                  <Text
-                    className="text-sm"
-                    style={{ color: theme.colors.text }}
-                  >
-                    {card.recipientName}
-                  </Text>
-                </Row>
-              ) : null}
-
-              {card.message ? (
-                <>
-                  <Separator className="my-2" />
-                  <Text
-                    className="text-xs"
-                    style={{ color: theme.colors.textSecondary }}
-                  >
-                    Message
-                  </Text>
-                  <Text
-                    className="mt-1 text-sm italic"
-                    style={{ color: theme.colors.text }}
-                  >
-                    "{card.message}"
-                  </Text>
-                </>
-              ) : null}
-            </Card>
-
-            {/* Action Buttons */}
-            <View className="mb-4">
-              {card.status === "active" && (
-                <>
-                  <Button onPress={() => setTopupModalVisible(true)}>
-                    Top Up Balance
-                  </Button>
-                  <Spacer size={8} />
-                  <Button variant="destructive" onPress={handleCancel} loading={loading}>
-                    Cancel Gift Card
-                  </Button>
-                </>
-              )}
-
-              {card.status === "cancelled" && (
-                <Button onPress={handleReactivate} loading={loading}>
-                  Reactivate Gift Card
-                </Button>
-              )}
-
-              <Spacer size={8} />
-              <Button
-                variant="destructive"
-                onPress={handleDelete}
-                loading={loading}
-              >
-                Delete Gift Card
-              </Button>
-            </View>
-
-            <Separator className="mb-3" />
-
-            <Text
-              className="mb-3 text-base font-semibold"
-              style={{ color: theme.colors.text }}
-            >
-              Transaction History
-            </Text>
-          </View>
-        }
-        ListEmptyComponent={
-          <View className="items-center py-8">
+        {card.expiresAt ? (
+          <Row justify="between" className="mb-2">
             <Text
               className="text-sm"
               style={{ color: theme.colors.textSecondary }}
             >
-              No transactions yet.
+              Expires
             </Text>
-          </View>
-        }
-      />
+            <Text
+              className="text-sm"
+              style={{ color: theme.colors.text }}
+            >
+              {formatDate(card.expiresAt)}
+            </Text>
+          </Row>
+        ) : null}
+
+        {card.purchaserName ? (
+          <Row justify="between" className="mb-2">
+            <Text
+              className="text-sm"
+              style={{ color: theme.colors.textSecondary }}
+            >
+              Purchaser
+            </Text>
+            <Text
+              className="text-sm"
+              style={{ color: theme.colors.text }}
+            >
+              {card.purchaserName}
+            </Text>
+          </Row>
+        ) : null}
+
+        {card.recipientName ? (
+          <Row justify="between" className="mb-2">
+            <Text
+              className="text-sm"
+              style={{ color: theme.colors.textSecondary }}
+            >
+              Recipient
+            </Text>
+            <Text
+              className="text-sm"
+              style={{ color: theme.colors.text }}
+            >
+              {card.recipientName}
+            </Text>
+          </Row>
+        ) : null}
+
+        {card.message ? (
+          <>
+            <Separator className="my-2" />
+            <Text
+              className="text-xs"
+              style={{ color: theme.colors.textSecondary }}
+            >
+              Message
+            </Text>
+            <Text
+              className="mt-1 text-sm italic"
+              style={{ color: theme.colors.text }}
+            >
+              "{card.message}"
+            </Text>
+          </>
+        ) : null}
+      </Card>
+
+      {/* Action Buttons */}
+      <View className="mb-4">
+        {cardStatus === "active" && (
+          <>
+            <Button onPress={() => setTopupModalVisible(true)}>
+              Top Up Balance
+            </Button>
+            <Spacer size={8} />
+            <Button variant="destructive" onPress={handleCancel} loading={loading}>
+              Cancel Gift Card
+            </Button>
+          </>
+        )}
+
+        {cardStatus === "cancelled" && (
+          <Button onPress={handleReactivate} loading={loading}>
+            Reactivate Gift Card
+          </Button>
+        )}
+
+        <Spacer size={8} />
+        <Button
+          variant="destructive"
+          onPress={handleDelete}
+          loading={loading}
+        >
+          Delete Gift Card
+        </Button>
+      </View>
 
       {/* Top Up Modal */}
       <Modal

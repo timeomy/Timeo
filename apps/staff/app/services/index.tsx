@@ -9,9 +9,8 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Scissors, Plus, Clock } from "lucide-react-native";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@timeo/api";
 import { useTimeoAuth } from "@timeo/auth";
+import { useServices, useUpdateService } from "@timeo/api-client";
 import {
   Screen,
   Header,
@@ -23,26 +22,24 @@ import {
   LoadingScreen,
   useTheme,
 } from "@timeo/ui";
+
 export default function ServicesScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
-  const tenantId = activeTenantId as any | null;
+  const tenantId = activeTenantId as string;
 
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
-  const services = useQuery(
-    api.services.list,
-    tenantId ? { tenantId } : "skip"
-  );
+  const { data: services, isLoading, refetch } = useServices(tenantId);
+  const { mutateAsync: updateService } = useUpdateService(tenantId ?? "");
 
-  const toggleActive = useMutation(api.services.toggleActive);
-
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const filteredServices = useMemo(() => {
     if (!services) return [];
@@ -52,14 +49,14 @@ export default function ServicesScreen() {
     return services.filter(
       (s) =>
         s.name.toLowerCase().includes(query) ||
-        s.description.toLowerCase().includes(query)
+        (s.description ?? "").toLowerCase().includes(query)
     );
   }, [services, searchQuery]);
 
   const handleToggleActive = useCallback(
-    async (serviceId: any) => {
+    async (serviceId: string, currentIsActive: boolean) => {
       try {
-        await toggleActive({ serviceId });
+        await updateService({ id: serviceId, isActive: !currentIsActive });
       } catch (err) {
         Alert.alert(
           "Error",
@@ -67,7 +64,7 @@ export default function ServicesScreen() {
         );
       }
     },
-    [toggleActive]
+    [updateService]
   );
 
   if (!tenantId) {
@@ -81,7 +78,7 @@ export default function ServicesScreen() {
     );
   }
 
-  if (services === undefined) {
+  if (isLoading && !services) {
     return <LoadingScreen message="Loading services..." />;
   }
 
@@ -113,8 +110,12 @@ export default function ServicesScreen() {
       {/* Service List */}
       <FlatList
         data={filteredServices}
-        keyExtractor={(item) => item._id}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100, gap: 10 }}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingBottom: 100,
+          gap: 10,
+        }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -131,7 +132,7 @@ export default function ServicesScreen() {
         }
         renderItem={({ item }) => (
           <TouchableOpacity
-            onPress={() => router.push(`/services/${item._id}/edit`)}
+            onPress={() => router.push(`/services/${item.id}/edit`)}
             activeOpacity={0.7}
             className="rounded-2xl p-4"
             style={{ backgroundColor: theme.colors.surface }}
@@ -182,7 +183,7 @@ export default function ServicesScreen() {
                 <Switch
                   value={item.isActive}
                   onValueChange={() =>
-                    handleToggleActive(item._id as any)
+                    handleToggleActive(item.id, item.isActive)
                   }
                 />
               </View>

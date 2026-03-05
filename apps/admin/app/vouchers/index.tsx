@@ -15,8 +15,7 @@ import {
   EmptyState,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useQuery } from "convex/react";
+import { useVouchers } from "@timeo/api-client";
 
 function getTypeLabel(type: string): string {
   switch (type) {
@@ -50,8 +49,9 @@ function formatValue(type: string, value: number): string {
   return "Free";
 }
 
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString("en-MY", {
+function formatDate(dateStr: string | undefined): string {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("en-MY", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -67,10 +67,7 @@ export default function VouchersScreen() {
 
   const tenantId = activeTenantId as string;
 
-  const vouchers = useQuery(
-    api.vouchers.listByTenant,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
+  const { data: vouchers, isLoading, refetch } = useVouchers(tenantId);
 
   const filteredVouchers = useMemo(() => {
     if (!vouchers) return [];
@@ -78,10 +75,14 @@ export default function VouchersScreen() {
     return vouchers;
   }, [vouchers, showActiveOnly]);
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   if (!tenantId) {
     return (
@@ -99,14 +100,14 @@ export default function VouchersScreen() {
     );
   }
 
-  if (vouchers === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading vouchers..." />;
   }
 
   const renderVoucher = ({ item }: { item: (typeof filteredVouchers)[0] }) => (
     <Card
       className="mb-3"
-      onPress={() => router.push(`/vouchers/${item._id}` as any)}
+      onPress={() => router.push(`/vouchers/${item.id}` as any)}
     >
       <Row justify="between" align="start">
         <View className="flex-1">
@@ -118,7 +119,7 @@ export default function VouchersScreen() {
           </Text>
           <Spacer size={4} />
           <Row gap={6}>
-            <Badge label={getTypeLabel(item.type)} variant={getTypeVariant(item.type)} />
+            <Badge label={getTypeLabel(item.type ?? item.discountType ?? "")} variant={getTypeVariant(item.type ?? item.discountType ?? "")} />
             <Badge
               label={item.isActive ? "Active" : "Inactive"}
               variant={item.isActive ? "success" : "error"}
@@ -155,7 +156,7 @@ export default function VouchersScreen() {
             className="text-lg font-bold"
             style={{ color: theme.colors.text }}
           >
-            {formatValue(item.type, item.value)}
+            {formatValue(item.type ?? item.discountType ?? "", item.value ?? item.discountValue ?? 0)}
           </Text>
           <Text
             className="mt-1 text-xs"
@@ -168,12 +169,12 @@ export default function VouchersScreen() {
               className="mt-1 text-xs"
               style={{
                 color:
-                  item.expiresAt < Date.now()
+                  new Date(item.expiresAt).getTime() < Date.now()
                     ? theme.colors.error
                     : theme.colors.textSecondary,
               }}
             >
-              {item.expiresAt < Date.now() ? "Expired" : `Exp: ${formatDate(item.expiresAt)}`}
+              {new Date(item.expiresAt).getTime() < Date.now() ? "Expired" : `Exp: ${formatDate(item.expiresAt)}`}
             </Text>
           ) : null}
         </View>
@@ -250,7 +251,7 @@ export default function VouchersScreen() {
       </View>
       <FlatList
         data={filteredVouchers}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         renderItem={renderVoucher}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}

@@ -14,8 +14,7 @@ import {
   Spacer,
 } from "@timeo/ui";
 import { useTimeoAuth, useTenantSwitcher } from "@timeo/auth";
-import { api } from "@timeo/api";
-import { useQuery } from "convex/react";
+import { useServices, useProducts } from "@timeo/api-client";
 import { useCart } from "../../providers/cart";
 
 export default function HomeScreen() {
@@ -25,15 +24,8 @@ export default function HomeScreen() {
   const { activeTenant } = useTenantSwitcher();
   const { addItem } = useCart();
 
-  const services = useQuery(
-    api.services.list,
-    activeTenantId ? { tenantId: activeTenantId as any } : "skip"
-  );
-
-  const products = useQuery(
-    api.products.list,
-    activeTenantId ? { tenantId: activeTenantId as any } : "skip"
-  );
+  const { data: services, isLoading: servicesLoading } = useServices(activeTenantId);
+  const { data: products, isLoading: productsLoading } = useProducts(activeTenantId);
 
   const displayName = user?.name?.split(" ")[0] ?? "there";
   const orgName = activeTenant?.name ?? "Timeo";
@@ -131,12 +123,12 @@ export default function HomeScreen() {
           onPress: () => router.push("/(tabs)/services"),
         }}
       >
-        {services === undefined ? (
+        {servicesLoading ? (
           <View className="flex-row gap-3">
             <Skeleton className="h-28 flex-1 rounded-2xl" />
             <Skeleton className="h-28 flex-1 rounded-2xl" />
           </View>
-        ) : services.length === 0 ? (
+        ) : !services || services.length === 0 ? (
           <EmptyState
             title="No services yet"
             description="This business hasn't added any services yet."
@@ -148,7 +140,7 @@ export default function HomeScreen() {
             contentContainerStyle={{ gap: 12 }}
           >
             {services.slice(0, 6).map((service) => (
-              <View key={service._id} className="w-72">
+              <View key={service.id} className="w-72">
                 <ServiceCard
                   name={service.name}
                   description={service.description}
@@ -156,10 +148,10 @@ export default function HomeScreen() {
                   price={service.price}
                   currency={service.currency}
                   onPress={() =>
-                    router.push(`/services/${service._id}` as any)
+                    router.push(`/services/${service.id}` as any)
                   }
                   onBook={() =>
-                    router.push(`/services/${service._id}` as any)
+                    router.push(`/services/${service.id}` as any)
                   }
                 />
               </View>
@@ -175,12 +167,12 @@ export default function HomeScreen() {
           onPress: () => router.push("/(tabs)/products"),
         }}
       >
-        {products === undefined ? (
+        {productsLoading ? (
           <View className="flex-row gap-3">
             <Skeleton className="h-52 flex-1 rounded-2xl" />
             <Skeleton className="h-52 flex-1 rounded-2xl" />
           </View>
-        ) : products.length === 0 ? (
+        ) : !products || products.length === 0 ? (
           <EmptyState
             title="No products yet"
             description="This business hasn't added any products yet."
@@ -188,7 +180,7 @@ export default function HomeScreen() {
         ) : (
           <View className="flex-row flex-wrap gap-3">
             {products.slice(0, 4).map((product) => (
-              <View key={product._id} className="w-[48%]">
+              <View key={product.id} className="w-[48%]">
                 <ProductCard
                   name={product.name}
                   description={product.description}
@@ -196,11 +188,11 @@ export default function HomeScreen() {
                   currency={product.currency}
                   image={product.imageUrl}
                   onPress={() =>
-                    router.push(`/products/${product._id}` as any)
+                    router.push(`/products/${product.id}` as any)
                   }
                   onAddToCart={() =>
                     addItem({
-                      productId: product._id,
+                      productId: product.id,
                       name: product.name,
                       price: product.price,
                       image: product.imageUrl,

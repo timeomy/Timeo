@@ -7,7 +7,6 @@ import {
   Screen,
   Header,
   Card,
-  Switch,
   Badge,
   Row,
   Spacer,
@@ -17,8 +16,7 @@ import {
   Toast,
   useTheme,
 } from "@timeo/ui";
-import { api } from "@timeo/api";
-import { useQuery, useMutation } from "convex/react";
+import { useMemberships, useUpdateMembership } from "@timeo/api-client";
 
 export default function MembershipsScreen() {
   const theme = useTheme();
@@ -27,12 +25,8 @@ export default function MembershipsScreen() {
 
   const tenantId = activeTenantId as string;
 
-  const memberships = useQuery(
-    api.memberships.listByTenant,
-    tenantId ? { tenantId: tenantId as any } : "skip"
-  );
-
-  const toggleActive = useMutation(api.memberships.toggleActive);
+  const { data: memberships, isLoading } = useMemberships(tenantId);
+  const { mutateAsync: updateMembership } = useUpdateMembership(tenantId ?? "");
 
   const [toast, setToast] = useState<{
     message: string;
@@ -41,9 +35,9 @@ export default function MembershipsScreen() {
   }>({ message: "", type: "success", visible: false });
 
   const handleToggleActive = useCallback(
-    async (membershipId: string) => {
+    async (membershipId: string, currentIsActive: boolean) => {
       try {
-        await toggleActive({ membershipId: membershipId as any });
+        await updateMembership({ membershipId, isActive: !currentIsActive });
       } catch (err) {
         const message =
           err instanceof Error
@@ -52,7 +46,7 @@ export default function MembershipsScreen() {
         setToast({ message, type: "error", visible: true });
       }
     },
-    [toggleActive]
+    [updateMembership]
   );
 
   if (!tenantId) {
@@ -71,7 +65,7 @@ export default function MembershipsScreen() {
     );
   }
 
-  if (memberships === undefined) {
+  if (isLoading) {
     return <LoadingScreen message="Loading memberships..." />;
   }
 
@@ -82,7 +76,7 @@ export default function MembershipsScreen() {
   }) => (
     <Card
       className="mb-3"
-      onPress={() => router.push(`/memberships/${item._id}/edit`)}
+      onPress={() => router.push(`/memberships/${item.id}/edit`)}
     >
       <Row justify="between" align="start">
         <View className="flex-1 mr-3">
@@ -112,37 +106,41 @@ export default function MembershipsScreen() {
               size="sm"
             />
             <Badge
-              label={item.interval === "monthly" ? "Monthly" : "Yearly"}
+              label={item.billingInterval === "monthly" ? "Monthly" : "Yearly"}
               variant="info"
             />
           </Row>
-          {item.features && item.features.length > 0 ? (
+          {item.benefits && item.benefits.length > 0 ? (
             <View className="mt-2">
-              {item.features.slice(0, 3).map((feature, i) => (
+              {item.benefits.slice(0, 3).map((benefit, i) => (
                 <Text
                   key={i}
                   className="text-xs"
                   style={{ color: theme.colors.textSecondary }}
                   numberOfLines={1}
                 >
-                  - {feature}
+                  - {benefit}
                 </Text>
               ))}
-              {item.features.length > 3 && (
+              {item.benefits.length > 3 && (
                 <Text
                   className="text-xs"
                   style={{ color: theme.colors.primary }}
                 >
-                  +{item.features.length - 3} more
+                  +{item.benefits.length - 3} more
                 </Text>
               )}
             </View>
           ) : null}
         </View>
-        <Switch
-          value={item.isActive}
-          onValueChange={() => handleToggleActive(item._id)}
-        />
+        <TouchableOpacity
+          onPress={() => handleToggleActive(item.id, item.isActive)}
+        >
+          <Badge
+            label={item.isActive ? "Active" : "Inactive"}
+            variant={item.isActive ? "success" : "default"}
+          />
+        </TouchableOpacity>
       </Row>
     </Card>
   );
@@ -164,7 +162,7 @@ export default function MembershipsScreen() {
       />
       <FlatList
         data={memberships}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         renderItem={renderMembership}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
