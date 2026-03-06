@@ -278,12 +278,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const isOnboarding = pathname === "/onboarding";
+
   useEffect(() => {
     if (!isLoaded || tenantsLoading) return;
     if (!isSignedIn) { router.replace("/sign-in"); return; }
-    if (tenants.length === 0) { router.replace("/portal"); return; }
+    // Allow onboarding page to render even without tenants
+    if (isOnboarding) return;
+    if (tenants.length === 0) { router.replace("/onboarding"); return; }
     if (activeRole === "customer") { router.replace("/portal"); }
-  }, [isLoaded, tenantsLoading, isSignedIn, tenants, activeRole, router]);
+  }, [isLoaded, tenantsLoading, isSignedIn, tenants, activeRole, router, isOnboarding]);
 
   if (!isLoaded || tenantsLoading) {
     return (
@@ -298,6 +302,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     );
+  }
+
+  // Allow onboarding page to render without tenants
+  if (isOnboarding) {
+    if (!isSignedIn) return null;
+    return <>{children}</>;
   }
 
   if (!isSignedIn || tenants.length === 0 || activeRole === "customer") {
