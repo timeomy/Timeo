@@ -45,8 +45,8 @@
     "production": {
       "ios": {
         "appleId": "jabez@oxloz.com",
-        "ascAppId": "",
-        "appleTeamId": ""
+        "ascAppId": "6760156042",
+        "appleTeamId": "U28N6G2V73"
       },
       "android": {
         "track": "internal",
