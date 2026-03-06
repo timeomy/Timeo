@@ -81,6 +81,13 @@ export async function requirePlatformAdmin(c: Context, next: Next) {
     );
   }
 
+  // Check users.role first (platform-level role from users table)
+  if (user.role === "platform_admin") {
+    await next();
+    return;
+  }
+
+  // Fallback: check tenant_memberships for legacy platform_admin role
   const [membership] = await db
     .select()
     .from(tenantMemberships)

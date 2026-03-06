@@ -387,3 +387,29 @@ When spawning sub-agents, assign clear roles:
 - Hardcode tenant-specific values
 - Expose internal IDs or stack traces
 - Skip RLS on tenant-scoped tables
+
+---
+
+## Platform Admin & User Flow Architecture
+
+### Platform Admin
+- **Jabez (jabez@oxloz.com)** is the platform admin for Timeo
+- Jabez has access to the **C2 (Command & Control) UI** — the platform admin dashboard
+- From C2, Jabez can **onboard and offboard businesses** (tenants) on Timeo
+
+### Business Onboarding Flow (via C2)
+1. Platform admin enrolls a new business in C2 (e.g., "WS Fitness")
+2. System **auto-sends a login email** to the specified business admin email address
+3. Email includes a **temporary password**
+4. Business admin logs in and is **required to reset the temp password** on first login
+5. Business admin then accesses the **Business Admin UI** (dashboard, staff, inventory, POS, etc.)
+
+### Sign-Up on timeo.my (Public)
+- The **sign-up feature on timeo.my is for normal users / clients only**
+- When a customer signs up and logs in, they see the **regular Customer UI** only
+- Customers can book appointments, make purchases, earn loyalty points, etc.
+
+### Business Login
+- Add a **"Business Login" link at the bottom of timeo.my** for businesses to log in
+- Business login leads to a **different UI** (Business Admin dashboard) — not the customer UI
+- This keeps customer and business flows clearly separated

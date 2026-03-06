@@ -73,6 +73,12 @@ export default function PortalLayout({
       return;
     }
 
+    // Platform admin always goes to C2
+    if (activeRole === "platform_admin") {
+      router.replace("/admin");
+      return;
+    }
+
     if (tenants.length === 0) {
       router.replace("/onboarding");
       return;

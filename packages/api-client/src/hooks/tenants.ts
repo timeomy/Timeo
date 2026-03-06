@@ -32,12 +32,25 @@ interface TenantWithRole extends Tenant {
   role: TimeoRole;
 }
 
+interface MyTenantsResponse {
+  tenants: TenantWithRole[];
+  platformRole: "platform_admin" | "user";
+}
+
 export function useMyTenants() {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.tenants.mine(),
-    queryFn: () => api.get<TenantWithRole[]>("/api/tenants/mine"),
+    queryFn: () => api.get<MyTenantsResponse>("/api/tenants/mine"),
     staleTime: 60_000,
   });
+
+  return {
+    ...query,
+    /** Flat tenant list (backwards-compatible) */
+    tenants: query.data?.tenants ?? [],
+    /** Platform-level role from users table */
+    platformRole: query.data?.platformRole ?? "user",
+  };
 }
 
 export function useTenant(tenantId: string | null | undefined) {

@@ -13,10 +13,13 @@ function TimeoWebAuthInner({
   children,
   tenants: externalTenants,
   tenantsLoading,
+  platformRole,
 }: {
   children: React.ReactNode;
   tenants?: TenantInfo[];
   tenantsLoading?: boolean;
+  /** Platform-level role from users table ("user" | "platform_admin") */
+  platformRole?: string;
 }) {
   const session = authClient.useSession();
   const [activeTenantId, setActiveTenantId] = useState<string | null>(null);
@@ -38,7 +41,11 @@ function TimeoWebAuthInner({
       : null;
 
     const activeTenant = tenants.find((t) => t.id === activeTenantId);
-    const activeRole: TimeoRole = activeTenant?.role ?? "customer";
+    // Platform admin role takes precedence over tenant-level roles
+    const activeRole: TimeoRole =
+      platformRole === "platform_admin"
+        ? "platform_admin"
+        : activeTenant?.role ?? "customer";
 
     return {
       user: timeoUser,
@@ -51,7 +58,7 @@ function TimeoWebAuthInner({
       activeRole,
       setActiveTenant: setActiveTenantId,
     };
-  }, [session.data, isLoaded, isSignedIn, activeTenantId, tenants]);
+  }, [session.data, isLoaded, isSignedIn, activeTenantId, tenants, platformRole]);
 
   const tenantSwitcher = useMemo<TenantSwitcherContext>(() => {
     const activeTenant = tenants.find((t) => t.id === activeTenantId) ?? null;
@@ -88,15 +95,18 @@ interface TimeoWebAuthProviderProps {
   tenants?: TenantInfo[];
   /** Whether tenant data is still loading */
   tenantsLoading?: boolean;
+  /** Platform-level role from users table ("user" | "platform_admin") */
+  platformRole?: string;
 }
 
 export function TimeoWebAuthProvider({
   children,
   tenants,
   tenantsLoading,
+  platformRole,
 }: TimeoWebAuthProviderProps) {
   return (
-    <TimeoWebAuthInner tenants={tenants} tenantsLoading={tenantsLoading}>
+    <TimeoWebAuthInner tenants={tenants} tenantsLoading={tenantsLoading} platformRole={platformRole}>
       {children}
     </TimeoWebAuthInner>
   );

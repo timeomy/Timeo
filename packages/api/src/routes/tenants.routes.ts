@@ -40,7 +40,7 @@ app.get("/", authMiddleware, async (c) => {
   return c.json(success(memberships));
 });
 
-// GET /tenants/mine - list user's tenants as flat TenantWithRole[]
+// GET /tenants/mine - list user's tenants as flat TenantWithRole[] + platformRole
 app.get("/mine", authMiddleware, async (c) => {
   const user = c.get("user");
 
@@ -88,7 +88,10 @@ app.get("/mine", authMiddleware, async (c) => {
     };
   });
 
-  return c.json(success(normalized));
+  // Include platform-level role so frontend can route platform admins correctly
+  const platformRole = user.role === "platform_admin" ? "platform_admin" : "user";
+
+  return c.json(success({ tenants: normalized, platformRole }));
 });
 
 // POST /tenants/join - join a tenant as a customer (by slug)

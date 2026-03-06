@@ -29,6 +29,8 @@ export const users = pgTable(
     updated_at: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    /** Platform-level role: "user" (default) or "platform_admin" */
+    role: text("role").notNull().default("user"),
   },
   (t) => [
     index("users_auth_id_idx").on(t.auth_id),
