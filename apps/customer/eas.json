@@ -46,7 +46,10 @@
       "ios": {
         "appleId": "jabez@oxloz.com",
         "ascAppId": "6760156042",
-        "appleTeamId": "U28N6G2V73"
+        "appleTeamId": "U28N6G2V73",
+        "ascApiKeyPath": "./AuthKey_AQ34RJHT5U.p8",
+        "ascApiKeyIssuerId": "b83fdc21-02b9-4f55-8f00-19c22d5ffda7",
+        "ascApiKeyId": "AQ34RJHT5U"
       },
       "android": {
         "track": "internal",
