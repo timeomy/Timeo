@@ -43,8 +43,14 @@
   },
   "submit": {
     "production": {
+      "ios": {
+        "appleId": "jabez@oxloz.com",
+        "ascAppId": "",
+        "appleTeamId": ""
+      },
       "android": {
-        "track": "internal"
+        "track": "internal",
+        "releaseStatus": "draft"
       }
     }
   }
