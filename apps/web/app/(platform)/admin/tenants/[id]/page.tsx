@@ -10,6 +10,9 @@ import {
   useSuspendPlatformTenant,
   useActivatePlatformTenant,
   usePlatformTenantMembers,
+  useAddPlatformTenantMember,
+  useUpdatePlatformTenantMemberRole,
+  useRemovePlatformTenantMember,
 } from "@timeo/api-client";
 import {
   Card,
@@ -43,6 +46,8 @@ import {
   Settings,
   Flag,
   Plus,
+  Trash2,
+  UserPlus,
 } from "lucide-react";
 
 function Toggle({
@@ -115,6 +120,9 @@ export default function TenantDetailPage() {
   const suspendMutation = useSuspendPlatformTenant();
   const activateMutation = useActivatePlatformTenant();
   const { data: members, isLoading: membersLoading } = usePlatformTenantMembers(tenantId);
+  const addMemberMutation = useAddPlatformTenantMember();
+  const updateMemberRoleMutation = useUpdatePlatformTenantMemberRole();
+  const removeMemberMutation = useRemovePlatformTenantMember();
 
   const [editName, setEditName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -128,6 +136,12 @@ export default function TenantDetailPage() {
   const [newFlagKey, setNewFlagKey] = useState("");
   const [newFlagEnabled, setNewFlagEnabled] = useState(true);
   const [savingFlag, setSavingFlag] = useState(false);
+
+  // Add Member state
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [newMemberEmail, setNewMemberEmail] = useState("");
+  const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberRole, setNewMemberRole] = useState<"admin" | "staff" | "customer">("staff");
 
   // Initialize settings from tenant
   useEffect(() => {
@@ -194,6 +208,48 @@ export default function TenantDetailPage() {
       alert(err.message || "Failed to add feature flag.");
     } finally {
       setSavingFlag(false);
+    }
+  }
+
+  async function handleAddMember() {
+    if (!newMemberEmail.trim()) return;
+    try {
+      await addMemberMutation.mutateAsync({
+        tenantId,
+        email: newMemberEmail.trim().toLowerCase(),
+        role: newMemberRole,
+        name: newMemberName.trim() || undefined,
+      });
+      setNewMemberEmail("");
+      setNewMemberName("");
+      setNewMemberRole("staff");
+      setAddMemberOpen(false);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to add member.");
+    }
+  }
+
+  async function handleUpdateMemberRole(
+    memberId: string,
+    newRole: "admin" | "staff" | "customer",
+  ) {
+    try {
+      await updateMemberRoleMutation.mutateAsync({
+        tenantId,
+        memberId,
+        role: newRole,
+      });
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to update role.");
+    }
+  }
+
+  async function handleRemoveMember(memberId: string, memberName: string) {
+    if (!confirm(`Remove ${memberName} from this tenant?`)) return;
+    try {
+      await removeMemberMutation.mutateAsync({ tenantId, memberId });
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to remove member.");
     }
   }
 
@@ -441,11 +497,20 @@ export default function TenantDetailPage() {
       {/* Members */}
       {!loading && (
         <Card className="glass border-white/[0.08]">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Users className="h-5 w-5" />
               Members
             </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAddMemberOpen(true)}
+              className="gap-1"
+            >
+              <UserPlus className="h-4 w-4" />
+              Add Member
+            </Button>
           </CardHeader>
           <CardContent className="p-0">
             {membersLoading ? (
@@ -471,6 +536,7 @@ export default function TenantDetailPage() {
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Joined</TableHead>
+                    <TableHead className="w-[60px]" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -483,9 +549,21 @@ export default function TenantDetailPage() {
                         {member.userEmail}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {member.role}
-                        </Badge>
+                        <select
+                          value={member.role}
+                          onChange={(e) =>
+                            handleUpdateMemberRole(
+                              member.id,
+                              e.target.value as "admin" | "staff" | "customer",
+                            )
+                          }
+                          disabled={updateMemberRoleMutation.isPending}
+                          className="rounded border border-white/[0.1] bg-transparent px-2 py-1 text-xs font-medium transition-colors hover:border-white/[0.2] focus:outline-none focus:ring-1 focus:ring-primary"
+                        >
+                          <option value="admin" className="bg-zinc-900">Admin</option>
+                          <option value="staff" className="bg-zinc-900">Staff</option>
+                          <option value="customer" className="bg-zinc-900">Customer</option>
+                        </select>
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -493,6 +571,8 @@ export default function TenantDetailPage() {
                           className={
                             member.status === "active"
                               ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                              : member.status === "invited"
+                              ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
                               : "bg-zinc-500/20 text-zinc-400 border-zinc-500/30"
                           }
                         >
@@ -500,11 +580,25 @@ export default function TenantDetailPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {new Date(member.joinedAt).toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })}
+                        {member.joinedAt
+                          ? new Date(member.joinedAt).toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })
+                          : "—"}
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          onClick={() =>
+                            handleRemoveMember(member.id, member.userName)
+                          }
+                          disabled={removeMemberMutation.isPending}
+                          className="rounded p-1 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400"
+                          title="Remove member"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -514,6 +608,68 @@ export default function TenantDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Add Member Dialog */}
+      <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Member to Tenant</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Email Address</label>
+              <Input
+                type="email"
+                value={newMemberEmail}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setNewMemberEmail(e.target.value)
+                }
+                placeholder="member@example.com"
+              />
+              <p className="text-xs text-muted-foreground">
+                If the email isn&apos;t registered yet, a new account will be created.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Name (optional)</label>
+              <Input
+                value={newMemberName}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setNewMemberName(e.target.value)
+                }
+                placeholder="John Doe"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Role</label>
+              <select
+                value={newMemberRole}
+                onChange={(e) =>
+                  setNewMemberRole(
+                    e.target.value as "admin" | "staff" | "customer",
+                  )
+                }
+                className="w-full rounded border border-white/[0.1] bg-transparent px-3 py-2 text-sm transition-colors hover:border-white/[0.2] focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="admin" className="bg-zinc-900">Admin (full business access)</option>
+                <option value="staff" className="bg-zinc-900">Staff (POS, appointments, limited access)</option>
+                <option value="customer" className="bg-zinc-900">Customer (bookings, purchases)</option>
+              </select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddMemberOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddMember}
+              disabled={addMemberMutation.isPending || !newMemberEmail.trim()}
+            >
+              {addMemberMutation.isPending ? "Adding..." : "Add Member"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Feature Flags */}
       {!loading && (

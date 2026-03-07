@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db, generateId } from "@timeo/db";
 import { tenants, tenantMemberships, users } from "@timeo/db/schema";
-import { eq, desc, sql, count } from "drizzle-orm";
+import { eq, desc, sql, count, and } from "drizzle-orm";
 import { authMiddleware } from "../../middleware/auth.js";
 import { requirePlatformAdmin } from "../../middleware/rbac.js";
 import { success, error } from "../../lib/response.js";
@@ -262,6 +262,232 @@ app.get("/:id/members", authMiddleware, requirePlatformAdmin, async (c) => {
 
   return c.json(success(members));
 });
+
+// POST /tenants/:id/members — add member to tenant
+app.post(
+  "/:id/members",
+  authMiddleware,
+  requirePlatformAdmin,
+  zValidator(
+    "json",
+    z.object({
+      email: z.string().email(),
+      role: z.enum(["customer", "staff", "admin"]),
+      name: z.string().min(1).max(200).optional(),
+    }),
+  ),
+  async (c) => {
+    const user = c.get("user");
+    const tenantId = c.req.param("id");
+    const body = c.req.valid("json");
+    const ip = getClientIp(c.req.raw.headers);
+
+    // Verify tenant exists
+    const [tenant] = await db
+      .select({ id: tenants.id })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
+
+    if (!tenant) {
+      return c.json(error("TENANT_NOT_FOUND", "Tenant not found"), 404);
+    }
+
+    // Find or create user by email
+    let [existingUser] = await db
+      .select({ id: users.id, name: users.name })
+      .from(users)
+      .where(eq(users.email, body.email))
+      .limit(1);
+
+    let userId: string;
+    let memberStatus: "active" | "invited";
+
+    if (existingUser) {
+      userId = existingUser.id;
+      memberStatus = "active";
+    } else {
+      // Create a new user record (they'll need to set up auth via invite email)
+      userId = generateId();
+      await db.insert(users).values({
+        id: userId,
+        email: body.email,
+        name: body.name || body.email.split("@")[0],
+        role: "user",
+      });
+      memberStatus = "invited";
+    }
+
+    // Check if membership already exists
+    const [existingMembership] = await db
+      .select({ id: tenantMemberships.id })
+      .from(tenantMemberships)
+      .where(
+        and(
+          eq(tenantMemberships.tenant_id, tenantId),
+          eq(tenantMemberships.user_id, userId),
+        ),
+      )
+      .limit(1);
+
+    if (existingMembership) {
+      return c.json(
+        error("ALREADY_MEMBER", "User is already a member of this tenant"),
+        409,
+      );
+    }
+
+    // Create membership
+    const membershipId = generateId();
+    await db.insert(tenantMemberships).values({
+      id: membershipId,
+      user_id: userId,
+      tenant_id: tenantId,
+      role: body.role,
+      status: memberStatus,
+    });
+
+    await insertAudit(
+      user.id,
+      "platform_admin",
+      "tenant_member.added",
+      "tenant_member",
+      membershipId,
+      { tenantId, email: body.email, role: body.role },
+      ip,
+    );
+
+    // Return the created membership
+    const [created] = await db
+      .select({
+        id: tenantMemberships.id,
+        user_id: tenantMemberships.user_id,
+        role: tenantMemberships.role,
+        status: tenantMemberships.status,
+        joined_at: tenantMemberships.joined_at,
+        user_name: users.name,
+        user_email: users.email,
+      })
+      .from(tenantMemberships)
+      .innerJoin(users, eq(tenantMemberships.user_id, users.id))
+      .where(eq(tenantMemberships.id, membershipId));
+
+    return c.json(success(created), 201);
+  },
+);
+
+// PATCH /tenants/:id/members/:memberId — update member role
+app.patch(
+  "/:id/members/:memberId",
+  authMiddleware,
+  requirePlatformAdmin,
+  zValidator(
+    "json",
+    z.object({
+      role: z.enum(["customer", "staff", "admin"]),
+    }),
+  ),
+  async (c) => {
+    const user = c.get("user");
+    const tenantId = c.req.param("id");
+    const memberId = c.req.param("memberId");
+    const body = c.req.valid("json");
+    const ip = getClientIp(c.req.raw.headers);
+
+    // Verify membership exists and belongs to this tenant
+    const [membership] = await db
+      .select({ id: tenantMemberships.id, user_id: tenantMemberships.user_id })
+      .from(tenantMemberships)
+      .where(
+        and(
+          eq(tenantMemberships.id, memberId),
+          eq(tenantMemberships.tenant_id, tenantId),
+        ),
+      )
+      .limit(1);
+
+    if (!membership) {
+      return c.json(error("NOT_FOUND", "Member not found"), 404);
+    }
+
+    await db
+      .update(tenantMemberships)
+      .set({ role: body.role })
+      .where(eq(tenantMemberships.id, memberId));
+
+    await insertAudit(
+      user.id,
+      "platform_admin",
+      "tenant_member.role_updated",
+      "tenant_member",
+      memberId,
+      { tenantId, role: body.role },
+      ip,
+    );
+
+    // Return updated membership
+    const [updated] = await db
+      .select({
+        id: tenantMemberships.id,
+        user_id: tenantMemberships.user_id,
+        role: tenantMemberships.role,
+        status: tenantMemberships.status,
+        joined_at: tenantMemberships.joined_at,
+        user_name: users.name,
+        user_email: users.email,
+      })
+      .from(tenantMemberships)
+      .innerJoin(users, eq(tenantMemberships.user_id, users.id))
+      .where(eq(tenantMemberships.id, memberId));
+
+    return c.json(success(updated));
+  },
+);
+
+// DELETE /tenants/:id/members/:memberId — remove member from tenant
+app.delete(
+  "/:id/members/:memberId",
+  authMiddleware,
+  requirePlatformAdmin,
+  async (c) => {
+    const user = c.get("user");
+    const tenantId = c.req.param("id");
+    const memberId = c.req.param("memberId");
+    const ip = getClientIp(c.req.raw.headers);
+
+    // Verify membership exists and belongs to this tenant
+    const [membership] = await db
+      .select({ id: tenantMemberships.id, user_id: tenantMemberships.user_id })
+      .from(tenantMemberships)
+      .where(
+        and(
+          eq(tenantMemberships.id, memberId),
+          eq(tenantMemberships.tenant_id, tenantId),
+        ),
+      )
+      .limit(1);
+
+    if (!membership) {
+      return c.json(error("NOT_FOUND", "Member not found"), 404);
+    }
+
+    await db
+      .delete(tenantMemberships)
+      .where(eq(tenantMemberships.id, memberId));
+
+    await insertAudit(
+      user.id,
+      "platform_admin",
+      "tenant_member.removed",
+      "tenant_member",
+      memberId,
+      { tenantId },
+      ip,
+    );
+
+    return c.json(success({ message: "Member removed" }));
+  },
+);
 
 // POST /tenants/:id/impersonate — create 30-min impersonation token
 app.post(

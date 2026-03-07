@@ -15,6 +15,9 @@ export interface TimeoUser {
   imageUrl: string | undefined;
 }
 
+/** Whether the platform admin is viewing C2 ("platform") or a tenant dashboard ("tenant") */
+export type ViewMode = "platform" | "tenant";
+
 export interface TimeoAuthContext {
   user: TimeoUser | null;
   isLoaded: boolean;
@@ -23,6 +26,12 @@ export interface TimeoAuthContext {
   activeTenantId: string | null;
   activeRole: TimeoRole;
   setActiveTenant: (tenantId: string) => void;
+  /** True if the user has platform_admin in users.role (independent of viewMode) */
+  isPlatformAdmin: boolean;
+  /** Current view mode — only meaningful for platform admins */
+  viewMode: ViewMode;
+  /** Switch between "platform" (C2) and "tenant" (business dashboard) views */
+  setViewMode: (mode: ViewMode) => void;
 }
 
 export interface TenantInfo {

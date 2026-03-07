@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useMemo, useState } from "react";
 import { authClient } from "./auth-client";
-import type { TimeoAuthContext, TenantSwitcherContext, TenantInfo, TimeoRole } from "../types";
+import type { TimeoAuthContext, TenantSwitcherContext, TenantInfo, TimeoRole, ViewMode } from "../types";
 
 // ─── Contexts ───────────────────────────────────────────────────────
 const TimeoWebAuthCtx = createContext<TimeoAuthContext | null>(null);
@@ -23,6 +23,11 @@ function TimeoWebAuthInner({
 }) {
   const session = authClient.useSession();
   const [activeTenantId, setActiveTenantId] = useState<string | null>(null);
+  const isPlatformAdmin = platformRole === "platform_admin";
+  // Platform admins start in "platform" mode (C2), can switch to "tenant" mode
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    isPlatformAdmin ? "platform" : "tenant"
+  );
 
   const isSignedIn = !!session.data?.user;
   const isLoaded = !session.isPending;
@@ -41,9 +46,10 @@ function TimeoWebAuthInner({
       : null;
 
     const activeTenant = tenants.find((t) => t.id === activeTenantId);
-    // Platform admin role takes precedence over tenant-level roles
+    // In "platform" mode, platform admins get platform_admin role
+    // In "tenant" mode, they get their tenant-level role
     const activeRole: TimeoRole =
-      platformRole === "platform_admin"
+      isPlatformAdmin && viewMode === "platform"
         ? "platform_admin"
         : activeTenant?.role ?? "customer";
 
@@ -57,8 +63,11 @@ function TimeoWebAuthInner({
       activeTenantId,
       activeRole,
       setActiveTenant: setActiveTenantId,
+      isPlatformAdmin,
+      viewMode,
+      setViewMode,
     };
-  }, [session.data, isLoaded, isSignedIn, activeTenantId, tenants, platformRole]);
+  }, [session.data, isLoaded, isSignedIn, activeTenantId, tenants, platformRole, viewMode, isPlatformAdmin]);
 
   const tenantSwitcher = useMemo<TenantSwitcherContext>(() => {
     const activeTenant = tenants.find((t) => t.id === activeTenantId) ?? null;
