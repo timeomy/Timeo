@@ -39,6 +39,7 @@ export const membershipStatusEnum = pgEnum("membership_status", [
   "active",
   "invited",
   "suspended",
+  "removed",
 ]);
 
 // ─── Booking ─────────────────────────────────────────────────────────────────

@@ -1,0 +1,260 @@
+[1/25/26, 10:25:26 PM] IT WS: ‎Messages and calls are end-to-end encrypted. Only people in this chat can read, listen to, or share them.
+[1/25/26, 10:25:26 PM] Jack (WS Fitness): ‎Jack (WS Fitness) created group “IT WS”
+[1/25/26, 10:25:26 PM] IT WS: ‎Jack (WS Fitness) added you
+[1/25/26, 10:26:21 PM] Jack (WS Fitness): @⁨~Mary⁩ hi Mary @⁨Oxloz - Jabez⁩ is my IT also my partner for OXLOZ|WS
+[1/25/26, 10:27:10 PM] ~ Mary: glad to talk to u,
+[1/25/26, 10:27:19 PM] ~ Mary: let me add our engineer
+[1/25/26, 10:36:47 PM] ~ Bin: ‎~ Mary added ~ Bin
+[1/25/26, 10:53:00 PM] Oxloz - Jabez: Hi there
+[1/25/26, 11:05:51 PM] ~ Mary: Do u have questions to discuss with our engineer
+[1/25/26, 11:06:05 PM] ~ Mary: hi Oxloz, do u have any questions to discuss with us
+‎[1/25/26, 11:10:47 PM] Oxloz - Jabez: HASdk_API_En.pdf • ‎224 pages ‎<attached: 00003011-HASdk_API_En.pdf>
+‎[1/25/26, 11:10:47 PM] Oxloz - Jabez: HTTP_En.pdf • ‎94 pages ‎<attached: 00003012-HTTP_En.pdf>
+[1/25/26, 11:11:37 PM] Oxloz - Jabez: i received this 2 PDF from Jack earlier its for the face recognition turnstile right
+[1/25/26, 11:11:59 PM] Oxloz - Jabez: one moment while i skim thru the PDF
+[1/25/26, 11:20:22 PM] ~ Mary: Yes this is for face recognition access control terminal
+[1/26/26, 6:28:01 PM] Oxloz - Jabez: Hi, quick question: Can this device connect directly to a public HTTPS domain (push/heartbeat) so we don’t need any local gateway? If it’s LAN-only HTTP server (port 8000), then we must run a local cloudflared connector for Cloudflare Tunnel—please confirm which is supported on this model/firmware.
+[1/26/26, 7:33:55 PM] ~ Bin: it can
+[1/26/26, 7:34:41 PM] ~ Mary: @⁨Oxloz - Jabez⁩
+[1/26/26, 10:45:43 PM] ~ Mary: Do u have more questions?
+[1/26/26, 10:45:47 PM] ~ Mary: @⁨Jack (WS Fitness)⁩
+[1/26/26, 10:48:00 PM] Jack (WS Fitness): @⁨Oxloz - Jabez⁩
+[1/26/26, 10:48:24 PM] Jack (WS Fitness): I am ok waiting for @⁨Oxloz - Jabez⁩ because he will be handling the IT
+‎[1/26/26, 10:57:02 PM] Oxloz - Jabez: Final Architecture take a look and let me know if this will work: ‎<attached: 00003023-PHOTO-2026-01-26-22-57-02.jpg>
+[1/26/26, 10:57:50 PM] Oxloz - Jabez: fyi:
+convex is our backend
+our mobile app is expo
+[1/26/26, 11:07:44 PM] ~ Mary: @⁨~Bin⁩
+[1/26/26, 11:09:56 PM] ~ Bin: sure, our device work with HTTPS server
+[1/26/26, 11:11:35 PM] ~ Bin: is your server ready？  I can test from my office
+[1/26/26, 11:19:30 PM] Oxloz - Jabez: im not ready yet, as im not aware about us testing it
+[1/26/26, 11:21:12 PM] Oxloz - Jabez: please tell me how am i supposed to set my server up and what is needed from me
+[1/26/26, 11:24:14 PM] ~ Bin: nothing special, those authentication such as jwt is not supported
+[1/26/26, 11:34:17 PM] Oxloz - Jabez: let me see what we can do here, my biggest question mark here is how am i pushing my data to the turnstile
+[1/26/26, 11:46:11 PM] ~ Bin: you want to send data to the device？
+[1/26/26, 11:46:38 PM] ~ Bin: websocket, then
+[1/26/26, 11:46:46 PM] ~ Bin: or mqtt
+[1/26/26, 11:47:10 PM] Oxloz - Jabez: For example if a new user signed up on our app I will set it to sync with the device so the face recognition can recognize the user
+[1/26/26, 11:47:39 PM] ~ Bin: mqtt
+[1/26/26, 11:48:33 PM] ~ Bin: or websocket
+[1/26/26, 11:52:08 PM] ~ Bin: time to bed. leave questions, will answer tomorrow.
+[1/27/26, 4:55:59 PM] Jack (WS Fitness): @⁨‎all⁩
+[1/27/26, 6:05:04 PM] ~ Mary: hi Jack
+[1/27/26, 6:05:23 PM] ~ Mary: do u have more questions?
+[1/27/26, 6:05:38 PM] ~ Mary: sorry for late response i was very busy today
+[1/28/26, 10:12:03 AM] Oxloz - Jabez: The app should be ready for test later today
+[1/28/26, 11:51:54 AM] Jack (WS Fitness): @⁨‎all⁩ Isit ok
+[1/28/26, 11:52:17 AM] ~ Bin: do you guys have the sample machine yet?
+[1/28/26, 1:01:06 PM] ~ Mary: not yet
+[1/28/26, 1:13:24 PM] Jack (WS Fitness): @⁨~Mary⁩ do u have sample machine for @⁨Oxloz - Jabez⁩ to remote the turnstile
+[1/28/26, 1:13:57 PM] Oxloz - Jabez: Or do I just provide you guys an api key that will be much easier
+[1/28/26, 1:14:08 PM] Jack (WS Fitness): @⁨~Mary⁩ or can I pay a deposit for ur company security
+[1/28/26, 1:24:04 PM] ~ Mary: Hi Jack
+[1/28/26, 1:24:14 PM] Jack (WS Fitness): Hi
+[1/28/26, 1:24:25 PM] ~ Mary: Yes we have a sample machine in our office
+[1/28/26, 1:25:02 PM] ~ Mary: U can pay a deposit if u like
+[1/28/26, 1:25:40 PM] ~ Mary: When do u want to test remotely ? I can ask Benny to prepare the sample device
+[1/28/26, 1:25:47 PM] Jack (WS Fitness): @⁨Oxloz - Jabez⁩
+[1/28/26, 1:26:29 PM] Oxloz - Jabez: Tomorrow
+[1/28/26, 1:26:54 PM] Oxloz - Jabez: I’m packed tonight but let me know what is needed and how are we testing it
+‎[1/28/26, 1:27:33 PM] Jack (WS Fitness): ‎<attached: 00003058-PHOTO-2026-01-28-13-27-33.jpg>
+[1/28/26, 1:27:58 PM] Jack (WS Fitness): @⁨~Mary⁩ what ur suggestion on this area
+[1/28/26, 1:30:37 PM] ~ Mary: Benny will inform later this afternoon
+[1/28/26, 1:31:46 PM] ~ Mary: The turnstile u choose can be used here, we will make its dimensions fit for yr site
+[1/28/26, 1:32:12 PM] ~ Mary: Or let me ask our partner what other types of turnstile they suggest
+[1/28/26, 1:41:09 PM] ~ Bin: if your http server is ready, send me the url, then I can setup our device to push event to it
+‎[1/28/26, 2:13:27 PM] ~ Mary: ‎image omitted
+[1/28/26, 2:16:24 PM] ~ Mary: Jack, this is the best turnstile option for your gym, high end type, your gym members will think the high membership charge worthy. after all this invetsment will be used for business for many years.  if we use the other one, it's less good looking  and doesnt look expensive
+[1/28/26, 2:17:32 PM] ~ Mary: our partner can customize the flap height and width to fit for your site dimensions bf manufacturing ‎<This message was edited>
+[1/28/26, 2:38:18 PM] Jack (WS Fitness): Ok then we need right side as picture but u see the door 3 ft
+[1/28/26, 2:38:24 PM] Jack (WS Fitness): Here
+[1/28/26, 3:57:02 PM] ~ Mary: a pair can work
+[1/28/26, 3:57:17 PM] Jack (WS Fitness): 👌
+[1/28/26, 3:58:00 PM] Jack (WS Fitness): ‎This message was deleted.
+[1/29/26, 5:57:10 PM] ~ Mary: Jack, when can your http server be ready for a remote test?
+[1/29/26, 5:57:25 PM] Jack (WS Fitness): @⁨Oxloz - Jabez⁩
+[1/29/26, 5:57:31 PM] Jack (WS Fitness): Waiting for him
+[1/29/26, 6:01:36 PM] Oxloz - Jabez: what do you mean our http server?
+[1/29/26, 6:01:57 PM] Oxloz - Jabez: to be frank til now i dont get the idea on how are we testing it
+[1/29/26, 6:02:10 PM] Oxloz - Jabez: could you guys elaborate a little on what is needed for the test
+‎[1/29/26, 6:03:02 PM] Oxloz - Jabez: ‎image omitted
+[1/29/26, 6:03:09 PM] Oxloz - Jabez: i have built the app ready like this
+[1/29/26, 6:03:10 PM] ~ Mary: Benny will explain to you soon
+[1/29/26, 6:03:19 PM] Oxloz - Jabez: just not sure how are we testing it
+‎[1/29/26, 6:03:32 PM] Oxloz - Jabez: ‎image omitted
+[1/29/26, 6:06:23 PM] ~ Bin: I don't know how you want to test either
+[1/29/26, 6:06:42 PM] ~ Bin: what function do you want to test?
+[1/29/26, 6:07:32 PM] ~ Bin: I think so far, you can only test if your http server can receive pushed messae from our device
+[1/29/26, 6:07:53 PM] Oxloz - Jabez: The most important is new user who signed up on our app data get pushed to the device
+[1/29/26, 6:08:41 PM] Oxloz - Jabez: From our previous turnstile I could receive logs from device via http whenever people scan their face thru the turnstile but we couldn’t push the data to the device
+‎[1/29/26, 6:11:31 PM] Oxloz - Jabez: ‎image omitted
+[1/29/26, 6:12:20 PM] Oxloz - Jabez: for example this is our current turnstile i could receive data showing the face recognition have successfully recognize a face and post it to my cloudflare
+[1/29/26, 6:13:04 PM] Oxloz - Jabez: and the documentation given is almost identical to yall's but i'm unable to send data to the device
+[1/29/26, 6:14:19 PM] Oxloz - Jabez: TLDR: would like to test data pushing to the device
+‎[1/29/26, 6:35:02 PM] Oxloz - Jabez: ‎<attached: 00003092-AUDIO-2026-01-29-18-35-01.opus>
+‎[1/29/26, 6:35:52 PM] Oxloz - Jabez: ‎<attached: 00003093-AUDIO-2026-01-29-18-35-51.opus>
+‎[1/29/26, 6:37:14 PM] Oxloz - Jabez: ‎<attached: 00003094-AUDIO-2026-01-29-18-37-13.opus>
+[1/29/26, 6:57:08 PM] Jack (WS Fitness): 🟢 NORMAL MODE (Internet OK — peak hours safe)
+	1.	Background sync (always running)
+	•	Server pushes active members + rules to turnstile cache
+	•	Cache has:
+	•	Expiry time
+	•	Access rules
+	•	Blacklist updates
+	2.	Member scans
+	•	Turnstile checks local cache FIRST
+	•	If valid → OPEN immediately (no waiting)
+	•	At the same time:
+	•	Entry log sent to server asynchronously
+
+⏱ Typical open time: < 300 ms
+
+👉 No crowd delay
+
+⸻
+
+🟡 CONTROL PRIORITY (very important)
+	•	Server is always the boss
+	•	Cache is only for speed
+	•	If server revokes a member:
+	•	Cache auto-updates
+	•	Next scan = ❌ denied
+
+⸻
+
+🔴 OFFLINE MODE (Internet down)
+	1.	Turnstile switches to limited offline
+	2.	Uses cached valid members only
+	3.	Rules apply:
+	•	Time-limited
+	•	Usage-limited
+	4.	All access logs stored locally
+	5.	Internet returns → auto-sync logs + refresh cache
+
+⸻
+
+🧠 One-sentence summary (this is the key)
+
+“Turnstile opens using server-managed local cache for speed, while the server keeps full control.”
+
+
+So what we need to know if the turnstiles can 
+
+	•	Edge cache / local cache
+	•	Server-first control
+	•	Async log upload
+	•	Cache expiry & blacklist
+	•	Offline log sync ‎<This message was edited>
+[1/29/26, 6:57:11 PM] Jack (WS Fitness): @⁨‎all⁩
+[1/29/26, 10:29:44 PM] ~ Mary: Jack, it is supposed to be two-way communication between the device and your app
+[1/29/26, 10:30:38 PM] ~ Mary: from your description, seemingly you only get data from the device, but can't issue data to the device
+[1/29/26, 10:41:54 PM] Jack (WS Fitness): @⁨~Mary⁩
+[1/29/26, 10:42:34 PM] Jack (WS Fitness): Can help me check why ya
+[1/30/26, 9:58:47 AM] ~ Bin: how can we help with the test？
+[1/30/26, 10:06:34 AM] ~ Bin: our face machine doesn't have the concept of cache, all registered member and list are scanned and compared
+[1/30/26, 10:08:32 AM] ~ Bin: 3.	Rules apply:
+	•	Time-limited
+	•	Usage-limited
+what is usage-limited? how many times people can be scanned and grant access?
+[1/30/26, 10:09:27 AM] ~ Bin: and what is edge cache/local cache?
+[1/30/26, 10:23:24 AM] ~ Mary: @⁨Jack (WS Fitness)⁩
+[1/30/26, 11:00:04 AM] ~ Bin: for face terminal, we don't have edge cache/local cache concept
+[1/30/26, 11:08:04 AM] Jack (WS Fitness): 1. Face scanned on device
+2. Device sends face data / feature to server
+3. Server queries membership database
+4. Server returns result (ALLOW / DENY)
+5. Device receives result
+6. Device opens turnstile or rejects
+[1/30/26, 11:09:17 AM] ~ Bin: these requirements can be satisfied
+[1/30/26, 11:13:34 AM] Jack (WS Fitness): {
+  "device_id": "FACE-01",
+  "person_id": "123456",
+  "event": "face_match",
+  "time": "2026-01-29T18:30:22"
+}
+
+Does the device accept this kind of JSON
+[1/30/26, 11:14:12 AM] ~ Bin: no, you must follow our protocol,
+‎[1/30/26, 11:15:40 AM] ~ Bin: RegisterImage+CapturedImage.json ‎<attached: 00003111-RegisterImage+CapturedImage.json>
+[1/30/26, 11:17:04 AM] ~ Bin: {
+ "reply": "ACK",
+ 
+ "cmd": "face ",
+ 
+ # Reply code
+ "code": 0,
+ 
+ # Serial number (need to be consistent with the one pushed)
+ "sequence_no": 1,
+
+# Capture time (need to be the same as the one pushed,Don’t reformat, no punctuation can be wrong)
+ "cap_time": "2017/12/18 16:45:30.003",
+ 
+ # Gate control (optional), used in online mode
+ "gateway_ctrl":{
+# Device type, gpio: io device wiegand: Wiegand device
+ "device_type": "gpio",
+
+# When the device type is gpio, this field indicates the io number
+# When the device type is wiegand, this field indicates the Wiegand card number,
+"device_no": 1,
+
+# Wiegand protocol access control card number (long integer), this field is used in wg36, wg44, wg66 protocols
+# When using this field, device_no must be assigned to 0
+ "long_card_id": 9223372036854775807,
+
+
+ # Control mode, test: test mode force: forced mode scene: scene mode
+ # Test mode: used for testing, no record of opening information is generated;
+# Forced mode: the output signal will be forced to the device;
+# Scene mode: Whether to output a signal to the device depends on whether the device is enabled;
+ "ctrl_mode": "force",
+
+ # Personnel id, only used in online mode, used to generate gate opening records
+ "person_id": "0001"
+},
+# The voice to be played (optional)
+"tts":{
+# Voice text (required,UTF8 encoding), the length does not exceed 64 bytes
+"text":"Welcome home, Zhang San"
+},
+# The text that needs to be displayed on the screen (optional)
+"text_display":{
+# Text display position
+ "position":{
+ "x":0,
+ "y":500
+ },
+# Text existence time unit ms
+ "alive_time": 1000,
+ # font size
+ "font_size": 100,
+# Text interval
+ "font_spacing": 1,
+ # Text color format ARGB
+ "font_color": "0xffffffff",
+ # Text content
+ "text":"Hello"
+ }
+}
+this is the response your server supposed to return
+[1/30/26, 11:18:42 AM] Jack (WS Fitness): @⁨Oxloz - Jabez⁩
+[1/30/26, 11:26:37 AM] ~ Bin: http://bin.866066.xyz/FaceTerminalUISim.github.io/
+[1/30/26, 11:26:54 AM] ~ Bin: this is the web UI of our face termianl, you can take a look
+[1/30/26, 11:28:23 AM] Jack (WS Fitness): @⁨Oxloz - Jabez⁩ look similar
+[1/30/26, 11:30:41 AM] Oxloz - Jabez: Awesome I’ll take a look
+‎[1/30/26, 1:53:53 PM] ~ Bin: I have setup mqtt, so you guys can interact with our device ‎<attached: 00003118-PHOTO-2026-01-30-13-53-53.jpg>
+[1/30/26, 1:54:36 PM] Oxloz - Jabez: Okay how can we interact with it
+[1/30/26, 1:54:58 PM] ~ Bin: send command to: topic/face/manage/request/abcd,   receive respons on: topic/face/manage/response/abcd
+‎[1/30/26, 1:57:35 PM] ~ Bin: https://1drv.ms/u/c/d9366be152b2115e/IQBeEbJS4Ws2IIDZpxMAAAAAAWI54I2G_xr61XpHHI6_dkA?e=wvyUKb ‎image omitted
+[1/30/26, 1:57:47 PM] ~ Bin: check this tool form available json command, and copy the json into mqttx
+‎[1/30/26, 2:00:38 PM] ~ Bin: ‎image omitted
+[2/1/26, 11:49:15 AM] Jack (WS Fitness): Hi may I know when u off day can I make deposit first
+[2/1/26, 11:50:10 AM] Jack (WS Fitness): For this size
+[2/1/26, 11:56:21 AM] ~ Mary: it’s not much money , we accept full payment to start production
+[2/1/26, 11:56:32 AM] Jack (WS Fitness): Can also
+[2/1/26, 11:56:46 AM] ~ Mary: Let me make u PI today
+[2/1/26, 11:56:49 AM] Jack (WS Fitness): When u guys gonna off day ya
+[2/1/26, 11:57:42 AM] ~ Mary: Not noticed yet, based on previous practice, 2-3days bf Chinese new year
+[2/1/26, 11:58:51 AM] ~ Mary: But the turnstile factory will have the holiday much earlier
+[2/2/26, 12:05:30 PM] Jack (WS Fitness): @⁨Oxloz - Jabez⁩

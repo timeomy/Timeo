@@ -18,6 +18,7 @@ function TimeoAuthInner({
 }) {
   const session = authClient.useSession();
   const [activeTenantId, setActiveTenantId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"platform" | "tenant">("tenant");
 
   const isSignedIn = !!session.data?.user;
   const isLoaded = !session.isPending;
@@ -37,6 +38,7 @@ function TimeoAuthInner({
 
     const activeTenant = tenants.find((t) => t.id === activeTenantId);
     const activeRole: TimeoRole = activeTenant?.role ?? "customer";
+    const isPlatformAdmin = activeRole === "platform_admin";
 
     return {
       user: timeoUser,
@@ -48,8 +50,11 @@ function TimeoAuthInner({
       activeTenantId,
       activeRole,
       setActiveTenant: setActiveTenantId,
+      isPlatformAdmin,
+      viewMode,
+      setViewMode,
     };
-  }, [session.data, isLoaded, isSignedIn, activeTenantId, tenants]);
+  }, [session.data, isLoaded, isSignedIn, activeTenantId, tenants, viewMode]);
 
   const tenantSwitcher = useMemo<TenantSwitcherContext>(() => {
     const activeTenant = tenants.find((t) => t.id === activeTenantId) ?? null;
