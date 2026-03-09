@@ -15,7 +15,6 @@ COPY packages/api-client/package.json ./packages/api-client/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/analytics/package.json ./packages/analytics/
 COPY packages/cms/package.json ./packages/cms/
-COPY packages/notifications/package.json ./packages/notifications/
 COPY packages/payments/package.json ./packages/payments/
 RUN pnpm install --no-frozen-lockfile --filter @timeo/api... --filter @timeo/db
 
