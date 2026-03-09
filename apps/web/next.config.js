@@ -25,7 +25,6 @@ const nextConfig = {
     "@timeo/payments",
     "@timeo/analytics",
     "@timeo/cms",
-    "@timeo/notifications",
     "recharts",
   ],
   async rewrites() {
