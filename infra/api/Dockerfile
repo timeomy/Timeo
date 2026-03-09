@@ -10,7 +10,7 @@ COPY packages/auth/package.json ./packages/auth/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/api/package.json ./packages/api/
 COPY packages/config-ts/package.json ./packages/config-ts/
-RUN pnpm install --frozen-lockfile --filter @timeo/api... --filter @timeo/db
+RUN pnpm install --no-frozen-lockfile --filter @timeo/api... --filter @timeo/db
 
 # ─── Builder ─────────────────────────────────────────────────────────────────
 FROM base AS builder

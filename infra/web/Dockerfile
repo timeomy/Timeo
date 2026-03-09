@@ -12,7 +12,7 @@ COPY packages/ui/package.json ./packages/ui/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/config-ts/package.json ./packages/config-ts/
 COPY packages/config-eslint/package.json ./packages/config-eslint/
-RUN pnpm install --frozen-lockfile --filter @timeo/web...
+RUN pnpm install --no-frozen-lockfile --filter @timeo/web...
 
 # ─── Builder ─────────────────────────────────────────────────────────────────
 FROM base AS builder
