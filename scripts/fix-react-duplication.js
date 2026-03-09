@@ -70,3 +70,50 @@ dedup(path.join(root, "node_modules/next/node_modules/react"), webReactReal);
 dedup(path.join(root, "node_modules/next/node_modules/react-dom"), webReactDomReal);
 
 console.log("React deduplication complete");
+
+// Fix HtmlContext mismatch between render.js (shared-runtime) and
+// pages.runtime.prod.js (vendored bundle). render.js creates a Provider
+// using shared-runtime HtmlContext (object A). pages.runtime.prod.js has
+// its own compiled renderToHTML that uses a vendored HtmlContext (object B).
+// A !== B → useContext in _document returns undefined → build fails.
+//
+// Fix: patch the shared-runtime module to re-export from the vendored
+// context in pages.runtime.prod.js. This makes render.js, pages.runtime,
+// and webpack chunks ALL use the same HtmlContext object (B).
+const sharedRuntimePath = path.join(
+  root,
+  "node_modules/next/dist/shared/lib/html-context.shared-runtime.js"
+);
+
+if (fs.existsSync(sharedRuntimePath)) {
+  const current = fs.readFileSync(sharedRuntimePath, "utf8");
+  if (current.includes("pages.runtime.prod")) {
+    console.log("HtmlContext shared-runtime already patched");
+  } else {
+    const patched = [
+      '"use strict";',
+      'const runtime = require("next/dist/compiled/next-server/pages.runtime.prod.js");',
+      'module.exports = runtime.vendored.contexts.HtmlContext;',
+      "",
+    ].join("\n");
+    fs.writeFileSync(sharedRuntimePath, patched);
+    console.log("Patched shared-runtime html-context → vendored context");
+  }
+}
+
+// Also restore vendored html-context files if they were previously patched
+const vendoredContexts = [
+  path.join(root, "node_modules/next/dist/server/future/route-modules/pages/vendored/contexts/html-context.js"),
+  path.join(root, "node_modules/next/dist/esm/server/future/route-modules/pages/vendored/contexts/html-context.js"),
+];
+
+const originalVendored = '"use strict";\nmodule.exports = require("../../module.compiled").vendored["contexts"].HtmlContext;\n';
+
+for (const ctxPath of vendoredContexts) {
+  if (!fs.existsSync(ctxPath)) continue;
+  const current = fs.readFileSync(ctxPath, "utf8");
+  if (current.includes("html-context.shared-runtime")) {
+    fs.writeFileSync(ctxPath, originalVendored);
+    console.log(`Restored vendored: ${path.relative(root, ctxPath)}`);
+  }
+}
