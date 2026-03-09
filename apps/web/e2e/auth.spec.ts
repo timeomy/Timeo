@@ -167,4 +167,138 @@ test.describe("Auth Flow", () => {
       /at least 8 characters/i
     );
   });
+
+  test("successful sign-in redirects to post-login page", async ({
+    page,
+  }) => {
+    // Use seeded test user credentials (assumes db seed has been run)
+    await page.goto("/sign-in");
+    await expect(page.locator("h1")).toContainText(/welcome back/i);
+
+    await page.fill("#email", "gym@demo.my");
+    await page.fill("#password", "GymAdmin123!");
+    await page.click('button[type="submit"]');
+
+    // Should redirect away from sign-in to post-login
+    await expect(page).not.toHaveURL(/\/sign-in/, { timeout: 15000 });
+    // Verify redirect goes to post-login (or dashboard if tenant already exists)
+    await expect(page).toHaveURL(
+      /(\/post-login|\/dashboard|\/onboarding)/,
+      { timeout: 15000 }
+    );
+  });
+
+  test("business login link on navbar goes to sign-in", async ({ page }) => {
+    // Verify the navbar "Business Login" link exists and goes to /sign-in
+    await page.goto("/");
+    const businessLoginLink = page.getByRole("link", {
+      name: /business login/i,
+    });
+    await expect(businessLoginLink).toBeVisible();
+    await businessLoginLink.click();
+
+    // Should navigate to sign-in page
+    await expect(page).toHaveURL(/\/sign-in/, { timeout: 8000 });
+    await expect(page.locator("h1")).toContainText(/welcome back/i);
+  });
+
+  test("sign-in with redirect parameter goes to specified page", async ({
+    page,
+  }) => {
+    // Test that the redirect parameter is respected (but safe)
+    await page.goto("/sign-in?redirect=/dashboard");
+    await expect(page.locator("h1")).toContainText(/welcome back/i);
+
+    // Fill in seeded credentials
+    await page.fill("#email", "gym@demo.my");
+    await page.fill("#password", "GymAdmin123!");
+    await page.click('button[type="submit"]');
+
+    // Should redirect to the specified page
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
+  });
+});
+
+test.describe("Dashboard Access", () => {
+  test("dashboard loads with navigation sidebar for authenticated user", async ({
+    page,
+  }) => {
+    // Sign in first with seeded credentials
+    await page.goto("/sign-in");
+    await page.fill("#email", "gym@demo.my");
+    await page.fill("#password", "GymAdmin123!");
+    await page.click('button[type="submit"]');
+
+    // Wait for redirect and navigation to complete
+    await expect(page).not.toHaveURL(/\/sign-in/, { timeout: 15000 });
+
+    // Navigate to dashboard
+    await page.goto("/dashboard");
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 8000 });
+
+    // Verify dashboard loads with key sidebar navigation elements
+    // Check for sidebar links
+    await expect(page.getByRole("link", { name: /dashboard/i })).toBeVisible({
+      timeout: 8000,
+    });
+    await expect(
+      page.getByRole("link", { name: /services/i })
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: /products/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /orders/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /team/i })).toBeVisible();
+
+    // Verify main dashboard content area is rendered
+    // Dashboard should have some content (stats, cards, etc.)
+    await expect(
+      page.locator("main").or(page.locator('[role="main"]'))
+    ).toBeVisible();
+  });
+
+  test("unauthenticated access to dashboard redirects to sign-in", async ({
+    page,
+  }) => {
+    // Direct access to dashboard without session cookie
+    await page.goto("/dashboard");
+
+    // Should redirect to sign-in with redirect parameter
+    await expect(page).toHaveURL(/\/sign-in\?redirect=%2Fdashboard/, {
+      timeout: 8000,
+    });
+    await expect(page.locator("h1")).toContainText(/welcome back/i);
+  });
+
+  test("sign-out from dashboard redirects to home page", async ({ page }) => {
+    // Sign in first
+    await page.goto("/sign-in");
+    await page.fill("#email", "gym@demo.my");
+    await page.fill("#password", "GymAdmin123!");
+    await page.click('button[type="submit"]');
+
+    // Wait for redirect
+    await expect(page).not.toHaveURL(/\/sign-in/, { timeout: 15000 });
+    await page.goto("/dashboard");
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 8000 });
+
+    // Find and click the logout button in the sidebar/menu
+    // Usually in a user menu or as a standalone button
+    const logoutBtn = page.getByRole("button", { name: /logout/i }).or(
+      page.getByRole("button", { name: /sign out/i })
+    );
+
+    // Try to find logout in a dropdown menu if the button isn't directly visible
+    const userMenuBtn = page.locator(
+      'button[aria-label*="user"], button[aria-label*="account"], button[aria-label*="menu"]'
+    );
+    if (await userMenuBtn.isVisible().catch(() => false)) {
+      await userMenuBtn.first().click();
+      await logoutBtn.click();
+    } else if (await logoutBtn.isVisible().catch(() => false)) {
+      await logoutBtn.click();
+    }
+
+    // After logout, should be redirected away from protected routes
+    // Give the logout handler time to complete
+    await expect(page).not.toHaveURL(/\/dashboard/, { timeout: 10000 });
+  });
 });
