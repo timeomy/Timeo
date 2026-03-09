@@ -77,7 +77,7 @@ function getTagColor(tag: string) {
 }
 
 export default function CustomerDetailPage() {
-  const params = useParams();
+  const params = useParams()!;
   const customerId = params.customerId as string;
   const { tenantId } = useTenantId();
   const [activeTab, setActiveTab] = useState<TabMode>("bookings");

@@ -18,10 +18,10 @@ export default function VerifyEmailPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [resendStatus, setResendStatus] = useState<"idle" | "sending" | "sent">("idle");
 
-  async function handleResend() {
+  async function handleResend(): Promise<void> {
     if (!email || resendStatus === "sending") return;
     setResendStatus("sending");
-    await authClient.sendVerificationEmail({ email, callbackURL: "/" }).catch(() => null);
+    await authClient.sendVerificationEmail({ email, callbackURL: "/" }).catch((): null => null);
     setResendStatus("sent");
     setTimeout(() => setResendStatus("idle"), 5000);
   }
