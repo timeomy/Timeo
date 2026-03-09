@@ -17,9 +17,16 @@ vi.mock("@timeo/db", () => ({
     insert: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
-    execute: vi.fn(),
+    execute: vi.fn(async () => undefined),
   },
   generateId: vi.fn(() => "test_id"),
+}));
+
+// Mock redis
+vi.mock("../lib/redis.js", () => ({
+  redis: {
+    ping: vi.fn(async () => "PONG"),
+  },
 }));
 
 // Mock @timeo/db/schema
