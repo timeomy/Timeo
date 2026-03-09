@@ -5,11 +5,18 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 # ─── Dependencies ────────────────────────────────────────────────────────────
 FROM base AS deps
 COPY .npmrc package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/api/package.json ./packages/api/
 COPY packages/db/package.json ./packages/db/
 COPY packages/auth/package.json ./packages/auth/
 COPY packages/shared/package.json ./packages/shared/
-COPY packages/api/package.json ./packages/api/
 COPY packages/config-ts/package.json ./packages/config-ts/
+COPY packages/config-eslint/package.json ./packages/config-eslint/
+COPY packages/api-client/package.json ./packages/api-client/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/analytics/package.json ./packages/analytics/
+COPY packages/cms/package.json ./packages/cms/
+COPY packages/notifications/package.json ./packages/notifications/
+COPY packages/payments/package.json ./packages/payments/
 RUN pnpm install --no-frozen-lockfile --filter @timeo/api... --filter @timeo/db
 
 # ─── Builder ─────────────────────────────────────────────────────────────────
