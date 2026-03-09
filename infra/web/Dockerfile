@@ -18,6 +18,8 @@ COPY packages/analytics/package.json ./packages/analytics/
 COPY packages/cms/package.json ./packages/cms/
 COPY packages/notifications/package.json ./packages/notifications/
 COPY packages/payments/package.json ./packages/payments/
+# Limit memory during install (postinstall scripts can be heavy)
+ENV NODE_OPTIONS="--max-old-space-size=384"
 RUN pnpm install --no-frozen-lockfile --filter @timeo/web...
 
 # ─── Builder ─────────────────────────────────────────────────────────────────
@@ -41,8 +43,9 @@ ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
 ENV NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Limit build workers and memory to prevent OOM on small VPS (KVM 2, 4GB RAM)
-ENV NODE_OPTIONS="--max-old-space-size=512"
+# Aggressive memory limits for small VPS (KVM 2, 4 GB RAM)
+# 384 MB heap + 1 build worker keeps total RSS under ~600 MB
+ENV NODE_OPTIONS="--max-old-space-size=384 --max-semi-space-size=64"
 RUN NEXT_BUILD_WORKERS=1 pnpm --filter @timeo/web build
 
 # ─── Runner ──────────────────────────────────────────────────────────────────
