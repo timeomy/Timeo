@@ -50,7 +50,7 @@ export default async function CMSPage({ params }: PageProps) {
 /**
  * Generate static paths for known published pages (ISR).
  */
-export async function generateStaticParams() {
+export async function generateStaticParams(): Promise<{ tenantSlug: string; slug: string[] }[]> {
   // In production, fetch all tenants and their published pages.
   // For now, return empty to rely on ISR at request time.
   return [];

@@ -2,23 +2,62 @@
   "extends": "@timeo/config-ts/tsconfig.base.json",
   "compilerOptions": {
     "skipLibCheck": true,
-    "lib": ["dom", "dom.iterable", "ES2022"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "ES2022"
+    ],
     "module": "ESNext",
     "jsx": "preserve",
-    "plugins": [{ "name": "next" }],
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
     "paths": {
-      "@/*": ["./app/*", "./components/*", "./lib/*"],
-      "@timeo/api": ["../../packages/api"],
-      "@timeo/ui": ["../../packages/ui/src"],
-      "@timeo/ui/web": ["../../packages/ui/src/web"],
-      "@timeo/shared": ["../../packages/shared/src"],
-      "@timeo/auth": ["../../packages/auth/src"],
-      "@timeo/auth/web": ["../../packages/auth/src/web"],
-      "@timeo/cms": ["../../packages/cms/src"],
-      "@timeo/analytics": ["../../packages/analytics/src"],
-      "@timeo/analytics/web": ["../../packages/analytics/src/web"]
-    }
+      "@/*": [
+        "./app/*",
+        "./components/*",
+        "./lib/*"
+      ],
+      "@timeo/api": [
+        "../../packages/api"
+      ],
+      "@timeo/ui": [
+        "../../packages/ui/src"
+      ],
+      "@timeo/ui/web": [
+        "../../packages/ui/src/web"
+      ],
+      "@timeo/shared": [
+        "../../packages/shared/src"
+      ],
+      "@timeo/auth": [
+        "../../packages/auth/src"
+      ],
+      "@timeo/auth/web": [
+        "../../packages/auth/src/web"
+      ],
+      "@timeo/cms": [
+        "../../packages/cms/src"
+      ],
+      "@timeo/analytics": [
+        "../../packages/analytics/src"
+      ],
+      "@timeo/analytics/web": [
+        "../../packages/analytics/src/web"
+      ]
+    },
+    "strictNullChecks": false
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "../../packages/cms/src/access/**"]
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "../../packages/cms/src/access/**"
+  ]
 }
