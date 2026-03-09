@@ -8,6 +8,7 @@ import Link from "next/link";
 const navLinks = [
   { label: "Features", href: "#features" },
   { label: "Why Timeo", href: "#why-timeo" },
+  { label: "Business Login", href: "/sign-in" },
 ];
 
 const Navbar = () => {

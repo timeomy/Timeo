@@ -4,7 +4,7 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 
 # ─── Dependencies ────────────────────────────────────────────────────────────
 FROM base AS deps
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY .npmrc package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/auth/package.json ./packages/auth/
 COPY packages/api-client/package.json ./packages/api-client/
@@ -16,9 +16,10 @@ RUN pnpm install --frozen-lockfile --filter @timeo/web...
 
 # ─── Builder ─────────────────────────────────────────────────────────────────
 FROM base AS builder
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/ ./
 COPY apps/ ./apps/
 COPY packages/ ./packages/
+COPY scripts/ ./scripts/
 COPY turbo.json ./
 
 # Build-time env vars (baked into the Next.js bundle)

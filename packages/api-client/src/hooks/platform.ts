@@ -10,6 +10,7 @@ export interface PlatformTenant {
   slug: string;
   plan: string;
   status: string;
+  is_public: boolean;
   settings: Record<string, unknown>;
   branding: Record<string, unknown>;
   createdAt: string;
@@ -207,6 +208,81 @@ export function usePlatformTenantMembers(tenantId: string) {
     queryFn: () =>
       api.get<TenantMember[]>(`/api/platform/tenants/${tenantId}/members`),
     enabled: !!tenantId,
+  });
+}
+
+export function useAddPlatformTenantMember() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      tenantId,
+      email,
+      role,
+      name,
+    }: {
+      tenantId: string;
+      email: string;
+      role: "customer" | "staff" | "admin";
+      name?: string;
+    }) =>
+      api.post<TenantMember>(
+        `/api/platform/tenants/${tenantId}/members`,
+        { email, role, name },
+      ),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({
+        queryKey: queryKeys.platform.tenantMembers(vars.tenantId),
+      });
+      qc.invalidateQueries({
+        queryKey: queryKeys.platform.tenant(vars.tenantId),
+      });
+    },
+  });
+}
+
+export function useUpdatePlatformTenantMemberRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      tenantId,
+      memberId,
+      role,
+    }: {
+      tenantId: string;
+      memberId: string;
+      role: "customer" | "staff" | "admin";
+    }) =>
+      api.patch<TenantMember>(
+        `/api/platform/tenants/${tenantId}/members/${memberId}`,
+        { role },
+      ),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({
+        queryKey: queryKeys.platform.tenantMembers(vars.tenantId),
+      });
+    },
+  });
+}
+
+export function useRemovePlatformTenantMember() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      tenantId,
+      memberId,
+    }: {
+      tenantId: string;
+      memberId: string;
+    }) =>
+      api.delete(`/api/platform/tenants/${tenantId}/members/${memberId}`),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({
+        queryKey: queryKeys.platform.tenantMembers(vars.tenantId),
+      });
+      qc.invalidateQueries({
+        queryKey: queryKeys.platform.tenant(vars.tenantId),
+      });
+    },
   });
 }
 

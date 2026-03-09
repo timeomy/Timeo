@@ -29,6 +29,7 @@ import {
   User,
   ChevronDown,
   Zap,
+  Search,
 } from "lucide-react";
 
 type NavLink = {
@@ -39,6 +40,7 @@ type NavLink = {
 
 const navLinks: NavLink[] = [
   { href: "/portal", label: "Home", icon: Home },
+  { href: "/portal/directory", label: "Browse", icon: Search },
   { href: "/portal/bookings", label: "Bookings", icon: Calendar },
   { href: "/portal/packages", label: "Packages", icon: Package },
   { href: "/portal/vouchers", label: "Vouchers", icon: Ticket },
@@ -73,12 +75,14 @@ export default function PortalLayout({
       return;
     }
 
-    if (tenants.length === 0) {
-      router.replace("/onboarding");
+    // Platform admin always goes to C2
+    if (activeRole === "platform_admin") {
+      router.replace("/admin");
       return;
     }
 
-    if (activeRole !== "customer") {
+    // Staff/admin with tenants go to business dashboard
+    if (tenants.length > 0 && activeRole !== "customer") {
       router.replace("/dashboard");
     }
   }, [isLoaded, tenantsLoading, isSignedIn, tenants, activeRole, router]);
@@ -99,8 +103,8 @@ export default function PortalLayout({
     );
   }
 
-  // Show loading while redirecting
-  if (!isSignedIn || tenants.length === 0 || activeRole !== "customer") {
+  // Show loading while redirecting (staff/admin go to dashboard, platform admin to C2)
+  if (!isSignedIn || (tenants.length > 0 && activeRole !== "customer")) {
     return null;
   }
 

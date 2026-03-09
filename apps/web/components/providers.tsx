@@ -14,9 +14,9 @@ const queryClient = new QueryClient({
 
 /** Loads tenant list and wires it into the auth provider. Must be inside QueryClientProvider. */
 function TenantsLoader({ children }: { children: ReactNode }) {
-  const { data: tenants, isLoading } = useMyTenants();
+  const { tenants, platformRole, isLoading } = useMyTenants();
   return (
-    <TimeoWebAuthProvider tenants={tenants ?? []} tenantsLoading={isLoading}>
+    <TimeoWebAuthProvider tenants={tenants} tenantsLoading={isLoading} platformRole={platformRole}>
       {children}
     </TimeoWebAuthProvider>
   );

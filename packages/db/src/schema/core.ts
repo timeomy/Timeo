@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   jsonb,
   pgTable,
@@ -29,6 +30,8 @@ export const users = pgTable(
     updated_at: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    /** Platform-level role: "user" (default) or "platform_admin" */
+    role: text("role").notNull().default("user"),
   },
   (t) => [
     index("users_auth_id_idx").on(t.auth_id),
@@ -52,6 +55,8 @@ export const tenants = pgTable(
     branding: jsonb("branding").notNull().default({}),
     e_invoice_profile: jsonb("e_invoice_profile"),
     payment_gateway: paymentGatewayEnum("payment_gateway").default("stripe"),
+    /** Whether this tenant appears in the public business directory */
+    is_public: boolean("is_public").notNull().default(false),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -63,6 +68,7 @@ export const tenants = pgTable(
     index("tenants_slug_idx").on(t.slug),
     index("tenants_owner_id_idx").on(t.owner_id),
     index("tenants_status_idx").on(t.status),
+    index("tenants_is_public_idx").on(t.is_public),
   ],
 );
 

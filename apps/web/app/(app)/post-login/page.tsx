@@ -21,7 +21,13 @@ export default function PostLoginPage() {
       return;
     }
 
-    // No tenant memberships — go to portal
+    // Platform admin always goes to C2 control center
+    if (activeRole === "platform_admin") {
+      router.replace("/admin");
+      return;
+    }
+
+    // No tenant memberships — go to portal (which may redirect to onboarding)
     if (tenants.length === 0) {
       router.replace("/portal");
       return;

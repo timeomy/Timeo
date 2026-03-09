@@ -145,7 +145,8 @@ function TenantSwitcher() {
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { user, signOut, activeRole } = useTimeoWebAuthContext();
+  const router = useRouter();
+  const { user, signOut, activeRole, isPlatformAdmin, setViewMode } = useTimeoWebAuthContext();
   const flags = useFeatureFlags();
 
   const displayName = user?.name || user?.email || "User";
@@ -217,17 +218,20 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <Separator className="bg-white/[0.06]" />
 
-      {/* Platform C2 Link (platform_admin only) */}
-      {activeRole === "platform_admin" && (
+      {/* Platform C2 Link (platform_admin only — visible in tenant mode too) */}
+      {isPlatformAdmin && (
         <div className="p-3">
-          <Link
-            href="/admin"
-            onClick={onNavigate}
-            className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm font-medium text-primary transition-all hover:bg-primary/10"
+          <button
+            onClick={() => {
+              setViewMode("platform");
+              router.push("/admin");
+              onNavigate?.();
+            }}
+            className="flex w-full items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm font-medium text-primary transition-all hover:bg-primary/10"
           >
             <Shield className="h-4 w-4" />
             C2 Control Center
-          </Link>
+          </button>
         </div>
       )}
 
@@ -281,6 +285,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isLoaded || tenantsLoading) return;
     if (!isSignedIn) { router.replace("/sign-in"); return; }
+    if (activeRole === "platform_admin") { router.replace("/admin"); return; }
     if (tenants.length === 0) { router.replace("/portal"); return; }
     if (activeRole === "customer") { router.replace("/portal"); }
   }, [isLoaded, tenantsLoading, isSignedIn, tenants, activeRole, router]);

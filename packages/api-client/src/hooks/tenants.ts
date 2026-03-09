@@ -32,12 +32,25 @@ interface TenantWithRole extends Tenant {
   role: TimeoRole;
 }
 
+interface MyTenantsResponse {
+  tenants: TenantWithRole[];
+  platformRole: "platform_admin" | "user";
+}
+
 export function useMyTenants() {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.tenants.mine(),
-    queryFn: () => api.get<TenantWithRole[]>("/api/tenants/mine"),
+    queryFn: () => api.get<MyTenantsResponse>("/api/tenants/mine"),
     staleTime: 60_000,
   });
+
+  return {
+    ...query,
+    /** Flat tenant list (backwards-compatible) */
+    tenants: query.data?.tenants ?? [],
+    /** Platform-level role from users table */
+    platformRole: query.data?.platformRole ?? "user",
+  };
 }
 
 export function useTenant(tenantId: string | null | undefined) {
@@ -113,6 +126,40 @@ export function useTenantFeatureFlags(tenantId: string | null | undefined) {
       api.get<Record<string, boolean>>(`/api/tenants/${tenantId}/feature-flags`),
     enabled: !!tenantId,
     staleTime: 60_000,
+  });
+}
+
+interface PublicTenant {
+  id: string;
+  name: string;
+  slug: string;
+  logo?: string;
+  logoUrl?: string;
+  primaryColor?: string;
+}
+
+export function usePublicTenants(search?: string) {
+  return useQuery({
+    queryKey: queryKeys.tenants.public(search),
+    queryFn: () => {
+      const params = search ? `?search=${encodeURIComponent(search)}` : "";
+      return api.get<PublicTenant[]>(`/api/tenants/public${params}`);
+    },
+    staleTime: 30_000,
+  });
+}
+
+export function useJoinTenant() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (slug: string) =>
+      api.post<{ tenantId: string; tenantName: string }>("/api/tenants/join", {
+        slug,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenants.mine() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenants.all() });
+    },
   });
 }
 
