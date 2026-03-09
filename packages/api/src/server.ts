@@ -11,6 +11,7 @@ import { redis, redisSubscriber } from "./lib/redis.js";
 import { isConfigured as isRMConfigured } from "./services/revenue-monster.service.js";
 import { runSendBookingReminders } from "./jobs/send-booking-reminders.js";
 import { runAutoCancelNoShows } from "./jobs/auto-cancel-no-shows.js";
+import { initMqtt } from "./services/mqtt.service.js";
 
 const PORT = parseInt(process.env.PORT ?? "4000", 10);
 
@@ -77,6 +78,9 @@ async function main() {
   );
 
   initSocketIO(httpServer);
+
+  // Initialize MQTT for turnstile device communication
+  initMqtt();
 
   // Schedule periodic jobs (interval-based — avoids BullMQ worker complexity)
   const ONE_HOUR = 60 * 60 * 1000;

@@ -8,7 +8,7 @@ export { authClient } from "./auth-client";
 export { timeoMiddleware, middlewareMatcher } from "./middleware";
 
 // Re-export shared types and utils for convenience
-export type { TimeoAuthContext, TenantSwitcherContext, TimeoRole, TenantInfo, RoleContext } from "../types";
+export type { TimeoAuthContext, TenantSwitcherContext, TimeoRole, TenantInfo, RoleContext, ViewMode } from "../types";
 export { ROLES, isRoleAtLeast } from "../types";
 export { hasPermission, PERMISSIONS } from "../permissions";
 export type { Resource } from "../permissions";

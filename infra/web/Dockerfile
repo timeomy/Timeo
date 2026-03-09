@@ -41,9 +41,8 @@ ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
 ENV NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# 1024 MB is the minimum for compiling 55+ Next.js pages with SWC
-# Single build worker keeps total RSS manageable on 4 GB VPS
-ENV NODE_OPTIONS="--max-old-space-size=1024"
+# Limit build memory to prevent OOM on small VPS (KVM 2, 4 GB RAM)
+ENV NODE_OPTIONS="--max-old-space-size=512"
 RUN NEXT_BUILD_WORKERS=1 pnpm --filter @timeo/web build
 
 # ─── Runner ──────────────────────────────────────────────────────────────────
@@ -64,4 +63,3 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 CMD ["node", "apps/web/server.js"]
-

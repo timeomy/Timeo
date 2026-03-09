@@ -2,6 +2,11 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db, user, session, account, verification } from "@timeo/db";
 import { sendMail } from "./email.js";
+import {
+  passwordResetEmail,
+  verificationEmail,
+  passwordResetSuccessEmail,
+} from "./email-templates.js";
 
 const siteUrl = process.env.SITE_URL ?? "http://localhost:3000";
 const apiUrl = process.env.API_URL ?? "http://localhost:4000";
@@ -35,20 +40,38 @@ export const auth = betterAuth({
     requireEmailVerification: true,
     sendResetPassword: async ({ user, url }) => {
       const safeUrl = url.replace(/[<>"'&]/g, "");
+      const email = passwordResetEmail({
+        name: user.name || user.email,
+        url: safeUrl,
+      });
       await sendMail({
         to: user.email,
-        subject: "Reset your Timeo password",
-        html: `<p>Click <a href="${safeUrl}">here</a> to reset your password. This link expires in 1 hour.</p>`,
+        subject: email.subject,
+        html: email.html,
+      });
+    },
+    onPasswordReset: async ({ user }) => {
+      const email = passwordResetSuccessEmail({
+        name: user.name || user.email,
+      });
+      await sendMail({
+        to: user.email,
+        subject: email.subject,
+        html: email.html,
       });
     },
   },
   emailVerification: {
     sendVerificationEmail: async ({ user, url }) => {
       const safeUrl = url.replace(/[<>"'&]/g, "");
+      const email = verificationEmail({
+        name: user.name || user.email,
+        url: safeUrl,
+      });
       await sendMail({
         to: user.email,
-        subject: "Verify your Timeo email",
-        html: `<p>Click <a href="${safeUrl}">here</a> to verify your email address.</p>`,
+        subject: email.subject,
+        html: email.html,
       });
     },
     autoSignInAfterVerification: true,

@@ -79,7 +79,36 @@ export async function getBookingAnalytics(
     )
     .groupBy(bookings.status);
 
-  return statusCounts;
+  // Transform into the shape the client expects
+  const bookingsByStatus: Record<string, number> = {};
+  let totalBookings = 0;
+  let completedBookings = 0;
+  let cancelledBookings = 0;
+  let noShowBookings = 0;
+
+  for (const row of statusCounts) {
+    const cnt = Number(row.count);
+    bookingsByStatus[row.status] = cnt;
+    totalBookings += cnt;
+    if (row.status === "completed") completedBookings = cnt;
+    if (row.status === "cancelled") cancelledBookings = cnt;
+    if (row.status === "no_show") noShowBookings = cnt;
+  }
+
+  const completionRate =
+    totalBookings > 0
+      ? Math.round((completedBookings / totalBookings) * 100)
+      : 0;
+
+  return {
+    totalBookings,
+    completedBookings,
+    cancelledBookings,
+    noShowBookings,
+    completionRate,
+    byDay: [],
+    bookingsByStatus,
+  };
 }
 
 export async function getTopServices(
@@ -131,12 +160,31 @@ export async function getOrderAnalytics(
     )
     .groupBy(orders.status);
 
-  const totalRevenue = statusCounts.reduce(
-    (acc, row) => acc + Number(row.totalRevenue ?? 0),
-    0,
-  );
+  // Transform into the shape the client expects
+  const ordersByStatus: Record<string, number> = {};
+  let totalOrders = 0;
+  let completedOrders = 0;
+  let cancelledOrders = 0;
+  let totalRevenue = 0;
 
-  return { statusCounts, totalRevenue };
+  for (const row of statusCounts) {
+    const cnt = Number(row.count);
+    ordersByStatus[row.status] = cnt;
+    totalOrders += cnt;
+    totalRevenue += Number(row.totalRevenue ?? 0);
+    if (row.status === "completed") completedOrders = cnt;
+    if (row.status === "cancelled") cancelledOrders = cnt;
+  }
+
+  return {
+    totalOrders,
+    completedOrders,
+    cancelledOrders,
+    totalRevenue,
+    currency: "MYR",
+    byDay: [],
+    ordersByStatus,
+  };
 }
 
 export async function getTopProducts(

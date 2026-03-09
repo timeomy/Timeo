@@ -8,6 +8,8 @@ export type AuthUser = {
   email: string;
   name: string;
   authId: string;
+  /** Platform-level role: "user" or "platform_admin" */
+  role: string;
 };
 
 declare module "hono" {
@@ -53,6 +55,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
     email: appUser.email,
     name: appUser.name,
     authId: session.user.id,
+    role: appUser.role ?? "user",
   });
 
   await next();
@@ -75,6 +78,7 @@ export const optionalAuth = createMiddleware(async (c, next) => {
           email: appUser.email,
           name: appUser.name,
           authId: session.user.id,
+          role: appUser.role ?? "user",
         });
       }
     }
