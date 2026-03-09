@@ -23,7 +23,7 @@ export default function DirectoryPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(
+  const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(
     null
   );
 
