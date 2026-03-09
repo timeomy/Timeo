@@ -18,10 +18,10 @@ import {
   featureFlags,
 } from "./schema/index";
 
-// Use dynamic import for bcryptjs (ESM compat)
+// Use Better Auth's scrypt-based password hashing (same format as runtime)
 async function hashPassword(password: string): Promise<string> {
-  const bcrypt = await import("bcryptjs");
-  return bcrypt.hash(password, 10);
+  const { hashPassword: baHashPassword } = await import("better-auth/crypto");
+  return baHashPassword(password);
 }
 
 // ─── Seed Data Definitions ──────────────────────────────────────────────────
