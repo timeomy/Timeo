@@ -19,9 +19,17 @@ const Footer = () => {
             <span className="text-lg font-bold font-display text-gradient-gold">Timeo</span>
           </Link>
         </motion.div>
-        <p className="text-sm text-muted-foreground">
-          &copy; {new Date().getFullYear()} Timeo. All rights reserved.
-        </p>
+        <div className="flex items-center gap-6">
+          <Link
+            href="/sign-in"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Business Login
+          </Link>
+          <p className="text-sm text-muted-foreground">
+            &copy; {new Date().getFullYear()} Timeo. All rights reserved.
+          </p>
+        </div>
       </div>
     </footer>
   );

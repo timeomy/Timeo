@@ -18,3 +18,4 @@ export * from "./platform";
 export * from "./files";
 export * from "./einvoice";
 export * from "./loyalty";
+export * from "./access-control";

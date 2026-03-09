@@ -1,0 +1,23 @@
+name = "turnstile-bridge"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# Enable Durable Objects
+[[durable_objects.bindings]]
+name = "TURNSTILE_SOCKETS"
+class_name = "TurnstileSocketManager"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["TurnstileSocketManager"]
+
+# Routes
+routes = [
+  { pattern = "gate.wsfitness.my/turnstile/*", zone_name = "wsfitness.my" }
+]
+
+[vars]
+SUPABASE_URL = "https://vbeygycoopxwmvjtxdyp.supabase.co"
+# Add SUPABASE_ANON_KEY and TURNSTILE_SHARED_SECRET as secrets via:
+# wrangler secret put SUPABASE_ANON_KEY
+# wrangler secret put TURNSTILE_SHARED_SECRET

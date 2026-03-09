@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useTimeoWebAuthContext } from "@timeo/auth/web";
+import { useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
 import { getInitials } from "@timeo/shared";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
 import {
@@ -54,7 +54,9 @@ const sidebarLinks: SidebarLink[] = [
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { user, signOut } = useTimeoWebAuthContext();
+  const router = useRouter();
+  const { user, signOut, setViewMode } = useTimeoWebAuthContext();
+  const { tenants } = useTimeoWebTenantContext();
 
   const displayName = user?.name || user?.email || "User";
 
@@ -121,17 +123,22 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <Separator className="bg-white/[0.06]" />
 
-      {/* Back to Dashboard Link */}
-      <div className="p-3">
-        <Link
-          href="/dashboard"
-          onClick={onNavigate}
-          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-all hover:bg-white/[0.06] hover:text-foreground"
-        >
-          <LayoutDashboard className="h-4 w-4" />
-          Back to Dashboard
-        </Link>
-      </div>
+      {/* Back to Dashboard — only if user has tenant memberships */}
+      {tenants.length > 0 && (
+        <div className="p-3">
+          <button
+            onClick={() => {
+              setViewMode("tenant");
+              router.push("/dashboard");
+              onNavigate?.();
+            }}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-all hover:bg-white/[0.06] hover:text-foreground"
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Back to Dashboard
+          </button>
+        </div>
+      )}
 
       <Separator className="bg-white/[0.06]" />
 
@@ -167,15 +174,20 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export default function PlatformLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { isLoaded, isSignedIn, activeRole } = useTimeoWebAuthContext();
+  const { isLoaded, isSignedIn, isPlatformAdmin, setViewMode } = useTimeoWebAuthContext();
   useEnsureUser(!!isSignedIn);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Ensure viewMode is "platform" when on C2 pages
+  useEffect(() => {
+    if (isPlatformAdmin) setViewMode("platform");
+  }, [isPlatformAdmin, setViewMode]);
 
   useEffect(() => {
     if (!isLoaded) return;
     if (!isSignedIn) { router.replace("/sign-in"); return; }
-    if (activeRole !== "platform_admin") { router.replace("/dashboard"); }
-  }, [isLoaded, isSignedIn, activeRole, router]);
+    if (!isPlatformAdmin) { router.replace("/dashboard"); }
+  }, [isLoaded, isSignedIn, isPlatformAdmin, router]);
 
   if (!isLoaded) {
     return (
@@ -192,7 +204,7 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
     );
   }
 
-  if (!isSignedIn || activeRole !== "platform_admin") {
+  if (!isSignedIn || !isPlatformAdmin) {
     return null;
   }
 

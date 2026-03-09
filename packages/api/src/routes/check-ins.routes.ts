@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { db } from "@timeo/db";
 import { checkIns, users } from "@timeo/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, gte, sql, count } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
 import { requireRole } from "../middleware/rbac.js";
@@ -11,6 +11,101 @@ import { CreateCheckInSchema } from "../lib/validation.js";
 import * as CheckInService from "../services/check-in.service.js";
 
 const app = new Hono();
+
+// GET /tenants/:tenantId/check-ins/stats
+app.get(
+  "/stats",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin", "staff"),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekStart = new Date(todayStart);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    try {
+      // Today's check-ins
+      const [todayRow] = await db
+        .select({ count: count() })
+        .from(checkIns)
+        .where(
+          and(
+            eq(checkIns.tenant_id, tenantId),
+            gte(checkIns.timestamp, todayStart),
+          ),
+        );
+
+      // This week's check-ins
+      const [weekRow] = await db
+        .select({ count: count() })
+        .from(checkIns)
+        .where(
+          and(
+            eq(checkIns.tenant_id, tenantId),
+            gte(checkIns.timestamp, weekStart),
+          ),
+        );
+
+      // This month's check-ins
+      const [monthRow] = await db
+        .select({ count: count() })
+        .from(checkIns)
+        .where(
+          and(
+            eq(checkIns.tenant_id, tenantId),
+            gte(checkIns.timestamp, monthStart),
+          ),
+        );
+
+      // Unique users today
+      const [uniqueRow] = await db
+        .select({ count: sql<number>`count(DISTINCT ${checkIns.user_id})` })
+        .from(checkIns)
+        .where(
+          and(
+            eq(checkIns.tenant_id, tenantId),
+            gte(checkIns.timestamp, todayStart),
+          ),
+        );
+
+      // By method today
+      const methodRows = await db
+        .select({
+          method: checkIns.method,
+          count: count(),
+        })
+        .from(checkIns)
+        .where(
+          and(
+            eq(checkIns.tenant_id, tenantId),
+            gte(checkIns.timestamp, todayStart),
+          ),
+        )
+        .groupBy(checkIns.method);
+
+      const byMethod: Record<string, number> = { qr: 0, nfc: 0, manual: 0 };
+      for (const row of methodRows) {
+        byMethod[row.method] = Number(row.count);
+      }
+
+      return c.json(
+        success({
+          today: Number(todayRow?.count ?? 0),
+          thisWeek: Number(weekRow?.count ?? 0),
+          monthCount: Number(monthRow?.count ?? 0),
+          uniqueToday: Number(uniqueRow?.count ?? 0),
+          byMethod,
+        }),
+      );
+    } catch (err) {
+      return c.json(error("CHECKIN_STATS_ERROR", (err as Error).message), 500);
+    }
+  },
+);
 
 // GET /tenants/:tenantId/check-ins
 app.get(

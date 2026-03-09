@@ -1,0 +1,203 @@
+/* Fonts loaded via preconnect + swap in index.html for faster rendering */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+
+    --card: 220 20% 11%;
+    --card-foreground: 0 0% 100%;
+
+    --popover: 220 20% 11%;
+    --popover-foreground: 0 0% 100%;
+
+    --primary: 174 72% 56%;
+    --primary-foreground: 0 0% 0%;
+
+    --secondary: 200 10% 25%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 15% 15%;
+    --muted-foreground: 200 10% 70%;
+
+    --accent: 270 60% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 10% 18%;
+    --input: 220 15% 15%;
+    --ring: 174 72% 56%;
+
+    --radius: 0.75rem;
+
+    /* QR (standardized across Admin + Member) */
+    --qr-bg: 0 0% 100%;
+    --qr-fg: 0 0% 5%;
+
+    /* iOS-style colors */
+    --teal: 174 72% 56%;
+    --purple: 270 60% 60%;
+    --ios-card: 220 20% 11%;
+
+    /* Gradients */
+    --gradient-neon: linear-gradient(135deg, hsl(174, 72%, 56%), hsl(190, 80%, 50%));
+    --gradient-purple: linear-gradient(135deg, hsl(270, 60%, 60%), hsl(300, 60%, 60%));
+
+    /* Shadows */
+    --shadow-neon: 0 0 20px hsl(174, 72%, 56%, 0.3);
+    --shadow-glow: 0 0 40px hsl(174, 72%, 56%, 0.2);
+    --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.4);
+
+    --sidebar-background: 0 0% 0%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 174 72% 56%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 220 15% 12%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 220 10% 18%;
+    --sidebar-ring: 174 72% 56%;
+  }
+
+  .dark {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --card: 220 20% 11%;
+    --card-foreground: 0 0% 100%;
+    --popover: 220 20% 11%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 174 72% 56%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 200 10% 25%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 220 15% 15%;
+    --muted-foreground: 200 10% 70%;
+    --accent: 270 60% 60%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 10% 18%;
+    --input: 220 15% 15%;
+    --ring: 174 72% 56%;
+    
+    /* QR (standardized across Admin + Member) */
+    --qr-bg: 0 0% 100%;
+    --qr-fg: 0 0% 5%;
+    
+    --sidebar-background: 0 0% 0%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 174 72% 56%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 220 15% 12%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 220 10% 18%;
+    --sidebar-ring: 174 72% 56%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply dark;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', sans-serif;
+    /* Prevent white flash on page load */
+    opacity: 1;
+  }
+
+  /* Ensure root element is visible immediately */
+  #root {
+    opacity: 1;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 0.05em;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-neon);
+  }
+
+  .bg-gradient-neon {
+    background-image: var(--gradient-neon);
+  }
+
+  .bg-gradient-purple {
+    background-image: var(--gradient-purple);
+  }
+
+  .glow {
+    box-shadow: var(--shadow-neon);
+  }
+
+  .glow-lg {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .glass {
+    @apply bg-card backdrop-blur-xl;
+  }
+
+  .neon-border {
+    @apply border border-border;
+  }
+
+  /* iOS-style pill badges */
+  .pill-teal {
+    @apply px-3 py-1 rounded-full text-xs font-semibold;
+    background-color: hsl(var(--teal) / 0.2);
+    color: hsl(var(--teal));
+  }
+
+  .pill-purple {
+    @apply px-3 py-1 rounded-full text-xs font-semibold;
+    background-color: hsl(var(--purple) / 0.2);
+    color: hsl(var(--purple));
+  }
+
+  /* iOS card style */
+  .ios-card {
+    @apply bg-card rounded-2xl;
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Safe area for iOS */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.5);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary));
+}

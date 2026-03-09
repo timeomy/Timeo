@@ -6,6 +6,8 @@ export const SocketEvents = {
   POS_TRANSACTION_CREATED: "pos:transaction_created",
   NOTIFICATION_NEW: "notification:new",
   CHECKIN_CREATED: "checkin:created",
+  ACCESS_ATTEMPT: "access:attempt",
+  FACE_REGISTERED: "face:registered",
 } as const;
 
 export type SocketEvent = (typeof SocketEvents)[keyof typeof SocketEvents];

@@ -4,7 +4,7 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 
 # ─── Dependencies ────────────────────────────────────────────────────────────
 FROM base AS deps
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY .npmrc package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/auth/package.json ./packages/auth/
 COPY packages/api-client/package.json ./packages/api-client/
@@ -12,13 +12,20 @@ COPY packages/ui/package.json ./packages/ui/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/config-ts/package.json ./packages/config-ts/
 COPY packages/config-eslint/package.json ./packages/config-eslint/
-RUN pnpm install --frozen-lockfile --filter @timeo/web...
+COPY packages/db/package.json ./packages/db/
+COPY packages/api/package.json ./packages/api/
+COPY packages/analytics/package.json ./packages/analytics/
+COPY packages/cms/package.json ./packages/cms/
+COPY packages/notifications/package.json ./packages/notifications/
+COPY packages/payments/package.json ./packages/payments/
+RUN pnpm install --no-frozen-lockfile --filter @timeo/web...
 
 # ─── Builder ─────────────────────────────────────────────────────────────────
 FROM base AS builder
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/ ./
 COPY apps/ ./apps/
 COPY packages/ ./packages/
+COPY scripts/ ./scripts/
 COPY turbo.json ./
 
 # Build-time env vars (baked into the Next.js bundle)
@@ -34,7 +41,8 @@ ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
 ENV NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Limit build workers to prevent CPU overload on small VPS (KVM 2)
+# 1024 MB is the minimum for compiling 55+ Next.js pages with SWC
+# Single build worker keeps total RSS manageable on 4 GB VPS
 ENV NODE_OPTIONS="--max-old-space-size=1024"
 RUN NEXT_BUILD_WORKERS=1 pnpm --filter @timeo/web build
 

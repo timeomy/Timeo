@@ -39,6 +39,7 @@ export const membershipStatusEnum = pgEnum("membership_status", [
   "active",
   "invited",
   "suspended",
+  "removed",
 ]);
 
 // ─── Booking ─────────────────────────────────────────────────────────────────
@@ -126,6 +127,32 @@ export const checkInMethodEnum = pgEnum("check_in_method", [
   "qr",
   "nfc",
   "manual",
+  "face",
+]);
+
+// ─── Access Control ─────────────────────────────────────────────────────────
+export const turnstileMatchModeEnum = pgEnum("turnstile_match_mode", [
+  "online",
+  "auto",
+  "offline_fallback",
+]);
+
+export const turnstileStatusEnum = pgEnum("turnstile_status", [
+  "active",
+  "inactive",
+]);
+
+export const faceRegistrationStatusEnum = pgEnum("face_registration_status", [
+  "pending",
+  "synced",
+  "failed",
+  "deleted",
+]);
+
+export const accessResultEnum = pgEnum("access_result", [
+  "allowed",
+  "denied",
+  "stranger",
 ]);
 
 export const sessionTypeEnum = pgEnum("session_type", [

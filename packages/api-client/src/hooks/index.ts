@@ -14,6 +14,8 @@ export {
   useUpdateTenantBranding,
   useTenantFeatureFlags,
   useInviteStaff,
+  usePublicTenants,
+  useJoinTenant,
 } from "./tenants";
 
 export {
@@ -182,6 +184,9 @@ export {
   usePlatformTenants,
   usePlatformTenant,
   usePlatformTenantMembers,
+  useAddPlatformTenantMember,
+  useUpdatePlatformTenantMemberRole,
+  useRemovePlatformTenantMember,
   useCreatePlatformTenant,
   useSuspendPlatformTenant,
   useActivatePlatformTenant,

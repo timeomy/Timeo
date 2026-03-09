@@ -1,0 +1,50 @@
+{
+  "addr_name": "",
+  "addr_no": "",
+  "cap_time": "2022/07/27 12:00:48.749",
+  "closeup_pic": {
+    "data": "base64 string (省略)",
+    "face_height": 782,
+    "face_width": 544,
+    "face_x": 409,
+    "face_y": 221,
+    "format": "jpg"
+  },
+  "closeup_pic_flag": true,
+  "cmd": "face",
+  "device_no": "",
+  "device_sn": "01234E-D16546-E1BCEE",
+  "is_realtime": 1,
+  "match": {
+    "customer_text": "",
+    "format": "jpg",
+    "image": "base64 string (省略)",
+    "is_encryption": false,
+    "match_type": [
+      "face"
+    ],
+    "origin": "none",
+    "person_attr": "permanent_list",
+    "person_id": "1656671807508",
+    "person_name": "bin",
+    "person_role": 1,
+    "wg_card_id": 8
+  },
+  "match_failed_reson": 0,
+  "match_result": 95,
+  "overall_pic_flag": false,
+  "person": {
+    "age": 0,
+    "face_quality": 100,
+    "has_mask": false,
+    "hat": "none",
+    "rotate_angle": 0,
+    "sex": "",
+    "temperatur": 36.108234405517578,
+    "turn_angle": 2,
+    "wg_card_id": 8
+  },
+  "sequence_no": 4,
+  "version": "0.42",
+  "video_flag": false
+}

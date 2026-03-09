@@ -17,19 +17,91 @@ import {
   QrCode,
   ArrowRight,
   Sparkles,
+  Search,
+  KeyRound,
+  Zap,
 } from "lucide-react";
 
 export default function PortalHomePage() {
   const { user } = useTimeoWebAuthContext();
   const { tenantId, tenant } = useTenantId();
 
+  const firstName = user?.name?.split(" ")[0] ?? "there";
+
+  // If user has no tenant membership, show onboarding card
+  if (!tenantId) {
+    return <NoTenantOnboarding firstName={firstName} />;
+  }
+
+  return <TenantDashboard tenantId={tenantId} tenant={tenant} firstName={firstName} />;
+}
+
+function NoTenantOnboarding({ firstName }: { firstName: string }) {
+  return (
+    <div className="space-y-8">
+      <div className="py-8 text-center">
+        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10">
+          <Zap className="h-10 w-10 text-primary" />
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+          Welcome to Timeo, {firstName}!
+        </h1>
+        <p className="mx-auto mt-2 max-w-md text-base text-white/50">
+          Join a business to start booking appointments, earning rewards, and
+          managing your memberships.
+        </p>
+      </div>
+
+      <div className="mx-auto grid max-w-lg gap-4 sm:grid-cols-2">
+        <Link href="/portal/directory">
+          <Card className="glass h-full border-white/[0.08] transition-colors hover:border-primary/30 hover:bg-white/[0.04]">
+            <CardContent className="flex flex-col items-center gap-3 p-6 text-center">
+              <div className="rounded-xl bg-primary/10 p-3">
+                <Search className="h-7 w-7 text-primary" />
+              </div>
+              <div>
+                <p className="font-semibold text-white">Browse Businesses</p>
+                <p className="mt-1 text-xs text-white/50">
+                  Discover gyms, salons, clinics and more near you
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/join">
+          <Card className="glass h-full border-white/[0.08] transition-colors hover:border-primary/30 hover:bg-white/[0.04]">
+            <CardContent className="flex flex-col items-center gap-3 p-6 text-center">
+              <div className="rounded-xl bg-amber-500/10 p-3">
+                <KeyRound className="h-7 w-7 text-amber-400" />
+              </div>
+              <div>
+                <p className="font-semibold text-white">Have a Code?</p>
+                <p className="mt-1 text-xs text-white/50">
+                  Enter a business code to join directly
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function TenantDashboard({
+  tenantId,
+  tenant,
+  firstName,
+}: {
+  tenantId: string;
+  tenant: { name?: string } | null;
+  firstName: string;
+}) {
   const { data: bookings, isLoading: bookingsLoading } = useMyBookings(tenantId);
   const { data: credits, isLoading: creditsLoading } = useSessionCredits(tenantId);
   const { data: vouchers, isLoading: vouchersLoading } = useVouchers(tenantId);
 
-  const firstName = user?.name?.split(" ")[0] ?? "there";
-
-  // Count upcoming bookings (status is pending or confirmed, startTime in the future)
   const now = Date.now();
   const upcomingCount =
     bookings?.filter(
@@ -61,7 +133,6 @@ export default function PortalHomePage() {
 
       {/* Quick Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
-        {/* Upcoming Bookings */}
         <Card className="glass border-white/[0.08]">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -82,7 +153,6 @@ export default function PortalHomePage() {
           </CardContent>
         </Card>
 
-        {/* Session Credits */}
         <Card className="glass border-white/[0.08]">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -103,7 +173,6 @@ export default function PortalHomePage() {
           </CardContent>
         </Card>
 
-        {/* Active Vouchers */}
         <Card className="glass border-white/[0.08]">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -127,9 +196,7 @@ export default function PortalHomePage() {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="mb-4 text-lg font-semibold text-white">
-          Quick Actions
-        </h2>
+        <h2 className="mb-4 text-lg font-semibold text-white">Quick Actions</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Link href="/portal/bookings">
             <Card className="glass border-white/[0.08] transition-colors hover:border-white/[0.15] hover:bg-white/[0.04]">
@@ -188,9 +255,7 @@ export default function PortalHomePage() {
       {bookings && bookings.length > 0 && (
         <div>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">
-              Recent Bookings
-            </h2>
+            <h2 className="text-lg font-semibold text-white">Recent Bookings</h2>
             <Link
               href="/portal/bookings"
               className="text-sm text-primary hover:underline"
@@ -200,10 +265,7 @@ export default function PortalHomePage() {
           </div>
           <div className="space-y-3">
             {bookings.slice(0, 3).map((booking) => (
-              <Card
-                key={booking.id}
-                className="glass border-white/[0.08]"
-              >
+              <Card key={booking.id} className="glass border-white/[0.08]">
                 <CardContent className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-3">
                     <div className="rounded-lg bg-white/[0.04] p-2">
@@ -255,7 +317,9 @@ function StatusBadge({ status }: { status: string }) {
         styles[status] ?? "bg-gray-500/15 text-gray-400 border-gray-500/30"
       )}
     >
-      {status === "no_show" ? "No Show" : status.charAt(0).toUpperCase() + status.slice(1)}
+      {status === "no_show"
+        ? "No Show"
+        : status.charAt(0).toUpperCase() + status.slice(1)}
     </span>
   );
 }

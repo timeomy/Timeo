@@ -1,0 +1,70 @@
+project_id = "vbeygycoopxwmvjtxdyp"
+
+[functions.email-hook]
+verify_jwt = false
+
+[functions.create-it-admin]
+verify_jwt = false
+
+[functions.seed-demo-data]
+verify_jwt = false
+
+[functions.create-user]
+verify_jwt = false
+
+[functions.delete-user]
+verify_jwt = false
+
+[functions.update-user]
+verify_jwt = false
+
+[functions.expire-memberships]
+verify_jwt = false
+
+[functions.send-expiry-reminders]
+verify_jwt = false
+
+[functions.check-access]
+verify_jwt = false
+
+[functions.gate-sync]
+verify_jwt = false
+
+[functions.send-member-notification]
+verify_jwt = false
+
+[functions.cleanup-orders]
+verify_jwt = false
+
+[functions.verify-access]
+verify_jwt = false
+
+[functions.zah-gate]
+verify_jwt = false
+
+[functions.send-password-reset]
+verify_jwt = false
+
+[functions.check-expiring-members]
+verify_jwt = false
+
+[functions.notify-day-pass]
+verify_jwt = false
+
+[functions.turnstile-face-callback]
+verify_jwt = false
+
+[functions.turnstile-face-enroll]
+verify_jwt = false
+
+[functions.sync-user-to-turnstile]
+verify_jwt = false
+
+[functions.check-turnstile-access]
+verify_jwt = false
+
+[functions.sync-to-camera]
+verify_jwt = false
+
+[functions.export-database]
+verify_jwt = false

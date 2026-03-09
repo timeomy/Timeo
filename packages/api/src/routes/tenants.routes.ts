@@ -7,7 +7,7 @@ import {
   featureFlags,
   featureFlagOverrides,
 } from "@timeo/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ilike, inArray } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
 import { success, error } from "../lib/response.js";
@@ -18,6 +18,44 @@ import {
 import * as TenantService from "../services/tenant.service.js";
 
 const app = new Hono();
+
+// GET /tenants/public - list public tenants (no auth required)
+app.get("/public", async (c) => {
+  const search = c.req.query("search");
+
+  const conditions = [
+    eq(tenants.is_public, true),
+    inArray(tenants.status, ["active", "trial"]),
+  ];
+
+  if (search && search.trim()) {
+    conditions.push(ilike(tenants.name, `%${search.trim()}%`));
+  }
+
+  const rows = await db
+    .select({
+      id: tenants.id,
+      name: tenants.name,
+      slug: tenants.slug,
+      branding: tenants.branding,
+    })
+    .from(tenants)
+    .where(and(...conditions));
+
+  const result = rows.map((row) => {
+    const branding = (row.branding ?? {}) as Record<string, unknown>;
+    return {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      logo: branding.logo as string | undefined,
+      logoUrl: branding.logoUrl as string | undefined,
+      primaryColor: branding.primaryColor as string | undefined,
+    };
+  });
+
+  return c.json(success(result));
+});
 
 // GET /tenants - list user's tenants
 app.get("/", authMiddleware, async (c) => {
@@ -40,7 +78,7 @@ app.get("/", authMiddleware, async (c) => {
   return c.json(success(memberships));
 });
 
-// GET /tenants/mine - list user's tenants as flat TenantWithRole[]
+// GET /tenants/mine - list user's tenants as flat TenantWithRole[] + platformRole
 app.get("/mine", authMiddleware, async (c) => {
   const user = c.get("user");
 
@@ -88,7 +126,10 @@ app.get("/mine", authMiddleware, async (c) => {
     };
   });
 
-  return c.json(success(normalized));
+  // Include platform-level role so frontend can route platform admins correctly
+  const platformRole = user.role === "platform_admin" ? "platform_admin" : "user";
+
+  return c.json(success({ tenants: normalized, platformRole }));
 });
 
 // POST /tenants/join - join a tenant as a customer (by slug)

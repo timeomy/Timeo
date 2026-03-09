@@ -17,6 +17,7 @@ import {
   Gift,
   Receipt,
   UserPlus,
+  ScanFace,
 } from "lucide-react-native";
 import {
   Screen,
@@ -155,6 +156,25 @@ export default function ProfileScreen() {
             style={{ color: theme.colors.text }}
           >
             My QR Code
+          </Text>
+          <ChevronRight size={18} color={theme.colors.textSecondary} />
+        </TouchableOpacity>
+        <Separator />
+        <TouchableOpacity
+          onPress={() => router.push("/face-registration/" as any)}
+          className="flex-row items-center py-3"
+        >
+          <View
+            className="mr-3 rounded-lg p-2"
+            style={{ backgroundColor: theme.colors.primary + "15" }}
+          >
+            <ScanFace size={18} color={theme.colors.primary} />
+          </View>
+          <Text
+            className="flex-1 text-base"
+            style={{ color: theme.colors.text }}
+          >
+            Face Registration
           </Text>
           <ChevronRight size={18} color={theme.colors.textSecondary} />
         </TouchableOpacity>
