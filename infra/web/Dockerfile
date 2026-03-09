@@ -41,8 +41,9 @@ ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
 ENV NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Limit build memory to prevent OOM on small VPS (KVM 2, 4 GB RAM)
-ENV NODE_OPTIONS="--max-old-space-size=512"
+# 768 MB heap is the minimum for Next.js builds of this size
+# Combined with 1 build worker keeps total RSS around 1 GB
+ENV NODE_OPTIONS="--max-old-space-size=768"
 RUN NEXT_BUILD_WORKERS=1 pnpm --filter @timeo/web build
 
 # ─── Runner ──────────────────────────────────────────────────────────────────
