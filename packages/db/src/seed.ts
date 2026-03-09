@@ -27,11 +27,11 @@ async function hashPassword(password: string): Promise<string> {
 // ─── Seed Data Definitions ──────────────────────────────────────────────────
 
 const USERS = [
-  { email: "admin@timeo.my", name: "Platform Admin", password: "Admin1234!" },
-  { email: "gym@demo.my", name: "Gym Owner", password: "Demo1234!" },
-  { email: "cafe@demo.my", name: "Cafe Owner", password: "Demo1234!" },
-  { email: "staff@demo.my", name: "Staff Member", password: "Demo1234!" },
-  { email: "customer@demo.my", name: "Demo Customer", password: "Demo1234!" },
+  { email: "admin@timeo.my", name: "Platform Admin", password: "Admin123!", role: "platform_admin" as const },
+  { email: "gym@demo.my", name: "Gym Owner", password: "GymAdmin123!", role: "user" as const },
+  { email: "cafe@demo.my", name: "Cafe Owner", password: "CafeAdmin123!", role: "user" as const },
+  { email: "staff@demo.my", name: "Staff Member", password: "Staff123!", role: "user" as const },
+  { email: "customer@demo.my", name: "Demo Customer", password: "Customer123!", role: "user" as const },
 ] as const;
 
 const TENANTS = [
@@ -138,6 +138,7 @@ async function seed() {
       auth_id: authId,
       email: u.email,
       name: u.name,
+      role: u.role,
     });
     counts.users++;
 
@@ -446,11 +447,11 @@ async function seed() {
   console.log(`\nTotal: ${total} records created.`);
 
   console.log("\n── Demo Credentials ─────────────────────────────────────");
-  console.log("  admin@timeo.my     / Admin1234!   (platform admin)");
-  console.log("  gym@demo.my        / Demo1234!    (Iron Paradise admin)");
-  console.log("  cafe@demo.my       / Demo1234!    (Brew & Bean admin)");
-  console.log("  staff@demo.my      / Demo1234!    (Iron Paradise staff)");
-  console.log("  customer@demo.my   / Demo1234!    (Iron Paradise customer)");
+  console.log("  admin@timeo.my     / Admin123!       (platform admin)");
+  console.log("  gym@demo.my        / GymAdmin123!    (Iron Paradise admin)");
+  console.log("  cafe@demo.my       / CafeAdmin123!   (Brew & Bean admin)");
+  console.log("  staff@demo.my      / Staff123!       (Iron Paradise staff)");
+  console.log("  customer@demo.my   / Customer123!    (Iron Paradise customer)");
   console.log("");
 
   process.exit(0);
