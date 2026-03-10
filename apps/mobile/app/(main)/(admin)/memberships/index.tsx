@@ -81,7 +81,7 @@ export default function MembershipsScreen() {
         }
         renderItem={({ item }) => (
           <TouchableOpacity
-            onPress={() => handleToggleActive(item.id, item.isActive)}
+            onPress={() => handleToggleActive(item.id, item.isActive ?? false)}
             activeOpacity={0.7}
             className="rounded-2xl p-4"
             style={{ backgroundColor: theme.colors.surface }}
