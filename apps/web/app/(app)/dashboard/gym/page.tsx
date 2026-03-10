@@ -25,6 +25,7 @@ import {
   Activity,
   Clock,
   SmilePlus,
+  CreditCard,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -253,6 +254,12 @@ export default function GymOverviewPage() {
               icon={Cpu}
               title="Manage Devices"
               desc="Turnstile controllers"
+            />
+            <QuickAction
+              href="/dashboard/gym/payments"
+              icon={CreditCard}
+              title="Payment Requests"
+              desc="Review DuitNow payment receipts"
             />
           </div>
         </CardContent>

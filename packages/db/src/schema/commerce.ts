@@ -7,6 +7,7 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 import { membershipIntervalEnum, orderStatusEnum } from "./enums";
+
 import { tenants, users } from "./core";
 
 // ─── Products ────────────────────────────────────────────────────────────────
@@ -129,6 +130,8 @@ export const memberships = pgTable(
     price: integer("price").notNull(), // cents
     currency: text("currency").notNull().default("MYR"),
     interval: membershipIntervalEnum("interval").notNull(),
+    duration_months: integer("duration_months"), // explicit duration override (1, 3, 6, 12)
+    plan_type: text("plan_type").notNull().default("all_access"), // 'all_access', 'studio_class'
     features: text("features").array().notNull(),
     is_active: boolean("is_active").notNull().default(true),
     created_at: timestamp("created_at", { withTimezone: true })

@@ -287,3 +287,13 @@ export {
   useEarnPoints,
   useRedeemPoints,
 } from "./loyalty";
+
+export {
+  useMyPaymentRequests,
+  useCreatePaymentRequest,
+  useUploadPaymentReceipt,
+  usePaymentRequests,
+  useApprovePaymentRequest,
+  useRejectPaymentRequest,
+} from "./payment-requests";
+export type { PaymentRequest, PaymentRequestStatus, PaymentRequestPlanType } from "./payment-requests";

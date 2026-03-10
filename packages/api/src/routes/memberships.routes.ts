@@ -54,6 +54,8 @@ app.post(
       price: body.price,
       currency: body.currency,
       interval: body.interval,
+      duration_months: body.durationMonths ?? null,
+      plan_type: body.planType ?? "all_access",
       features: body.features,
       is_active: body.isActive,
     });

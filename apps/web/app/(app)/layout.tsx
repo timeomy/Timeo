@@ -79,6 +79,7 @@ const sidebarLinks: SidebarLink[] = [
       { href: "/dashboard/gym/checkins", label: "Check-ins", icon: Activity },
       { href: "/dashboard/gym/scanner", label: "Scanner", icon: ScanLine },
       { href: "/dashboard/gym/turnstile", label: "Turnstile", icon: Cpu },
+      { href: "/dashboard/gym/payments", label: "Payments", icon: CreditCard },
     ],
   },
   { href: "/dashboard/session-logs", label: "Session Logs", icon: NotebookPen, minRole: "staff" },

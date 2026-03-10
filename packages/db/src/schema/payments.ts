@@ -9,6 +9,8 @@ import {
 } from "drizzle-orm/pg-core";
 import {
   paymentStatusEnum,
+  paymentRequestStatusEnum,
+  paymentRequestPlanTypeEnum,
   posPaymentMethodEnum,
   posTransactionStatusEnum,
   stripeAccountStatusEnum,
@@ -152,5 +154,50 @@ export const posTransactions = pgTable(
       t.created_at,
     ),
     index("pos_transactions_receipt_idx").on(t.receipt_number),
+  ],
+);
+
+// ─── Payment Requests (DuitNow / Manual Transfer) ────────────────────────────
+export const paymentRequests = pgTable(
+  "payment_requests",
+  {
+    id: text("id").primaryKey(),
+    tenant_id: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    customer_id: text("customer_id")
+      .notNull()
+      .references(() => users.id),
+    // Plan info snapshot
+    plan_id: text("plan_id"), // references memberships.id or session_packages.id
+    plan_reference_type: paymentRequestPlanTypeEnum("plan_reference_type").notNull().default("membership"),
+    plan_name: text("plan_name").notNull(),
+    plan_duration_months: integer("plan_duration_months"), // for membership plans
+    plan_session_count: integer("plan_session_count"), // for session packages
+    // Payment details
+    amount: integer("amount").notNull(), // cents
+    currency: text("currency").notNull().default("MYR"),
+    receipt_url: text("receipt_url"), // uploaded receipt image URL
+    // Status
+    status: paymentRequestStatusEnum("status").notNull().default("pending_verification"),
+    member_note: text("member_note"),
+    admin_note: text("admin_note"),
+    approved_by: text("approved_by").references(() => users.id),
+    approved_at: timestamp("approved_at", { withTimezone: true }),
+    rejected_at: timestamp("rejected_at", { withTimezone: true }),
+    // Result
+    subscription_id: text("subscription_id"), // created on approval (for memberships)
+    session_credit_id: text("session_credit_id"), // created on approval (for session packages)
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updated_at: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("payment_requests_tenant_id_idx").on(t.tenant_id),
+    index("payment_requests_customer_id_idx").on(t.customer_id),
+    index("payment_requests_status_idx").on(t.tenant_id, t.status),
   ],
 );

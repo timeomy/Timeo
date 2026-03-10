@@ -145,6 +145,16 @@ export const queryKeys = {
     byId: (tenantId: string, id: string) => ["payments", tenantId, id] as const,
   },
 
+  paymentRequests: {
+    all: (tenantId: string, status?: string) =>
+      status
+        ? (["paymentRequests", tenantId, status] as const)
+        : (["paymentRequests", tenantId] as const),
+    mine: (tenantId: string) => ["paymentRequests", tenantId, "mine"] as const,
+    byId: (tenantId: string, id: string) =>
+      ["paymentRequests", tenantId, id] as const,
+  },
+
   staff: {
     all: (tenantId: string) => ["staff", tenantId] as const,
   },

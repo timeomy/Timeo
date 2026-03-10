@@ -23,6 +23,7 @@ import { platformRouter } from "./routes/platform.routes.js";
 import { filesRouter } from "./routes/files.routes.js";
 import { einvoiceRouter } from "./routes/einvoice.routes.js";
 import { paymentsRouter } from "./routes/payments.routes.js";
+import { paymentRequestsRouter } from "./routes/payment-requests.routes.js";
 import { customersRouter } from "./routes/customers.routes.js";
 import { loyaltyRouter } from "./routes/loyalty.routes.js";
 import { staffRouter } from "./routes/staff.routes.js";
@@ -56,6 +57,7 @@ export function createApp() {
   app.route("/api/tenants/:tenantId/products", productsRouter);
   app.route("/api/tenants/:tenantId/orders", ordersRouter);
   app.route("/api/tenants/:tenantId/payments", paymentsRouter);
+  app.route("/api/tenants/:tenantId/payment-requests", paymentRequestsRouter);
   app.route("/api/tenants/:tenantId/pos", posRouter);
   app.route("/api/tenants/:tenantId/check-ins", checkInsRouter);
   app.route("/api/tenants/:tenantId/sessions", sessionsRouter);
