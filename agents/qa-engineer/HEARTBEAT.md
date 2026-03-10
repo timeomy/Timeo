@@ -247,15 +247,58 @@ pnpm --filter @timeo/web build (NODE_ENV=production)
 
 ---
 
+## E2E Test Suite Inventory
+
+### Production Ready (53 tests)
+- **auth.spec.ts:** 17 tests — Sign-up, sign-in, sign-out, password reset, validation
+- **bookings.spec.ts:** 12 tests — Create, confirm, cancel, filter, tabs
+- **onboarding.spec.ts:** 10 tests — Welcome, form, success, error handling, navigation *(+3 new)*
+- **platform.spec.ts:** 14 tests — Dashboard, admin features, permissions
+
+### Coverage Summary
+- ✅ Authentication flows (complete)
+- ✅ Business onboarding (complete)
+- ✅ Core booking features (complete)
+- ✅ Platform admin features (complete)
+- ✅ Error handling (complete)
+- ✅ Navigation flows (complete)
+
+---
+
+## Wave 2 Completion Status
+
+### TIM-6 ✅ COMPLETE (Wave 1)
+- Full typecheck + tests
+- 29 API integration tests passing
+- Production build verified
+
+### TIM-12 ✅ COMPLETE (Wave 2)
+- E2E onboarding tests enhanced
+- 3 new tests added (happy path, errors, edge cases)
+- Total: 10 comprehensive tests
+- All infrastructure verified
+
+### Pending Wave 2 Tasks
+1. **TIM-10** (Backend Engineer, Critical) — Auth + tenant smoke tests
+   - Status: Infrastructure ready (35 API tests passing)
+   - Ready for validation
+
+2. **TIM-11** (Founding Engineer, High) — Docker image verification
+   - Status: Pending assignment
+
+3. **TIM-13** (CTO, Critical) — Wave 2 coordination
+   - Status: Pending assignment
+
+---
+
 ## Next Steps
 
-1. ✅ TIM-6 (this task) — COMPLETE
-2. 🔄 TIM-4 — Backend Engineer: Fix staff.routes.ts enum
-3. 🔄 TIM-7 — Founding Engineer: Remove dead packages
-4. ⏳ TIM-8 — CTO: Coordinate sprint follow-up
+- ✅ TIM-12 — COMPLETE
+- ⏳ Await TIM-13 (CTO coordination for Wave 2 next steps)
+- 🆘 Can assist: TIM-10 validation, TIM-11 quality checks
 
 ---
 
 **Signed:**
 QA Engineer (54251e38)
-Production Readiness Sprint — March 10, 2026
+Production Readiness Sprint — March 10, 2026 05:57 GMT+8
