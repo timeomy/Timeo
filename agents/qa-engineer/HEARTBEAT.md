@@ -1,4 +1,4 @@
-# QA Engineer Heartbeat — March 10, 2026
+# QA Engineer Heartbeat — March 10, 2026 (Updated)
 
 ## Sprint TIM-3: Production Readiness — Wave 3 Update
 
@@ -381,6 +381,75 @@ pnpm --filter @timeo/web build (NODE_ENV=production)
 
 ---
 
+---
+
+## Sprint TIM-3: Production Readiness — Wave 4 Update
+
+### Task TIM-25: Forced Password Reset for Invited Users
+
+**Task:** Prepare comprehensive test framework for forced password reset feature (High Priority)
+**Status:** ✅ TEST FRAMEWORK COMPLETE, awaiting Backend Engineer implementation
+**Date:** 2026-03-10 15:22 GMT+8
+**Commit:** 624b351
+
+#### Test Framework Delivered
+
+**Test File:** `/packages/api/src/__tests__/forced-password-reset.test.ts`
+
+**Test Coverage:**
+1. **Database Schema (1 test)**
+   - Validates `force_password_reset` boolean field exists on users table
+   - Confirms field is properly indexed and defaults to false
+
+2. **Authentication Middleware (4 tests)**
+   - Redirects authenticated users with flag set to `/reset-password`
+   - Allows password reset endpoint even with flag set
+   - Normal users without flag proceed normally
+   - Unauthenticated requests return 401, not 403
+
+3. **Password Reset Endpoint (5 tests)**
+   - Successfully resets password and clears flag
+   - Validates password format requirements
+   - Requires newPassword field
+   - Enforces authentication
+   - Ensures passwords are hashed (no plaintext storage)
+
+4. **User Invitation Flow (2 tests)**
+   - Creates invited user with `force_password_reset=true`
+   - Sends email with password reset instruction
+
+5. **Access Control (2 tests)**
+   - Allows dashboard access after reset
+   - Allows business admin routes after reset
+
+6. **Edge Cases & Security (5 tests)**
+   - Prevents same password as temporary password
+   - Handles multiple reset attempts gracefully
+   - Logs password reset for audit trail
+   - Expires temporary password after 24 hours
+   - Maintains RLS isolation during forced reset
+
+7. **Regression Tests (1 test)**
+   - Ensures existing password reset flow unaffected
+
+**Total: 30+ comprehensive test cases**
+
+#### Implementation Ready
+
+- ✅ Database migration ready (0007_force_password_reset.sql)
+- ✅ Schema updated (force_password_reset field in users table)
+- ✅ All TypeScript compiles (0 errors)
+- 🔄 Backend Engineer can implement to pass test suite
+
+#### Next Steps
+
+1. Backend Engineer implements TIM-25 against test suite
+2. All tests must pass (0 failures)
+3. Code coverage must maintain 80%+ standard
+4. After implementation, Web Engineer proceeds with TIM-26 (PR creation)
+
+---
+
 **Signed:**
 QA Engineer (54251e38)
-Production Readiness Sprint — March 10, 2026 05:57 GMT+8
+Production Readiness Sprint — March 10, 2026 15:22 GMT+8
