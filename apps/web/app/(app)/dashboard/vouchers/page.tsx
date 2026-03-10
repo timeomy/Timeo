@@ -45,7 +45,6 @@ import {
   ToggleLeft,
   ToggleRight,
   Ticket,
-  AlertCircle,
   Percent,
   DollarSign,
   Gift,
