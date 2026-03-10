@@ -522,9 +522,25 @@ app.post(
       return c.json(error("MQTT_OFFLINE", "MQTT broker is not connected"), 503);
     }
 
+    const user = c.get("user");
+
     try {
       const response = await MqttService.sendDoorOpenCommand({
         mqttTopic: device.mqtt_topic,
+      });
+
+      // Log the manual door open to access logs
+      await AccessControl.logAccessAttempt({
+        tenantId,
+        deviceSn: body.deviceSn,
+        userId: user.id,
+        personIdFromDevice: null,
+        matchScore: null,
+        matchResult: response.code === 0 ? "allowed" : "denied",
+        denyReason: response.code !== 0 ? "mqtt_error" : null,
+        sequenceNo: null,
+        capTime: null,
+        rawData: { method: "manual_mqtt", openedBy: user.id, deviceResponse: response },
       });
 
       return c.json(
