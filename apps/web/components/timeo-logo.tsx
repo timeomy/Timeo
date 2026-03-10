@@ -3,12 +3,13 @@ import { cn } from "@timeo/ui/web";
 
 type LogoSize = "xs" | "sm" | "md" | "lg" | "xl";
 
-const sizeMap: Record<LogoSize, { height: number; width: number }> = {
-  xs: { height: 16, width: 36 },
-  sm: { height: 24, width: 55 },
-  md: { height: 32, width: 73 },
-  lg: { height: 40, width: 91 },
-  xl: { height: 48, width: 110 },
+// Height-only sizing — width is unconstrained so the natural aspect ratio is preserved.
+const heightMap: Record<LogoSize, number> = {
+  xs: 20,
+  sm: 28,
+  md: 36,
+  lg: 44,
+  xl: 56,
 };
 
 export function TimeoLogo({
@@ -18,15 +19,14 @@ export function TimeoLogo({
   size?: LogoSize;
   className?: string;
 }) {
-  const { height, width } = sizeMap[size];
+  const h = heightMap[size];
   return (
-    <Image
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
       src="/timeo-logo.png"
       alt="Timeo"
-      width={width}
-      height={height}
-      className={cn("object-contain", className)}
-      priority
+      style={{ height: h, width: "auto" }}
+      className={cn("block", className)}
     />
   );
 }
