@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { db } from "@timeo/db";
-import { memberships, subscriptions, users } from "@timeo/db/schema";
+import { memberships, subscriptions } from "@timeo/db/schema";
 import { and, eq, desc } from "drizzle-orm";
 import { generateId } from "@timeo/db";
 import { authMiddleware } from "../middleware/auth.js";
@@ -25,10 +25,11 @@ app.get("/", authMiddleware, tenantMiddleware, async (c) => {
 
 // GET /tenants/:tenantId/memberships/:planId
 app.get("/:planId", authMiddleware, tenantMiddleware, async (c) => {
+  const tenantId = c.get("tenantId");
   const [row] = await db
     .select()
     .from(memberships)
-    .where(eq(memberships.id, c.req.param("planId")))
+    .where(and(eq(memberships.id, c.req.param("planId")), eq(memberships.tenant_id, tenantId)))
     .limit(1);
   if (!row) return c.json(error("NOT_FOUND", "Membership plan not found"), 404);
   return c.json(success(row));
