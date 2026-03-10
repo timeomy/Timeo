@@ -1,6 +1,8 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { db, user, session, account, verification } from "@timeo/db";
+import { db, user, session, account, verification, users } from "@timeo/db";
+import { generateId } from "@timeo/db";
+import { eq } from "drizzle-orm";
 import { sendMail } from "./email.js";
 import {
   passwordResetEmail,
@@ -89,8 +91,30 @@ export const auth = betterAuth({
       process.env.NODE_ENV === "production"
         ? { enabled: true, domain: ".timeo.my" }
         : { enabled: false },
-    generateId: () => {
-      return crypto.randomUUID();
+  },
+  generateId: () => {
+    return crypto.randomUUID();
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (newUser) => {
+          // Sync the Better Auth user to our app-level users table
+          const existing = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.auth_id, newUser.id))
+            .limit(1);
+          if (existing.length === 0) {
+            await db.insert(users).values({
+              id: generateId(),
+              auth_id: newUser.id,
+              email: newUser.email,
+              name: newUser.name ?? newUser.email,
+            });
+          }
+        },
+      },
     },
   },
 });
