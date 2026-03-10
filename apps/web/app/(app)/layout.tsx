@@ -8,6 +8,7 @@ import { useTimeoWebAuthContext, useTimeoWebTenantContext, isRoleAtLeast } from 
 import type { TimeoRole } from "@timeo/auth/web";
 import { getInitials } from "@timeo/shared";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
+import { useUserProfile } from "@timeo/api-client";
 import { FeatureFlagsProvider, useFeatureFlags } from "@/hooks/use-feature-flags";
 import { AnnouncementBanner } from "@/announcement-banner";
 import { MaintenanceGate } from "@/maintenance-gate";
@@ -279,6 +280,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn, activeRole } = useTimeoWebAuthContext();
   const { tenants, isLoading: tenantsLoading } = useTimeoWebTenantContext();
   useEnsureUser(!!isSignedIn);
+  const { data: userProfile } = useUserProfile();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -287,8 +289,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (!isSignedIn) { router.replace("/sign-in"); return; }
     if (activeRole === "platform_admin") { router.replace("/admin"); return; }
     if (tenants.length === 0) { router.replace("/portal"); return; }
-    if (activeRole === "customer") { router.replace("/portal"); }
-  }, [isLoaded, tenantsLoading, isSignedIn, tenants, activeRole, router]);
+    if (activeRole === "customer") { router.replace("/portal"); return; }
+    if (userProfile?.force_password_reset) { router.replace("/change-password"); return; }
+  }, [isLoaded, tenantsLoading, isSignedIn, tenants, activeRole, userProfile, router]);
 
   if (!isLoaded || tenantsLoading) {
     return (

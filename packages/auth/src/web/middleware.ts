@@ -23,6 +23,7 @@ const PUBLIC_PATTERNS = [
   /^\/sign-up/,
   /^\/forgot-password/,
   /^\/reset-password/,
+  /^\/change-password/,
   /^\/verify-email/,
   /^\/store/,
   /^\/api\/webhooks/,
