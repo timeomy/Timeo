@@ -217,6 +217,12 @@ export const InviteStaffSchema = z.object({
   role: z.enum(["staff", "admin"]),
 });
 
+export const AddTenantMemberSchema = z.object({
+  userId: z.string().min(1),
+  role: z.enum(["customer", "staff", "admin"]),
+  notes: z.string().max(500).optional(),
+});
+
 // ─── Memberships ──────────────────────────────────────────────────────────────
 
 export const CreateMembershipPlanSchema = z.object({
