@@ -9,6 +9,7 @@ import { getInitials } from "@timeo/shared";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
 import { useEnsureMembership } from "@/hooks/use-ensure-membership";
 import { useTenantId } from "@/hooks/use-tenant-id";
+import { useTenant } from "@timeo/api-client";
 import {
   Avatar,
   AvatarImage,
@@ -61,6 +62,8 @@ export default function PortalLayout({
   useEnsureUser(!!isSignedIn);
   const { tenantId } = useTenantId();
   useEnsureMembership(tenantId);
+  const { data: tenantData } = useTenant(tenantId);
+  const tenantLogoUrl = tenantData?.logoUrl ?? "/tenants/ws-fitness-logo.png";
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
@@ -114,7 +117,15 @@ export default function PortalLayout({
           {/* Left: Logo */}
           <div className="flex items-center gap-6">
             <Link href="/portal" className="flex items-center gap-2">
-              <TimeoLogo size="md" />
+              {/* Tenant branding: dynamic logo from tenant settings, fallback to WS Fitness logo */}
+              <img
+                src={tenantLogoUrl}
+                alt="Gym Logo"
+                className="h-8 w-auto"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
             </Link>
 
             {/* Desktop Nav Links */}

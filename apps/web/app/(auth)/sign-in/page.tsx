@@ -57,9 +57,19 @@ export default function SignInPage() {
     <div className="w-full max-w-md">
       <div className="rounded-xl border bg-card p-8 shadow-sm">
         <div className="mb-6 text-center">
+          <div className="mb-4 flex justify-center">
+            <img
+              src="/tenants/ws-fitness-logo.png"
+              alt="WS Fitness"
+              className="h-16 w-auto"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = "none";
+              }}
+            />
+          </div>
           <h1 className="text-2xl font-bold">Welcome back</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Sign in to your Timeo account
+            Sign in to your WS Fitness account
           </p>
         </div>
 

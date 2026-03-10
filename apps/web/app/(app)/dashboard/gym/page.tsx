@@ -169,7 +169,20 @@ export default function GymOverviewPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+            <img
+              src="/tenants/ws-fitness-logo.png"
+              alt="WS Fitness"
+              className="h-10 w-auto"
+              onError={(e) => {
+                const el = e.currentTarget as HTMLImageElement;
+                el.style.display = "none";
+                const fallback = el.nextElementSibling as HTMLElement | null;
+                if (fallback) fallback.style.display = "flex";
+              }}
+            />
+            <div
+              className="hidden h-10 w-10 items-center justify-center rounded-xl bg-primary/10"
+            >
               <Dumbbell className="h-5 w-5 text-primary" />
             </div>
             <div>

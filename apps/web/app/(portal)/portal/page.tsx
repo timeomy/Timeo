@@ -10,6 +10,7 @@ import {
   Skeleton,
   cn,
 } from "@timeo/ui/web";
+import { useTenant } from "@timeo/api-client";
 import {
   Calendar,
   CreditCard,
@@ -98,6 +99,8 @@ function TenantDashboard({
   tenant: { name?: string } | null;
   firstName: string;
 }) {
+  const { data: tenantData } = useTenant(tenantId);
+  const tenantLogoUrl = tenantData?.logoUrl ?? "/tenants/ws-fitness-logo.png";
   const { data: bookings, isLoading: bookingsLoading } = useMyBookings(tenantId);
   const { data: credits, isLoading: creditsLoading } = useSessionCredits(tenantId);
   const { data: vouchers, isLoading: vouchersLoading } = useVouchers(tenantId);
@@ -120,15 +123,25 @@ function TenantDashboard({
   return (
     <div className="space-y-8">
       {/* Welcome Section */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-          Welcome back, {firstName}
-        </h1>
-        <p className="mt-1 text-sm text-white/50">
-          {tenant?.name
-            ? `Your ${tenant.name} member portal`
-            : "Your member portal"}
-        </p>
+      <div className="flex items-center gap-4">
+        <img
+          src={tenantLogoUrl}
+          alt={tenant?.name ?? "Gym Logo"}
+          className="h-12 w-auto hidden sm:block"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
+        />
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+            Welcome back, {firstName}
+          </h1>
+          <p className="mt-1 text-sm text-white/50">
+            {tenant?.name
+              ? `Your ${tenant.name} member portal`
+              : "Your member portal"}
+          </p>
+        </div>
       </div>
 
       {/* Quick Stats */}
