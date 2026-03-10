@@ -32,6 +32,8 @@ export const users = pgTable(
       .defaultNow(),
     /** Platform-level role: "user" (default) or "platform_admin" */
     role: text("role").notNull().default("user"),
+    /** If true, user must change their password before accessing the app (set on invite) */
+    force_password_reset: boolean("force_password_reset").notNull().default(false),
   },
   (t) => [
     index("users_auth_id_idx").on(t.auth_id),

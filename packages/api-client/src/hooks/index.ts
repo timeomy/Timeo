@@ -5,6 +5,8 @@ export {
   useSignOut,
 } from "./auth";
 
+export { useUserProfile, useChangePassword } from "./users";
+
 export {
   useMyTenants,
   useTenant,

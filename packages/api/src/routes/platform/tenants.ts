@@ -42,13 +42,14 @@ async function createUserWithCredentials(email: string, name: string): Promise<{
     password: passwordHash,
   });
 
-  // Timeo app user record
+  // Timeo app user record — force_password_reset so they must change temp password on first login
   await db.insert(users).values({
     id: timeoId,
     auth_id: authId,
     email,
     name,
     role: "user",
+    force_password_reset: true,
   });
 
   return { timeoUserId: timeoId, tempPassword };
