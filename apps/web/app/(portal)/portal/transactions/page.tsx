@@ -304,8 +304,6 @@ export default function TransactionHistoryPage() {
               </h3>
               <div className="space-y-2">
                 {txs!.map((tx) => {
-                  const PayIcon =
-                    PAYMENT_ICON[tx.paymentMethod as PaymentMethod] ?? DollarSign;
                   const statusConfig =
                     STATUS_CONFIG[tx.status as keyof typeof STATUS_CONFIG];
 

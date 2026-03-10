@@ -21,6 +21,7 @@ import {
   Cpu,
   ArrowRight,
   UserCheck,
+  UserPlus,
   Activity,
   Clock,
   SmilePlus,
@@ -228,6 +229,18 @@ export default function GymOverviewPage() {
               icon={UserCheck}
               title="View Members"
               desc="Manage gym memberships"
+            />
+            <QuickAction
+              href="/dashboard/gym/members/new"
+              icon={UserPlus}
+              title="Add Member"
+              desc="Register a new gym member"
+            />
+            <QuickAction
+              href="/dashboard/gym/scanner"
+              icon={ScanLine}
+              title="QR Scanner"
+              desc="Scan member QR codes"
             />
             <QuickAction
               href="/dashboard/gym/checkins"

@@ -11,15 +11,11 @@ import {
   CardTitle,
   Button,
   Input,
-  Label,
-  Skeleton,
-  cn,
 } from "@timeo/ui/web";
 import {
   ArrowLeft,
   UserPlus,
   Loader2,
-  CheckCircle2,
   XCircle,
 } from "lucide-react";
 
@@ -87,7 +83,6 @@ export default function NewGymMemberPage() {
         phone: phone.trim(),
         membershipPlan: membershipPlan.trim(),
       });
-      // Redirect to the new member's detail page
       router.push(`/dashboard/gym/members/${result.id}`);
     } catch (err) {
       console.error("Create member error:", err);
@@ -129,9 +124,9 @@ export default function NewGymMemberPage() {
           <CardContent className="space-y-5">
             {/* Name */}
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm text-white/70">
+              <label htmlFor="name" className="block text-sm font-medium text-white/70">
                 Full Name <span className="text-red-400">*</span>
-              </Label>
+              </label>
               <Input
                 id="name"
                 placeholder="e.g. Ahmad bin Ali"
@@ -143,9 +138,9 @@ export default function NewGymMemberPage() {
 
             {/* Email */}
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm text-white/70">
+              <label htmlFor="email" className="block text-sm font-medium text-white/70">
                 Email Address <span className="text-red-400">*</span>
-              </Label>
+              </label>
               <Input
                 id="email"
                 type="email"
@@ -161,9 +156,9 @@ export default function NewGymMemberPage() {
 
             {/* Phone */}
             <div className="space-y-2">
-              <Label htmlFor="phone" className="text-sm text-white/70">
+              <label htmlFor="phone" className="block text-sm font-medium text-white/70">
                 Phone Number
-              </Label>
+              </label>
               <Input
                 id="phone"
                 type="tel"
@@ -175,12 +170,9 @@ export default function NewGymMemberPage() {
 
             {/* Membership Plan */}
             <div className="space-y-2">
-              <Label
-                htmlFor="membershipPlan"
-                className="text-sm text-white/70"
-              >
+              <label htmlFor="membershipPlan" className="block text-sm font-medium text-white/70">
                 Membership Plan
-              </Label>
+              </label>
               <Input
                 id="membershipPlan"
                 placeholder="e.g. Monthly Premium, Day Pass"

@@ -10,13 +10,11 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
-  CardFooter,
   Button,
   Avatar,
   AvatarImage,
   AvatarFallback,
   Badge,
-  Separator,
   Skeleton,
 } from "@timeo/ui/web";
 import {

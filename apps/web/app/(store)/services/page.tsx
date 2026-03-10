@@ -15,7 +15,6 @@ import {
   Badge,
   Button,
   Skeleton,
-  cn,
 } from "@timeo/ui/web";
 import { Search, Clock, Calendar, ArrowRight } from "lucide-react";
 

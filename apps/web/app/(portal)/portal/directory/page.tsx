@@ -15,7 +15,6 @@ import {
   Building2,
   Loader2,
   Check,
-  Zap,
   ArrowRight,
 } from "lucide-react";
 

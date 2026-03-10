@@ -59,7 +59,6 @@ function useCheckInByQr() {
       );
       const data = await res.json();
       if (!data.success) {
-        // Check if it's a denied access (still a valid response)
         if (data.data?.status === "denied") {
           return data.data as ScanResult;
         }
@@ -93,7 +92,6 @@ export default function GymScannerPage() {
       console.error("Scan error:", err);
     }
     setQrValue("");
-    // Re-focus input for next scan
     setTimeout(() => inputRef.current?.focus(), 100);
   }
 
@@ -188,7 +186,6 @@ export default function GymScannerPage() {
         >
           <CardContent className="p-6">
             <div className="flex flex-col items-center gap-4 text-center">
-              {/* Status Icon */}
               <div
                 className={cn(
                   "flex h-20 w-20 items-center justify-center rounded-full",
@@ -202,7 +199,6 @@ export default function GymScannerPage() {
                 )}
               </div>
 
-              {/* Status Text */}
               <div>
                 <h2
                   className={cn(
@@ -219,7 +215,6 @@ export default function GymScannerPage() {
                 )}
               </div>
 
-              {/* Member Info */}
               {result.member && (
                 <div className="flex items-center gap-4 rounded-lg border border-white/[0.06] bg-white/[0.02] p-4 w-full max-w-sm">
                   <Avatar className="h-14 w-14">
@@ -252,7 +247,6 @@ export default function GymScannerPage() {
                 </div>
               )}
 
-              {/* Scan Again */}
               <Button
                 variant="outline"
                 onClick={handleReset}

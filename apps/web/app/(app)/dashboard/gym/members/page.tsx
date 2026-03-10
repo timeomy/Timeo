@@ -25,6 +25,7 @@ import {
 import {
   Search,
   UserCheck,
+  UserPlus,
   CheckCircle2,
   XCircle,
   ArrowLeft,
@@ -130,6 +131,13 @@ export default function GymMembersPage() {
             </p>
           </div>
         </div>
+        <Button
+          className="gap-2"
+          onClick={() => router.push("/dashboard/gym/members/new")}
+        >
+          <UserPlus className="h-4 w-4" />
+          Add Member
+        </Button>
       </div>
 
       {/* Search */}

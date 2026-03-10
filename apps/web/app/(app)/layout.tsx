@@ -35,6 +35,7 @@ import {
   Menu,
   LogOut,
   ChevronDown,
+  ChevronRight,
   Building2,
   Check,
   Plus,
@@ -48,6 +49,8 @@ import {
   BarChart3,
   Shield,
   Dumbbell,
+  Activity,
+  Cpu,
 } from "lucide-react";
 
 type SidebarLink = {
@@ -56,6 +59,7 @@ type SidebarLink = {
   icon: React.ElementType;
   minRole?: TimeoRole;
   flagKey?: string;
+  children?: SidebarLink[];
 };
 
 const sidebarLinks: SidebarLink[] = [
@@ -67,7 +71,16 @@ const sidebarLinks: SidebarLink[] = [
   { href: "/dashboard/team", label: "Team", icon: Users, minRole: "admin" },
   { href: "/dashboard/scheduling", label: "Scheduling", icon: Clock, minRole: "staff", flagKey: "appointments_enabled" },
   { href: "/dashboard/check-ins", label: "Check-ins", icon: ScanLine, minRole: "staff", flagKey: "pos_enabled" },
-  { href: "/dashboard/gym", label: "Gym", icon: Dumbbell, minRole: "staff" },
+  {
+    href: "/dashboard/gym", label: "Gym", icon: Dumbbell, minRole: "staff",
+    children: [
+      { href: "/dashboard/gym", label: "Overview", icon: Dumbbell },
+      { href: "/dashboard/gym/members", label: "Members", icon: UserCheck },
+      { href: "/dashboard/gym/checkins", label: "Check-ins", icon: Activity },
+      { href: "/dashboard/gym/scanner", label: "Scanner", icon: ScanLine },
+      { href: "/dashboard/gym/turnstile", label: "Turnstile", icon: Cpu },
+    ],
+  },
   { href: "/dashboard/session-logs", label: "Session Logs", icon: NotebookPen, minRole: "staff" },
   { href: "/dashboard/packages", label: "Packages", icon: CreditCard, minRole: "admin" },
   { href: "/dashboard/vouchers", label: "Gift Cards & Vouchers", icon: Ticket, minRole: "admin" },
@@ -181,9 +194,73 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       {/* Navigation */}
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {getVisibleLinks(activeRole).map((link) => {
+          const isInSection = link.children && pathname.startsWith(link.href);
           const isActive =
-            pathname === link.href ||
-            (link.href !== "/dashboard" && pathname.startsWith(link.href + "/"));
+            !link.children && (
+              pathname === link.href ||
+              (link.href !== "/dashboard" && pathname.startsWith(link.href + "/"))
+            );
+
+          if (link.children) {
+            return (
+              <div key={link.href}>
+                <motion.div
+                  whileHover={{ x: 2 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="relative"
+                >
+                  {isInSection && (
+                    <motion.div
+                      layoutId="activeNav"
+                      className="absolute inset-0 rounded-lg bg-primary/10"
+                      transition={{ type: "spring", duration: 0.2, bounce: 0.1 }}
+                    />
+                  )}
+                  <Link
+                    href={link.href}
+                    onClick={onNavigate}
+                    className={cn(
+                      "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                      isInSection
+                        ? "text-primary"
+                        : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
+                    )}
+                  >
+                    <link.icon className={cn("h-4 w-4", isInSection && "text-primary")} />
+                    {link.label}
+                    <ChevronRight className={cn(
+                      "ml-auto h-3.5 w-3.5 transition-transform",
+                      isInSection && "rotate-90"
+                    )} />
+                  </Link>
+                </motion.div>
+                {isInSection && (
+                  <div className="mt-1 ml-4 space-y-0.5 border-l border-white/[0.06] pl-3">
+                    {link.children.map((child) => {
+                      const isChildActive = pathname === child.href;
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          onClick={onNavigate}
+                          className={cn(
+                            "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
+                            isChildActive
+                              ? "text-primary font-medium"
+                              : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
+                          )}
+                        >
+                          <child.icon className={cn("h-3.5 w-3.5", isChildActive && "text-primary")} />
+                          {child.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           return (
             <motion.div
               key={link.href}

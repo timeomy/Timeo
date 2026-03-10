@@ -7,7 +7,9 @@
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "test": "turbo test",
-    "clean": "turbo clean && rm -rf node_modules"
+    "clean": "turbo clean && rm -rf node_modules",
+    "migrate:wsfitness": "npx tsx scripts/migrate-wsfitness.ts",
+    "migrate:wsfitness:dry": "npx tsx scripts/migrate-wsfitness.ts --dry-run"
   },
   "devDependencies": {
     "turbo": "^2.3.0",

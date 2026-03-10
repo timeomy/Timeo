@@ -36,7 +36,6 @@ import {
 import {
   Plus,
   Trash2,
-  Search,
   AlertCircle,
   Dumbbell,
   X,

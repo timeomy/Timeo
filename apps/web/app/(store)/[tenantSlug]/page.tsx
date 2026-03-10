@@ -13,25 +13,11 @@ import {
   Clock,
   Calendar,
   ArrowRight,
-  CheckCircle2,
   MapPin,
   Phone,
   Mail,
-  Star,
-  Users,
   Zap,
-  Package,
 } from "lucide-react";
-
-const DAY_NAMES = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
 
 export default function TenantLandingPage() {
   const params = useParams();
