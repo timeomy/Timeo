@@ -21,13 +21,11 @@
     },
     "production": {
       "autoIncrement": true,
+      "node": "22.22.1",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.timeo.my",
         "EXPO_PUBLIC_APP_SCHEME": "timeo"
-      },
-      "node": "22.22.1",
-      "cacheDefaultPaths": false,
-      "buildArtifactPaths": ["android/app/build/outputs/**/*.aab"]
+      }
     }
   },
   "submit": {
