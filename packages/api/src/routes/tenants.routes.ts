@@ -4,6 +4,7 @@ import { db } from "@timeo/db";
 import {
   tenants,
   tenantMemberships,
+  users,
   featureFlags,
   featureFlagOverrides,
 } from "@timeo/db/schema";
@@ -14,6 +15,7 @@ import { success, error } from "../lib/response.js";
 import {
   CreateTenantSchema,
   UpdateTenantSettingsSchema,
+  AddTenantMemberSchema,
 } from "../lib/validation.js";
 import * as TenantService from "../services/tenant.service.js";
 
@@ -289,6 +291,91 @@ app.post("/:tenantId/ensure-membership", authMiddleware, async (c) => {
 
   return c.json(success({ ok: true }));
 });
+
+// POST /tenants/:tenantId/members - admin-side member assignment
+app.post(
+  "/:tenantId/members",
+  authMiddleware,
+  zValidator("json", AddTenantMemberSchema),
+  async (c) => {
+    const user = c.get("user");
+    const tenantId = c.req.param("tenantId");
+    const body = c.req.valid("json");
+
+    // Only platform_admin or tenant admin may assign members
+    const [callerMembership] = await db
+      .select({ role: tenantMemberships.role })
+      .from(tenantMemberships)
+      .where(
+        and(
+          eq(tenantMemberships.tenant_id, tenantId),
+          eq(tenantMemberships.user_id, user.id),
+          eq(tenantMemberships.status, "active"),
+        ),
+      )
+      .limit(1);
+
+    const isPlatformAdmin = user.role === "platform_admin";
+    const isTenantAdmin =
+      callerMembership?.role === "admin" ||
+      callerMembership?.role === "platform_admin";
+
+    if (!isPlatformAdmin && !isTenantAdmin) {
+      return c.json(error("FORBIDDEN", "Insufficient permissions"), 403);
+    }
+
+    // Verify tenant exists
+    const [tenant] = await db
+      .select({ id: tenants.id })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
+
+    if (!tenant) {
+      return c.json(error("NOT_FOUND", "Tenant not found"), 404);
+    }
+
+    // Verify target user exists
+    const [targetUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.id, body.userId))
+      .limit(1);
+
+    if (!targetUser) {
+      return c.json(error("NOT_FOUND", "User not found"), 404);
+    }
+
+    // Check for existing membership
+    const [existing] = await db
+      .select({ id: tenantMemberships.id })
+      .from(tenantMemberships)
+      .where(
+        and(
+          eq(tenantMemberships.tenant_id, tenantId),
+          eq(tenantMemberships.user_id, body.userId),
+        ),
+      )
+      .limit(1);
+
+    if (existing) {
+      return c.json(error("CONFLICT", "User is already a member"), 409);
+    }
+
+    const { generateId } = await import("@timeo/db");
+    const memberId = generateId();
+    await db.insert(tenantMemberships).values({
+      id: memberId,
+      tenant_id: tenantId,
+      user_id: body.userId,
+      role: body.role,
+      status: "active",
+      notes: body.notes,
+    });
+
+    return c.json(success({ memberId }), 201);
+  },
+);
 
 // PATCH /tenants/:tenantId/settings
 app.patch(
