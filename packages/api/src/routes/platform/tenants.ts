@@ -2,13 +2,57 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db, generateId } from "@timeo/db";
-import { tenants, tenantMemberships, users } from "@timeo/db/schema";
+import { tenants, tenantMemberships, users, user as authUser, account as authAccount } from "@timeo/db/schema";
 import { eq, desc, sql, count, and } from "drizzle-orm";
 import { authMiddleware } from "../../middleware/auth.js";
 import { requirePlatformAdmin } from "../../middleware/rbac.js";
 import { success, error } from "../../lib/response.js";
 import { redis } from "../../lib/redis.js";
 import { insertAudit, getClientIp } from "./helpers.js";
+import { sendMail } from "@timeo/auth/email";
+import { tenantInviteEmail } from "@timeo/auth/email-templates";
+
+const SITE_URL = process.env.SITE_URL ?? "http://localhost:3000";
+
+async function hashTempPassword(password: string): Promise<string> {
+  const { hashPassword } = await import("better-auth/crypto");
+  return hashPassword(password);
+}
+
+async function createUserWithCredentials(email: string, name: string): Promise<{ timeoUserId: string; tempPassword: string }> {
+  const authId = generateId();
+  const timeoId = generateId();
+  const tempPassword = generateId().slice(0, 12);
+  const passwordHash = await hashTempPassword(tempPassword);
+
+  // Better Auth user record (enables sign-in via auth middleware)
+  await db.insert(authUser).values({
+    id: authId,
+    name,
+    email,
+    emailVerified: false,
+  });
+
+  // Credential account so they can sign in with email + tempPassword
+  await db.insert(authAccount).values({
+    id: generateId(),
+    accountId: authId,
+    providerId: "credential",
+    userId: authId,
+    password: passwordHash,
+  });
+
+  // Timeo app user record
+  await db.insert(users).values({
+    id: timeoId,
+    auth_id: authId,
+    email,
+    name,
+    role: "user",
+  });
+
+  return { timeoUserId: timeoId, tempPassword };
+}
 
 const app = new Hono();
 
@@ -68,15 +112,33 @@ app.post(
       return c.json(error("SLUG_TAKEN", "Tenant slug already in use"), 409);
     }
 
-    // Find or validate owner user
-    const [owner] = await db
-      .select({ id: users.id })
+    // Find or create owner user
+    const [existingOwner] = await db
+      .select({ id: users.id, name: users.name })
       .from(users)
       .where(eq(users.email, body.ownerEmail))
       .limit(1);
 
-    if (!owner) {
-      return c.json(error("OWNER_NOT_FOUND", "No user with that email"), 404);
+    let ownerId: string;
+    let memberStatus: "active" | "invited";
+
+    if (existingOwner) {
+      ownerId = existingOwner.id;
+      memberStatus = "active";
+    } else {
+      // New business owner — create user + auth records and send invite email
+      const ownerName = body.ownerEmail.split("@")[0];
+      const { timeoUserId, tempPassword } = await createUserWithCredentials(body.ownerEmail, ownerName);
+      ownerId = timeoUserId;
+      memberStatus = "invited";
+
+      const invite = tenantInviteEmail({
+        name: ownerName,
+        businessName: body.name,
+        tempPassword,
+        signInUrl: `${SITE_URL}/sign-in`,
+      });
+      await sendMail({ to: body.ownerEmail, subject: invite.subject, html: invite.html });
     }
 
     const tenantId = generateId();
@@ -84,7 +146,7 @@ app.post(
       id: tenantId,
       name: body.name,
       slug: body.slug,
-      owner_id: owner.id,
+      owner_id: ownerId,
       plan: body.plan,
       status: "active",
     });
@@ -92,10 +154,10 @@ app.post(
     // Add owner as admin member
     await db.insert(tenantMemberships).values({
       id: generateId(),
-      user_id: owner.id,
+      user_id: ownerId,
       tenant_id: tenantId,
       role: "admin",
-      status: "active",
+      status: memberStatus,
     });
 
     await insertAudit(
@@ -335,7 +397,7 @@ app.post(
 
     // Verify tenant exists
     const [tenant] = await db
-      .select({ id: tenants.id })
+      .select({ id: tenants.id, name: tenants.name })
       .from(tenants)
       .where(eq(tenants.id, tenantId))
       .limit(1);
@@ -345,7 +407,7 @@ app.post(
     }
 
     // Find or create user by email
-    let [existingUser] = await db
+    const [existingMember] = await db
       .select({ id: users.id, name: users.name })
       .from(users)
       .where(eq(users.email, body.email))
@@ -353,20 +415,18 @@ app.post(
 
     let userId: string;
     let memberStatus: "active" | "invited";
+    let inviteContext: { name: string; tempPassword: string } | null = null;
 
-    if (existingUser) {
-      userId = existingUser.id;
+    if (existingMember) {
+      userId = existingMember.id;
       memberStatus = "active";
     } else {
-      // Create a new user record (they'll need to set up auth via invite email)
-      userId = generateId();
-      await db.insert(users).values({
-        id: userId,
-        email: body.email,
-        name: body.name || body.email.split("@")[0],
-        role: "user",
-      });
+      // New user — create auth + timeo records and send invite email after membership created
+      const memberName = body.name || body.email.split("@")[0];
+      const { timeoUserId, tempPassword } = await createUserWithCredentials(body.email, memberName);
+      userId = timeoUserId;
       memberStatus = "invited";
+      inviteContext = { name: memberName, tempPassword };
     }
 
     // Check if membership already exists
@@ -407,6 +467,17 @@ app.post(
       { tenantId, email: body.email, role: body.role },
       ip,
     );
+
+    // Send invite email for newly created users
+    if (inviteContext) {
+      const invite = tenantInviteEmail({
+        name: inviteContext.name,
+        businessName: tenant.name,
+        tempPassword: inviteContext.tempPassword,
+        signInUrl: `${SITE_URL}/sign-in`,
+      });
+      await sendMail({ to: body.email, subject: invite.subject, html: invite.html });
+    }
 
     // Return the created membership
     const [created] = await db

@@ -133,6 +133,37 @@ export function verificationEmail(params: {
   };
 }
 
+// ─── Tenant Invite ───────────────────────────────────────────────
+
+export function tenantInviteEmail(opts: {
+  name: string;
+  businessName: string;
+  tempPassword: string;
+  signInUrl: string;
+}): { subject: string; html: string } {
+  const { name, businessName, tempPassword, signInUrl } = opts;
+  const firstName = name.split(" ")[0] || "there";
+
+  return {
+    subject: `You have been invited to join ${businessName} on Timeo`,
+    html: layout(`
+      <h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#ffffff;">You're invited!</h1>
+      <p style="margin:0 0 20px;font-size:15px;color:${TEXT_COLOR};line-height:1.6;">
+        Hi ${firstName}, you have been added as a business admin for <strong style="color:#ffffff;">${businessName}</strong> on Timeo. Sign in to get started.
+      </p>
+      <div style="margin:0 0 24px;padding:16px 20px;background-color:rgba(212,160,23,0.08);border:1px solid rgba(212,160,23,0.2);border-radius:8px;">
+        <p style="margin:0 0 8px;font-size:13px;color:${TEXT_MUTED};line-height:1.5;">Your temporary password</p>
+        <p style="margin:0;font-size:18px;font-weight:700;color:#ffffff;letter-spacing:2px;font-family:monospace;">${tempPassword}</p>
+      </div>
+      ${button(signInUrl, "Sign In to Timeo")}
+      <p style="margin:24px 0 0;font-size:13px;color:${TEXT_MUTED};line-height:1.6;">
+        You will be prompted to change your password after signing in. If you did not expect this invitation, please contact <a href="mailto:support@timeo.my" style="color:${BRAND_COLOR};text-decoration:underline;">support@timeo.my</a>.
+      </p>
+      ${fallbackLink(signInUrl)}
+    `),
+  };
+}
+
 // ─── Password Reset Success ──────────────────────────────────────
 
 export function passwordResetSuccessEmail(params: {
