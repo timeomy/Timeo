@@ -1,11 +1,14 @@
-# Exclude non-mobile packages from EAS upload
-../../packages/api
-../../packages/db
+**/__tests__/**
+**/*.test.*
+**/*.spec.*
+**/docs/**
+**/specs/**
 ../../infra
-../../docs
-../../specs
-../../scripts
 ../../store-assets
 ../../wsfitness
 ../../.git
-node_modules
+../../.github
+../../test-results
+**/android/build/**
+**/ios/build/**
+**/ios/Pods/**
