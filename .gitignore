@@ -32,6 +32,11 @@ out/
 dist/
 build/
 
+# Test Results (Playwright, Vitest)
+test-results/
+coverage/
+.nyc_output/
+
 # OS
 .DS_Store
 Thumbs.db

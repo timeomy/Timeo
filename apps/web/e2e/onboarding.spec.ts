@@ -3,6 +3,9 @@ import { test, expect, type Page } from "@playwright/test";
 /**
  * Sign in with seeded user credentials.
  * Assumes the dev seed script has been run (packages/db seed).
+ *
+ * Note: onboarding@demo.my is a fresh test user with no business.
+ * Other test users (gym@demo.my, cafe@demo.my) have businesses and will be redirected to dashboard.
  */
 async function signIn(page: Page, email: string, password: string) {
   await page.goto("/sign-in");
@@ -29,7 +32,7 @@ test.describe("Onboarding Flow", () => {
   test("step 1 shows welcome screen with Get Started button", async ({
     page,
   }) => {
-    await signIn(page, "gym@demo.my", "GymAdmin123!");
+    await signIn(page, "onboarding@demo.my", "Onboarding123!");
     await page.goto("/onboarding");
 
     // Step 1: Welcome card
@@ -46,7 +49,7 @@ test.describe("Onboarding Flow", () => {
   test("clicking Get Started advances to step 2 business form", async ({
     page,
   }) => {
-    await signIn(page, "gym@demo.my", "GymAdmin123!");
+    await signIn(page, "onboarding@demo.my", "Onboarding123!");
     await page.goto("/onboarding");
 
     await page.getByRole("button", { name: /get started/i }).click();
@@ -70,7 +73,7 @@ test.describe("Onboarding Flow", () => {
   });
 
   test("business name auto-generates URL slug", async ({ page }) => {
-    await signIn(page, "gym@demo.my", "GymAdmin123!");
+    await signIn(page, "onboarding@demo.my", "Onboarding123!");
     await page.goto("/onboarding");
     await page.getByRole("button", { name: /get started/i }).click();
 
@@ -92,7 +95,7 @@ test.describe("Onboarding Flow", () => {
   });
 
   test("Back button returns to step 1 welcome", async ({ page }) => {
-    await signIn(page, "gym@demo.my", "GymAdmin123!");
+    await signIn(page, "onboarding@demo.my", "Onboarding123!");
     await page.goto("/onboarding");
     await page.getByRole("button", { name: /get started/i }).click();
 
@@ -114,7 +117,7 @@ test.describe("Onboarding Flow", () => {
   });
 
   test("step indicators show correct progress", async ({ page }) => {
-    await signIn(page, "gym@demo.my", "GymAdmin123!");
+    await signIn(page, "onboarding@demo.my", "Onboarding123!");
     await page.goto("/onboarding");
 
     // There should be 3 step indicators
@@ -126,7 +129,7 @@ test.describe("Onboarding Flow", () => {
   test("successful business creation redirects to dashboard", async ({
     page,
   }) => {
-    await signIn(page, "gym@demo.my", "GymAdmin123!");
+    await signIn(page, "onboarding@demo.my", "Onboarding123!");
     await page.goto("/onboarding");
 
     // Step 1: Welcome
@@ -167,7 +170,7 @@ test.describe("Onboarding Flow", () => {
   });
 
   test("shows error message for duplicate slug", async ({ page }) => {
-    await signIn(page, "gym@demo.my", "GymAdmin123!");
+    await signIn(page, "onboarding@demo.my", "Onboarding123!");
     await page.goto("/onboarding");
 
     // Go to Step 2

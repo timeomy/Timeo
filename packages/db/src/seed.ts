@@ -32,6 +32,7 @@ const USERS = [
   { email: "cafe@demo.my", name: "Cafe Owner", password: "CafeAdmin123!", role: "user" as const },
   { email: "staff@demo.my", name: "Staff Member", password: "Staff123!", role: "user" as const },
   { email: "customer@demo.my", name: "Demo Customer", password: "Customer123!", role: "user" as const },
+  { email: "onboarding@demo.my", name: "Onboarding Test", password: "Onboarding123!", role: "user" as const },
 ] as const;
 
 const TENANTS = [
