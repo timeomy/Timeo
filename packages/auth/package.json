@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./server": "./src/server.ts",
     "./email": "./src/email.ts",
+    "./email-templates": "./src/email-templates.ts",
     "./web": "./src/web/index.ts",
     "./web/server": "./src/web/auth-server.ts"
   },
