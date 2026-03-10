@@ -34,7 +34,6 @@ import {
   QrCode,
   Smartphone,
   Hand,
-  Search,
   AlertCircle,
   Users,
   TrendingUp,

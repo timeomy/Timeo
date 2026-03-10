@@ -413,3 +413,27 @@ When spawning sub-agents, assign clear roles:
 - Add a **"Business Login" link at the bottom of timeo.my** for businesses to log in
 - Business login leads to a **different UI** (Business Admin dashboard) — not the customer UI
 - This keeps customer and business flows clearly separated
+
+---
+
+## Deployment
+
+Timeo is deployed on Hostinger VPS via Dokploy at https://admin.timeo.my
+
+- Web app: https://timeo.my (applicationId: KH114M6kwj02WRunDey1x)
+- API: https://api.timeo.my (applicationId: JumiDwQeQKTMZOM02qDG7)
+- GitHub: https://github.com/timeomy/Timeo (branch: main)
+
+### Deploy Command (run after any changes):
+```bash
+./scripts/deploy-now.sh "feat: your message here"
+```
+This commits, pushes to GitHub, and triggers Dokploy redeploy for both web + API.
+
+### Update Env Vars (via Dokploy API):
+```bash
+curl -s -X POST "https://admin.timeo.my/api/trpc/project.saveEnvironment" \
+  -H "x-api-key: YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"json":{"projectId":"itmmBWvEIgqoGzu27SqTA","env":"KEY=value\n..."}}'
+```

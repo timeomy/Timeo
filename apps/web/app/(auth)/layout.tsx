@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Zap } from "lucide-react";
+import { TimeoLogo } from "@/timeo-logo";
 
 export default function AuthLayout({
   children,
@@ -12,10 +12,7 @@ export default function AuthLayout({
       <header className="border-b">
         <div className="mx-auto flex h-16 max-w-7xl items-center px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <Zap className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-bold">Timeo</span>
+            <TimeoLogo size="md" />
           </Link>
         </div>
       </header>

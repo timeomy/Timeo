@@ -16,6 +16,7 @@ import {
   Separator,
   cn,
 } from "@timeo/ui/web";
+import { TimeoLogo } from "@/timeo-logo";
 import {
   Home,
   Calendar,
@@ -28,7 +29,6 @@ import {
   LogOut,
   User,
   ChevronDown,
-  Zap,
   Search,
 } from "lucide-react";
 
@@ -92,9 +92,7 @@ export default function PortalLayout({
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-            <Zap className="h-7 w-7 text-primary-foreground" />
-          </div>
+          <TimeoLogo size="xl" />
           <div className="h-1 w-32 overflow-hidden rounded-full bg-muted">
             <div className="h-full w-1/2 animate-pulse rounded-full bg-primary" />
           </div>
@@ -116,10 +114,7 @@ export default function PortalLayout({
           {/* Left: Logo */}
           <div className="flex items-center gap-6">
             <Link href="/portal" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <Zap className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <span className="text-lg font-bold">Timeo</span>
+              <TimeoLogo size="md" />
             </Link>
 
             {/* Desktop Nav Links */}

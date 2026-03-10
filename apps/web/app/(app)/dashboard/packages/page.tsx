@@ -38,7 +38,6 @@ import {
   ToggleLeft,
   ToggleRight,
   CreditCard,
-  AlertCircle,
 } from "lucide-react";
 
 const CURRENCY_OPTIONS = [

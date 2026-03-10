@@ -83,6 +83,7 @@ export {
   useCheckInStats,
   useCreateCheckIn,
   useCheckInByQr,
+  useMyCheckInHistory,
 } from "./check-ins";
 
 export {
@@ -270,6 +271,8 @@ export {
 export {
   useMemberQrCode,
   useGenerateQrCode,
+  useFaceEnrollmentStatus,
+  useSubmitFacePhoto,
 } from "./qr-code";
 
 export {

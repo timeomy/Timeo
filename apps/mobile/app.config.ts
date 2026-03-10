@@ -6,6 +6,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: "timeo",
   version: "1.0.0",
   orientation: "portrait",
+  userInterfaceStyle: "automatic",
   scheme: process.env.EXPO_PUBLIC_APP_SCHEME || "timeo",
   icon: "./assets/icon.png",
   splash: {
@@ -33,6 +34,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-router",
     "expo-secure-store",
     [
+      "expo-camera",
+      {
+        cameraPermission:
+          "Timeo needs camera access to scan QR codes and enroll your face for check-in.",
+      },
+    ],
+    [
       "expo-font",
       {
         fonts: [],
@@ -45,7 +53,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   extra: {
     apiUrl: process.env.EXPO_PUBLIC_API_URL,
     eas: {
-      projectId: "YOUR_EAS_PROJECT_ID",
+      projectId: "db721660-6452-498b-b554-6ce4fc2930d9",
     },
   },
 });

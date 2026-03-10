@@ -41,6 +41,8 @@ export const queryKeys = {
   checkIns: {
     all: (tenantId: string) => ["checkIns", tenantId] as const,
     qrCode: (tenantId: string) => ["checkIns", tenantId, "qrCode"] as const,
+    myHistory: (tenantId: string) => ["checkIns", tenantId, "myHistory"] as const,
+    faceEnrollment: (tenantId: string) => ["checkIns", tenantId, "faceEnrollment"] as const,
   },
 
   sessions: {

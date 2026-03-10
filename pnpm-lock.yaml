@@ -297,9 +297,15 @@ importers:
       expo:
         specifier: ~55.0.0-preview.12
         version: 55.0.4(@babel/core@7.29.0)(@expo/dom-webview@55.0.3)(@expo/metro-runtime@55.0.6)(bufferutil@4.1.0)(expo-router@55.0.0-preview.9)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
+      expo-brightness:
+        specifier: ~14.0.3
+        version: 14.0.8(expo@55.0.4)(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))
       expo-build-properties:
         specifier: ~55.0.8
         version: 55.0.8(expo@55.0.4)
+      expo-camera:
+        specifier: ~16.0.18
+        version: 16.0.18(expo@55.0.4)(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0)
       expo-constants:
         specifier: ~55.0.6
         version: 55.0.7(expo@55.0.4)(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(typescript@5.9.3)
@@ -5545,10 +5551,27 @@ packages:
       react: '*'
       react-native: 0.83.2
 
+  expo-brightness@14.0.8:
+    resolution: {integrity: sha512-WOg3UxzkHFTKBW3XvROlrVRmnJmZLhGBGd1RdzTfrtt2/MdSzvVmCevqWh4bohkeLABh0Yc9YRo1vFgfT73DWw==}
+    peerDependencies:
+      expo: '*'
+      react-native: 0.83.2
+
   expo-build-properties@55.0.8:
     resolution: {integrity: sha512-27FZtjqa00XIn5u4jydonfvMowyKz/cUA8SX1kuaNiHqlW/zlt/l5eS6jcsb9sAPYDnjo+ooIxG9wjOMwwj7AA==}
     peerDependencies:
       expo: '*'
+
+  expo-camera@16.0.18:
+    resolution: {integrity: sha512-NP5u2yyc+wZc9GdUXH+jcEytyXZwBnHxItMwXoZQQxi4wgltwvs4XfSWjBtRZe1LngnhpBfPyPJV0aShjWlLDg==}
+    peerDependencies:
+      expo: '*'
+      react: '*'
+      react-native: 0.83.2
+      react-native-web: '*'
+    peerDependenciesMeta:
+      react-native-web:
+        optional: true
 
   expo-camera@55.0.7:
     resolution: {integrity: sha512-inlyshlYkfKI9C1W/yszBxE+KcdiVpgiRg87DUOGuAL15suzSWySswgfa/UgJKDQLb7tsLZzf3OZi7gnnHfh9w==}
@@ -10559,17 +10582,6 @@ snapshots:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
 
-  '@better-auth/core@1.4.18(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.8(zod@3.25.76))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.0)':
-    dependencies:
-      '@better-auth/utils': 0.3.0
-      '@better-fetch/fetch': 1.1.21
-      '@standard-schema/spec': 1.1.0
-      better-call: 1.1.8(zod@3.25.76)
-      jose: 6.1.3
-      kysely: 0.28.11
-      nanostores: 1.1.0
-      zod: 4.3.6
-
   '@better-auth/core@1.4.18(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.8(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.0)':
     dependencies:
       '@better-auth/utils': 0.3.0
@@ -14604,13 +14616,13 @@ snapshots:
 
   better-auth@1.4.18(mongodb@6.16.0(socks@2.8.7))(next@14.2.25(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(sass@1.77.4))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@20.19.33)(jiti@1.21.7)(lightningcss@1.31.1)(sass@1.77.4)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)):
     dependencies:
-      '@better-auth/core': 1.4.18(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.8(zod@3.25.76))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.0)
+      '@better-auth/core': 1.4.18(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.8(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.0)
       '@better-auth/telemetry': 1.4.18(@better-auth/core@1.4.18(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.8(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.0))
       '@better-auth/utils': 0.3.0
       '@better-fetch/fetch': 1.1.21
       '@noble/ciphers': 2.1.1
       '@noble/hashes': 2.0.1
-      better-call: 1.1.8(zod@3.25.76)
+      better-call: 1.1.8(zod@4.3.6)
       defu: 6.1.4
       jose: 6.1.3
       kysely: 0.28.11
@@ -14622,15 +14634,6 @@ snapshots:
       react: 19.2.0
       react-dom: 19.2.0(react@19.2.0)
       vitest: 3.2.4(@types/debug@4.1.12)(@types/node@20.19.33)(jiti@1.21.7)(lightningcss@1.31.1)(sass@1.77.4)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
-
-  better-call@1.1.8(zod@3.25.76):
-    dependencies:
-      '@better-auth/utils': 0.3.0
-      '@better-fetch/fetch': 1.1.21
-      rou3: 0.7.12
-      set-cookie-parser: 2.7.2
-    optionalDependencies:
-      zod: 3.25.76
 
   better-call@1.1.8(zod@4.3.6):
     dependencies:
@@ -15772,6 +15775,11 @@ snapshots:
       - supports-color
       - typescript
 
+  expo-brightness@14.0.8(expo@55.0.4)(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10)):
+    dependencies:
+      expo: 55.0.4(@babel/core@7.29.0)(@expo/dom-webview@55.0.3)(@expo/metro-runtime@55.0.6)(bufferutil@4.1.0)(expo-router@55.0.0-preview.9)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
+      react-native: 0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10)
+
   expo-build-properties@55.0.8(expo@55.0.0-preview.12):
     dependencies:
       '@expo/schema-utils': 55.0.2
@@ -15785,6 +15793,13 @@ snapshots:
       expo: 55.0.4(@babel/core@7.29.0)(@expo/dom-webview@55.0.3)(@expo/metro-runtime@55.0.6)(bufferutil@4.1.0)(expo-router@55.0.0-preview.9)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
       resolve-from: 5.0.0
       semver: 7.7.4
+
+  expo-camera@16.0.18(expo@55.0.4)(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0):
+    dependencies:
+      expo: 55.0.4(@babel/core@7.29.0)(@expo/dom-webview@55.0.3)(@expo/metro-runtime@55.0.6)(bufferutil@4.1.0)(expo-router@55.0.0-preview.9)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
+      invariant: 2.2.4
+      react: 19.2.0
+      react-native: 0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10)
 
   expo-camera@55.0.7(expo@55.0.0-preview.12)(react-native@0.83.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@5.0.10))(react@19.2.0):
     dependencies:
@@ -18449,7 +18464,7 @@ snapshots:
       postcss: 8.4.31
       react: 19.2.0
       react-dom: 19.2.0(react@19.2.0)
-      styled-jsx: 5.1.1(@babel/core@7.29.0)(react@19.2.0)
+      styled-jsx: 5.1.1(react@19.2.0)
     optionalDependencies:
       '@next/swc-darwin-arm64': 14.2.25
       '@next/swc-darwin-x64': 14.2.25
@@ -20210,11 +20225,17 @@ snapshots:
       react: 19.2.0
     optionalDependencies:
       '@babel/core': 7.29.0
+    optional: true
 
   styled-jsx@5.1.1(react@18.3.1):
     dependencies:
       client-only: 0.0.1
       react: 18.3.1
+
+  styled-jsx@5.1.1(react@19.2.0):
+    dependencies:
+      client-only: 0.0.1
+      react: 19.2.0
 
   stylis@4.2.0: {}
 

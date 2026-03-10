@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState } from "react";
 import {
   usePosTransactions,
   useCreatePosTransaction,
@@ -45,7 +45,6 @@ import {
 import {
   Store,
   Plus,
-  Search,
   Receipt,
   Ban,
   DollarSign,
@@ -56,14 +55,10 @@ import {
   Trash2,
   Eye,
   FileText,
-  Calendar,
   ChevronLeft,
   ChevronRight,
-  Download,
   Printer,
   Smartphone,
-  X,
-  Loader2,
 } from "lucide-react";
 
 type PaymentMethod = "cash" | "card" | "qr_pay" | "bank_transfer" | "revenue_monster";
@@ -1247,7 +1242,7 @@ function StatementView({
   month,
   onPrevMonth,
   onNextMonth,
-  isAdmin,
+  isAdmin: _isAdmin,
 }: {
   statement: any;
   isLoading: boolean;

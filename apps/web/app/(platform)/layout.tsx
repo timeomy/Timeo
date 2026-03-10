@@ -13,12 +13,13 @@ import {
   Separator,
   cn,
 } from "@timeo/ui/web";
+import { TimeoLogo } from "@/timeo-logo";
 import {
   LayoutDashboard,
   Building2,
   Users,
   CreditCard,
-  Zap,
+  ToggleRight,
   Settings,
   BarChart3,
   ScrollText,
@@ -42,7 +43,7 @@ const sidebarLinks: SidebarLink[] = [
   { href: "/admin/tenants", label: "Tenants", icon: Building2 },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/billing", label: "Billing", icon: CreditCard },
-  { href: "/admin/features", label: "Feature Flags", icon: Zap },
+  { href: "/admin/features", label: "Feature Flags", icon: ToggleRight },
   { href: "/admin/config", label: "Config", icon: Settings },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/admin/activity", label: "Activity", icon: ScrollText },
@@ -65,15 +66,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       {/* Logo */}
       <div className="p-4">
         <Link href="/admin" className="flex items-center gap-2" onClick={onNavigate}>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <Zap className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <div>
-            <span className="text-xl font-bold">Timeo</span>
-            <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              C2 Control Center
-            </p>
-          </div>
+          <TimeoLogo size="md" />
+          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            C2
+          </p>
         </Link>
       </div>
 
@@ -193,9 +189,7 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-            <Zap className="h-7 w-7 text-primary-foreground" />
-          </div>
+          <TimeoLogo size="xl" />
           <div className="h-1 w-32 overflow-hidden rounded-full bg-muted">
             <div className="h-full w-1/2 animate-pulse rounded-full bg-primary" />
           </div>
@@ -239,10 +233,7 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-              <Zap className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <span className="font-semibold">Timeo</span>
+            <TimeoLogo size="sm" />
             <span className="text-xs text-muted-foreground">C2</span>
           </div>
         </header>

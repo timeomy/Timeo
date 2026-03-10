@@ -26,6 +26,8 @@ import { paymentsRouter } from "./routes/payments.routes.js";
 import { customersRouter } from "./routes/customers.routes.js";
 import { loyaltyRouter } from "./routes/loyalty.routes.js";
 import { staffRouter } from "./routes/staff.routes.js";
+import { turnstileRouter } from "./routes/turnstile.routes.js";
+import { gymRouter } from "./routes/gym.routes.js";
 import { usersRouter } from "./routes/users.routes.js";
 import { stripeWebhookRouter } from "./routes/webhooks/stripe.js";
 import { revenueMonsterWebhookRouter } from "./routes/webhooks/revenue-monster.js";
@@ -69,6 +71,11 @@ export function createApp() {
   app.route("/api/tenants/:tenantId/customers", customersRouter);
   app.route("/api/tenants/:tenantId/loyalty", loyaltyRouter);
   app.route("/api/tenants/:tenantId/staff", staffRouter);
+  app.route("/api/tenants/:tenantId/turnstile", turnstileRouter);
+  app.route("/api/tenants/:tenantId/gym", gymRouter);
+
+  // Gym device check-in (no auth - uses API key, tenant derived from QR code)
+  app.route("/api/gym", gymRouter);
 
   // User profile routes
   app.route("/api/users", usersRouter);

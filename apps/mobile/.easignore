@@ -1,0 +1,11 @@
+# Exclude non-mobile packages from EAS upload
+../../packages/api
+../../packages/db
+../../infra
+../../docs
+../../specs
+../../scripts
+../../store-assets
+../../wsfitness
+../../.git
+node_modules

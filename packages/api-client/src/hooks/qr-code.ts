@@ -33,3 +33,37 @@ export function useGenerateQrCode(tenantId: string) {
       }),
   });
 }
+
+interface FaceEnrollmentStatus {
+  enrolled: boolean;
+  enrolledAt?: string;
+  photoUrl?: string;
+}
+
+export function useFaceEnrollmentStatus(
+  tenantId: string | null | undefined,
+) {
+  return useQuery({
+    queryKey: queryKeys.checkIns.faceEnrollment(tenantId ?? ""),
+    queryFn: () =>
+      api.get<FaceEnrollmentStatus>(
+        `/api/tenants/${tenantId}/gym/face-enrollment/status`,
+      ),
+    enabled: !!tenantId,
+  });
+}
+
+export function useSubmitFacePhoto(tenantId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { photoBase64: string }) =>
+      api.post<{ enrolled: boolean; enrolledAt: string }>(
+        `/api/tenants/${tenantId}/gym/face-enrollment`,
+        data,
+      ),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.checkIns.faceEnrollment(tenantId),
+      }),
+  });
+}

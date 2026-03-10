@@ -218,6 +218,22 @@ export async function queryDevicePersons(input: {
   return sendCommand(input.mqttTopic, command, 30000);
 }
 
+// ─── Force Open Door ───────────────────────────────────────────────────────
+
+export async function sendDoorOpenCommand(input: {
+  mqttTopic: string;
+}): Promise<DeviceResponse> {
+  const command: DeviceCommand = {
+    version: "0.2",
+    cmd: "gateway_ctrl",
+    device_type: "gpio",
+    device_no: 1,
+    ctrl_mode: "force",
+  };
+
+  return sendCommand(input.mqttTopic, command);
+}
+
 // ─── Cleanup ────────────────────────────────────────────────────────────────
 
 export function closeMqtt(): void {
