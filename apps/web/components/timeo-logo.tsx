@@ -26,7 +26,7 @@ export function TimeoLogo({
   className?: string;
 }) {
   return (
-    <span className={cn("flex items-center gap-1", className)}>
+    <span className={cn("flex items-end gap-1", className)}>
       <span
         className={cn(
           "font-extrabold tracking-tight leading-none",
