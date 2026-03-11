@@ -1,15 +1,21 @@
-import Image from "next/image";
 import { cn } from "@timeo/ui/web";
 
 type LogoSize = "xs" | "sm" | "md" | "lg" | "xl";
 
-// Height-only sizing — width is unconstrained so the natural aspect ratio is preserved.
-const heightMap: Record<LogoSize, number> = {
-  xs: 20,
-  sm: 28,
-  md: 36,
-  lg: 44,
-  xl: 56,
+const fontSizeMap: Record<LogoSize, string> = {
+  xs: "text-base",
+  sm: "text-lg",
+  md: "text-2xl",
+  lg: "text-3xl",
+  xl: "text-4xl",
+};
+
+const dotSizeMap: Record<LogoSize, string> = {
+  xs: "w-1.5 h-1.5",
+  sm: "w-1.5 h-1.5",
+  md: "w-2 h-2",
+  lg: "w-2.5 h-2.5",
+  xl: "w-3 h-3",
 };
 
 export function TimeoLogo({
@@ -19,14 +25,23 @@ export function TimeoLogo({
   size?: LogoSize;
   className?: string;
 }) {
-  const h = heightMap[size];
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src="/timeo-logo.png"
-      alt="Timeo"
-      style={{ height: h, width: "auto" }}
-      className={cn("block", className)}
-    />
+    <span className={cn("flex items-center gap-1", className)}>
+      <span
+        className={cn(
+          "font-extrabold tracking-tight leading-none",
+          fontSizeMap[size]
+        )}
+        style={{ letterSpacing: "-0.03em" }}
+      >
+        timeo
+      </span>
+      <span
+        className={cn(
+          "rounded-full bg-blue-600 inline-block flex-shrink-0 mb-0.5",
+          dotSizeMap[size]
+        )}
+      />
+    </span>
   );
 }

@@ -55,21 +55,12 @@ export default function SignInPage() {
 
   return (
     <div className="w-full max-w-md">
-      <div className="rounded-xl border bg-card p-8 shadow-sm">
-        <div className="mb-6 text-center">
-          <div className="mb-4 flex justify-center">
-            <img
-              src="/tenants/ws-fitness-logo.png"
-              alt="WS Fitness"
-              className="h-16 w-auto"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.display = "none";
-              }}
-            />
-          </div>
-          <h1 className="text-2xl font-bold">Welcome back</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Sign in to your WS Fitness account
+      <div className="rounded-2xl border border-border/60 bg-card p-8 shadow-lg shadow-black/20">
+        {/* Header */}
+        <div className="mb-7 text-center">
+          <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Sign in to your Timeo account
           </p>
         </div>
 
@@ -89,6 +80,7 @@ export default function SignInPage() {
               }}
               disabled={loading}
               autoComplete="email"
+              className="transition-colors focus-visible:ring-blue-500"
             />
           </div>
 
@@ -97,7 +89,10 @@ export default function SignInPage() {
               <label htmlFor="password" className="mb-1.5 block text-sm font-medium">
                 Password
               </label>
-              <Link href="/forgot-password" className="mb-1.5 text-xs text-primary hover:underline">
+              <Link
+                href="/forgot-password"
+                className="mb-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+              >
                 Forgot password?
               </Link>
             </div>
@@ -112,18 +107,26 @@ export default function SignInPage() {
               }}
               disabled={loading}
               autoComplete="current-password"
+              className="transition-colors focus-visible:ring-blue-500"
             />
           </div>
 
           {error && (
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {error}
+            </p>
           )}
 
-          <Button type="submit" className="w-full" size="lg" disabled={loading}>
+          <Button
+            type="submit"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+            size="lg"
+            disabled={loading}
+          >
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Signing in...
+                Signing in…
               </>
             ) : (
               "Sign In"
@@ -133,7 +136,10 @@ export default function SignInPage() {
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}
-          <Link href="/sign-up" className="font-medium text-primary hover:underline">
+          <Link
+            href="/sign-up"
+            className="font-medium text-blue-400 hover:text-blue-300 transition-colors"
+          >
             Sign up
           </Link>
         </p>

@@ -63,10 +63,10 @@ export default function SignUpPage() {
 
   return (
     <div className="w-full max-w-md">
-      <div className="rounded-xl border bg-card p-8 shadow-sm">
-        <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold">Create your account</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+      <div className="rounded-2xl border border-border/60 bg-card p-8 shadow-lg shadow-black/20">
+        <div className="mb-7 text-center">
+          <h1 className="text-2xl font-bold tracking-tight">Create your account</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
             Get started with Timeo for free
           </p>
         </div>
@@ -130,11 +130,16 @@ export default function SignUpPage() {
             <p className="text-sm text-destructive">{error}</p>
           )}
 
-          <Button type="submit" className="w-full" size="lg" disabled={loading}>
+          <Button
+            type="submit"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+            size="lg"
+            disabled={loading}
+          >
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating account...
+                Creating account…
               </>
             ) : (
               "Create Account"
@@ -144,7 +149,10 @@ export default function SignUpPage() {
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Already have an account?{" "}
-          <Link href="/sign-in" className="font-medium text-primary hover:underline">
+          <Link
+            href="/sign-in"
+            className="font-medium text-blue-400 hover:text-blue-300 transition-colors"
+          >
             Sign in
           </Link>
         </p>
