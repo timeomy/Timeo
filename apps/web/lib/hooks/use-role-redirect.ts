@@ -6,7 +6,8 @@ import type { TimeoRole } from "@timeo/auth/web";
 export function getRoleHomePath(role: TimeoRole, _hasTenant: boolean): string {
   if (role === "platform_admin") return "/admin";
   if (role === "customer") return "/portal";
-  return "/dashboard";
+  if (role === "staff") return "/dashboard/gym/checkins"; // Coach: daily check-ins & client log
+  return "/dashboard/gym"; // Admin: gym overview (members, payments, stats)
 }
 
 export function useRoleRedirect() {

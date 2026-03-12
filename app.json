@@ -1,3 +1,13 @@
 {
-  "expo": {}
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "db721660-6452-498b-b554-6ce4fc2930d9"
+      }
+    },
+    "owner": "oxloz",
+    "android": {
+      "package": "my.timeo.app"
+    }
+  }
 }

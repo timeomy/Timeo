@@ -11,11 +11,11 @@ const fontSizeMap: Record<LogoSize, string> = {
 };
 
 const dotSizeMap: Record<LogoSize, string> = {
-  xs: "w-1.5 h-1.5",
-  sm: "w-1.5 h-1.5",
-  md: "w-2 h-2",
-  lg: "w-2.5 h-2.5",
-  xl: "w-3 h-3",
+  xs: "w-1 h-1",
+  sm: "w-1 h-1",
+  md: "w-1.5 h-1.5",
+  lg: "w-2 h-2",
+  xl: "w-2.5 h-2.5",
 };
 
 export function TimeoLogo({
@@ -26,7 +26,7 @@ export function TimeoLogo({
   className?: string;
 }) {
   return (
-    <span className={cn("flex items-end gap-1", className)}>
+    <span className={cn("flex items-end gap-0.5", className)}>
       <span
         className={cn(
           "font-extrabold tracking-tight leading-none",

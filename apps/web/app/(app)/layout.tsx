@@ -361,14 +361,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // Use the first tenant's role directly to avoid a timing race where
+  // activeTenantId starts as null, making activeRole default to "customer"
+  // even for admin/staff users on first render.
+  const primaryRole = tenants[0]?.role ?? "customer";
+
   useEffect(() => {
     if (!isLoaded || tenantsLoading) return;
     if (!isSignedIn) { router.replace("/sign-in"); return; }
     if (activeRole === "platform_admin") { router.replace("/admin"); return; }
     if (tenants.length === 0) { router.replace("/portal"); return; }
-    if (activeRole === "customer") { router.replace("/portal"); return; }
+    if (primaryRole === "customer") { router.replace("/portal"); return; }
     if (userProfile?.force_password_reset) { router.replace("/change-password"); return; }
-  }, [isLoaded, tenantsLoading, isSignedIn, tenants, activeRole, userProfile, router]);
+  }, [isLoaded, tenantsLoading, isSignedIn, tenants, activeRole, primaryRole, userProfile, router]);
 
   if (!isLoaded || tenantsLoading) {
     return (
@@ -383,7 +388,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isSignedIn || tenants.length === 0 || activeRole === "customer") {
+  if (!isSignedIn || tenants.length === 0 || primaryRole === "customer") {
     return null;
   }
 

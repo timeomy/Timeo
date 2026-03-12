@@ -1,0 +1,33 @@
+{
+  "cli": {
+    "version": ">= 12.0.0"
+  },
+  "build": {
+    "production": {
+      "ios": {
+        "buildConfiguration": "Release",
+        "bundleIdentifier": "my.timeo.app"
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "mail@oxloz.com",
+        "ascAppId": "6760156042",
+        "bundleIdentifier": "my.timeo.app",
+        "ascApiKeyPath": "../../AuthKey_AQ34RJHT5U.p8",
+        "ascApiKeyId": "AQ34RJHT5U",
+        "ascApiKeyIssuerId": "b83fdc21-02b9-4f55-8f00-19c22d5ffda7"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "internal"
+      }
+    }
+  }
+}
