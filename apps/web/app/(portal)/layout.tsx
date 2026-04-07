@@ -9,6 +9,7 @@ import { getInitials } from "@timeo/shared";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
 import { useEnsureMembership } from "@/hooks/use-ensure-membership";
 import { useTenantId } from "@/hooks/use-tenant-id";
+import { useTenant } from "@timeo/api-client";
 import {
   Avatar,
   AvatarImage,
@@ -16,6 +17,9 @@ import {
   Separator,
   cn,
 } from "@timeo/ui/web";
+import { TimeoLogo } from "@/timeo-logo";
+import { NotificationsBell } from "@/notifications-bell";
+import { LanguageSwitcher } from "@/language-switcher";
 import {
   Home,
   Calendar,
@@ -28,7 +32,6 @@ import {
   LogOut,
   User,
   ChevronDown,
-  Zap,
   Search,
 } from "lucide-react";
 
@@ -43,9 +46,6 @@ const navLinks: NavLink[] = [
   { href: "/portal/directory", label: "Browse", icon: Search },
   { href: "/portal/bookings", label: "Bookings", icon: Calendar },
   { href: "/portal/packages", label: "Packages", icon: Package },
-  { href: "/portal/vouchers", label: "Vouchers", icon: Ticket },
-  { href: "/portal/transactions", label: "Transactions", icon: Receipt },
-  { href: "/portal/qr-code", label: "QR Code", icon: QrCode },
 ];
 
 export default function PortalLayout({
@@ -61,6 +61,8 @@ export default function PortalLayout({
   useEnsureUser(!!isSignedIn);
   const { tenantId } = useTenantId();
   useEnsureMembership(tenantId);
+  const { data: tenantData } = useTenant(tenantId);
+  const tenantLogoUrl = tenantData?.branding?.logoUrl ?? "/tenants/ws-fitness-logo.png";
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
@@ -82,7 +84,10 @@ export default function PortalLayout({
     }
 
     // Staff/admin with tenants go to business dashboard
-    if (tenants.length > 0 && activeRole !== "customer") {
+    // Use tenants[0]?.role directly to avoid race where activeRole defaults
+    // to "customer" before activeTenantId is auto-selected.
+    const primaryRole = tenants.length > 0 ? tenants[0]?.role : undefined;
+    if (tenants.length > 0 && primaryRole && primaryRole !== "customer") {
       router.replace("/dashboard");
     }
   }, [isLoaded, tenantsLoading, isSignedIn, tenants, activeRole, router]);
@@ -92,9 +97,7 @@ export default function PortalLayout({
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-            <Zap className="h-7 w-7 text-primary-foreground" />
-          </div>
+          <TimeoLogo size="xl" />
           <div className="h-1 w-32 overflow-hidden rounded-full bg-muted">
             <div className="h-full w-1/2 animate-pulse rounded-full bg-primary" />
           </div>
@@ -104,7 +107,7 @@ export default function PortalLayout({
   }
 
   // Show loading while redirecting (staff/admin go to dashboard, platform admin to C2)
-  if (!isSignedIn || (tenants.length > 0 && activeRole !== "customer")) {
+  if (!isSignedIn || (tenants.length > 0 && tenants[0]?.role !== "customer")) {
     return null;
   }
 
@@ -116,10 +119,15 @@ export default function PortalLayout({
           {/* Left: Logo */}
           <div className="flex items-center gap-6">
             <Link href="/portal" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <Zap className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <span className="text-lg font-bold">Timeo</span>
+              {/* Tenant branding: dynamic logo from tenant settings, fallback to WS Fitness logo */}
+              <img
+                src={tenantLogoUrl}
+                alt="Gym Logo"
+                className="h-8 w-auto"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
             </Link>
 
             {/* Desktop Nav Links */}
@@ -148,8 +156,10 @@ export default function PortalLayout({
             </nav>
           </div>
 
-          {/* Right: User Avatar Dropdown + Mobile Hamburger */}
+          {/* Right: Notifications + User Avatar Dropdown + Mobile Hamburger */}
           <div className="flex items-center gap-2">
+            <LanguageSwitcher />
+            <NotificationsBell />
             {/* User Dropdown (Desktop) */}
             <div className="relative hidden md:block">
               <button
@@ -157,10 +167,7 @@ export default function PortalLayout({
                 className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/[0.06]"
               >
                 <Avatar className="h-7 w-7">
-                  <AvatarImage
-                    src={user?.imageUrl ?? undefined}
-                    alt={displayName}
-                  />
+                  {user?.imageUrl && <AvatarImage src={user.imageUrl} alt={displayName} />}
                   <AvatarFallback className="text-xs">
                     {getInitials(displayName)}
                   </AvatarFallback>
@@ -177,7 +184,7 @@ export default function PortalLayout({
                     className="fixed inset-0 z-40"
                     onClick={() => setUserMenuOpen(false)}
                   />
-                  <div className="glass absolute right-0 top-full z-50 mt-1.5 w-48 p-1.5">
+                  <div className="absolute right-0 top-full z-50 mt-1.5 w-48 rounded-xl border border-white/[0.08] bg-[#1a1a2e] p-1.5 shadow-xl">
                     <Link
                       href="/portal/profile"
                       onClick={() => setUserMenuOpen(false)}
@@ -248,10 +255,7 @@ export default function PortalLayout({
               {/* Mobile User Section */}
               <div className="flex items-center gap-3 px-3 py-2">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage
-                    src={user?.imageUrl ?? undefined}
-                    alt={displayName}
-                  />
+                  {user?.imageUrl && <AvatarImage src={user.imageUrl} alt={displayName} />}
                   <AvatarFallback className="text-xs">
                     {getInitials(displayName)}
                   </AvatarFallback>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useService, useCreateBooking, useAvailableSlots } from "@timeo/api-client";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
@@ -23,7 +23,6 @@ import {
   Clock,
   ArrowLeft,
   Calendar,
-  FileText,
   CheckCircle2,
   Loader2,
 } from "lucide-react";
@@ -39,7 +38,6 @@ function formatSlotTime(isoString: string): string {
 
 export default function ServiceDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const serviceId = params.id as string;
 
   const { activeTenantId, isSignedIn } = useTimeoWebAuthContext();

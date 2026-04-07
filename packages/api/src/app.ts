@@ -23,14 +23,25 @@ import { platformRouter } from "./routes/platform.routes.js";
 import { filesRouter } from "./routes/files.routes.js";
 import { einvoiceRouter } from "./routes/einvoice.routes.js";
 import { paymentsRouter } from "./routes/payments.routes.js";
+import { paymentRequestsRouter } from "./routes/payment-requests.routes.js";
 import { customersRouter } from "./routes/customers.routes.js";
 import { loyaltyRouter } from "./routes/loyalty.routes.js";
 import { staffRouter } from "./routes/staff.routes.js";
+import { turnstileRouter } from "./routes/turnstile.routes.js";
+import { gymRouter } from "./routes/gym.routes.js";
+import { missionControlRouter } from "./routes/mission-control.routes.js";
 import { usersRouter } from "./routes/users.routes.js";
 import { stripeWebhookRouter } from "./routes/webhooks/stripe.js";
 import { revenueMonsterWebhookRouter } from "./routes/webhooks/revenue-monster.js";
 import { doorWebhookRouter } from "./routes/webhooks/door.js";
+import { gateRouter } from "./routes/gate.routes.js";
+import { walletRouter } from "./routes/wallet.routes.js";
+import { coachRouter } from "./routes/coach.routes.js";
+import { notificationTemplatesRouter, notificationSettingsRouter } from "./routes/notification-templates.routes.js";
+import { invoicesRouter } from "./routes/invoices.routes.js";
 import { healthRouter } from "./routes/health.js";
+import { feedRouter, broadcastsRouter, catalogRouter } from "./routes/feed.routes.js";
+import { wsFitnessMigrationRouter } from "./routes/admin-migration.routes.js";
 
 export function createApp() {
   const app = new Hono();
@@ -44,6 +55,11 @@ export function createApp() {
   // Health check
   app.route("/health", healthRouter);
 
+  // Feed & Broadcast routes
+  app.route("/api/feed", feedRouter);
+  app.route("/api/tenants/:tenantId/broadcasts", broadcastsRouter);
+  app.route("/api/tenants/:tenantId/catalog", catalogRouter);
+
   // Better Auth routes
   app.route("/api/auth", authRouter);
 
@@ -54,6 +70,7 @@ export function createApp() {
   app.route("/api/tenants/:tenantId/products", productsRouter);
   app.route("/api/tenants/:tenantId/orders", ordersRouter);
   app.route("/api/tenants/:tenantId/payments", paymentsRouter);
+  app.route("/api/tenants/:tenantId/payment-requests", paymentRequestsRouter);
   app.route("/api/tenants/:tenantId/pos", posRouter);
   app.route("/api/tenants/:tenantId/check-ins", checkInsRouter);
   app.route("/api/tenants/:tenantId/sessions", sessionsRouter);
@@ -69,17 +86,30 @@ export function createApp() {
   app.route("/api/tenants/:tenantId/customers", customersRouter);
   app.route("/api/tenants/:tenantId/loyalty", loyaltyRouter);
   app.route("/api/tenants/:tenantId/staff", staffRouter);
+  app.route("/api/tenants/:tenantId/turnstile", turnstileRouter);
+  app.route("/api/tenants/:tenantId/gym", gymRouter);
+  app.route("/api/tenants/:tenantId/mission-control", missionControlRouter);
+  app.route("/api/tenants/:tenantId/coaches", coachRouter);
+
+  // Gym device check-in (no auth - uses API key, tenant derived from QR code)
+  app.route("/api/gym", gymRouter);
 
   // User profile routes
   app.route("/api/users", usersRouter);
 
   // Platform admin routes
   app.route("/api/platform", platformRouter);
+  app.route("/api/admin/migration/wsfitness", wsFitnessMigrationRouter);
 
   // Webhooks (no auth middleware - verified via signatures)
   app.route("/webhooks/stripe", stripeWebhookRouter);
   app.route("/webhooks/revenue-monster", revenueMonsterWebhookRouter);
   app.route("/webhooks/door", doorWebhookRouter);
+  app.route("/api/gate", gateRouter);
+  app.route("/api/tenants/:tenantId/notification-templates", notificationTemplatesRouter);
+  app.route("/api/tenants/:tenantId/notification-settings", notificationSettingsRouter);
+  app.route("/api/tenants/:tenantId/invoices", invoicesRouter);
+  app.route("/api/wallet", walletRouter);
 
   return app;
 }

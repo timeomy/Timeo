@@ -41,6 +41,8 @@ export const queryKeys = {
   checkIns: {
     all: (tenantId: string) => ["checkIns", tenantId] as const,
     qrCode: (tenantId: string) => ["checkIns", tenantId, "qrCode"] as const,
+    myHistory: (tenantId: string) => ["checkIns", tenantId, "myHistory"] as const,
+    faceEnrollment: (tenantId: string) => ["checkIns", tenantId, "faceEnrollment"] as const,
   },
 
   sessions: {
@@ -141,6 +143,16 @@ export const queryKeys = {
   payments: {
     all: (tenantId: string) => ["payments", tenantId] as const,
     byId: (tenantId: string, id: string) => ["payments", tenantId, id] as const,
+  },
+
+  paymentRequests: {
+    all: (tenantId: string, status?: string) =>
+      status
+        ? (["paymentRequests", tenantId, status] as const)
+        : (["paymentRequests", tenantId] as const),
+    mine: (tenantId: string) => ["paymentRequests", tenantId, "mine"] as const,
+    byId: (tenantId: string, id: string) =>
+      ["paymentRequests", tenantId, id] as const,
   },
 
   staff: {

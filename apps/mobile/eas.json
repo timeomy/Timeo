@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 10.0.0"
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -20,6 +21,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "node": "22.22.1",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.timeo.my",
         "EXPO_PUBLIC_APP_SCHEME": "timeo"

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { usePublicTenants, useJoinTenant } from "@timeo/api-client";
+import { usePublicTenants } from "@timeo/api-client";
 import {
   Card,
   CardContent,
@@ -13,10 +13,8 @@ import {
 import {
   Search,
   Building2,
-  Loader2,
-  Check,
-  Zap,
   ArrowRight,
+  KeyRound,
 } from "lucide-react";
 
 export default function DirectoryPage() {
@@ -30,9 +28,6 @@ export default function DirectoryPage() {
   const { data: businesses, isLoading } = usePublicTenants(
     debouncedSearch || undefined
   );
-  const joinMutation = useJoinTenant();
-  const [joiningSlug, setJoiningSlug] = useState<string | null>(null);
-  const [joinedSlug, setJoinedSlug] = useState<string | null>(null);
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
@@ -41,27 +36,14 @@ export default function DirectoryPage() {
     setDebounceTimer(timer);
   };
 
-  const handleJoin = async (slug: string) => {
-    setJoiningSlug(slug);
-    try {
-      await joinMutation.mutateAsync(slug);
-      setJoinedSlug(slug);
-      setTimeout(() => {
-        router.push("/portal");
-      }, 1200);
-    } catch {
-      setJoiningSlug(null);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-          Browse Businesses
+          Find a Business
         </h1>
         <p className="mt-1 text-sm text-white/50">
-          Discover gyms, salons, clinics and more on Timeo
+          Discover gyms, salons, clinics and more on Timeo. To join, ask them for an invite code.
         </p>
       </div>
 
@@ -88,76 +70,58 @@ export default function DirectoryPage() {
         </div>
       ) : businesses && businesses.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {businesses.map((biz) => {
-            const isJoining = joiningSlug === biz.slug;
-            const isJoined = joinedSlug === biz.slug;
-
-            return (
-              <Card
-                key={biz.id}
-                className="glass border-white/[0.08] transition-colors hover:border-white/[0.15]"
-              >
-                <CardContent className="flex flex-col gap-4 p-5">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
-                      style={{
-                        backgroundColor: biz.primaryColor
-                          ? `${biz.primaryColor}20`
-                          : "hsl(var(--primary) / 0.1)",
-                      }}
-                    >
-                      {biz.logoUrl ? (
-                        <img
-                          src={biz.logoUrl}
-                          alt={biz.name}
-                          className="h-8 w-8 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <Building2
-                          className="h-6 w-6"
-                          style={{
-                            color: biz.primaryColor ?? "hsl(var(--primary))",
-                          }}
-                        />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold text-white">
-                        {biz.name}
-                      </p>
-                      <p className="text-xs text-white/40">{biz.slug}</p>
-                    </div>
-                  </div>
-
-                  <Button
-                    size="sm"
-                    className="w-full gap-2"
-                    variant={isJoined ? "outline" : "default"}
-                    disabled={isJoining || isJoined}
-                    onClick={() => handleJoin(biz.slug)}
+          {businesses.map((biz) => (
+            <Card
+              key={biz.id}
+              className="glass border-white/[0.08] transition-colors hover:border-white/[0.15]"
+            >
+              <CardContent className="flex flex-col gap-4 p-5">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+                    style={{
+                      backgroundColor: biz.primaryColor
+                        ? `${biz.primaryColor}20`
+                        : "hsl(var(--primary) / 0.1)",
+                    }}
                   >
-                    {isJoined ? (
-                      <>
-                        <Check className="h-4 w-4" />
-                        Joined!
-                      </>
-                    ) : isJoining ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Joining...
-                      </>
+                    {biz.logoUrl ? (
+                      <img
+                        src={biz.logoUrl}
+                        alt={biz.name}
+                        className="h-8 w-8 rounded-lg object-cover"
+                      />
                     ) : (
-                      <>
-                        Join
-                        <ArrowRight className="h-4 w-4" />
-                      </>
+                      <Building2
+                        className="h-6 w-6"
+                        style={{
+                          color: biz.primaryColor ?? "hsl(var(--primary))",
+                        }}
+                      />
                     )}
-                  </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-white">
+                      {biz.name}
+                    </p>
+                    <p className="text-xs text-white/40">{biz.slug}</p>
+                  </div>
+                </div>
+
+                <div className="rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-2 text-center">
+                  <p className="text-xs text-white/50">
+                    Have an invite code?{" "}
+                    <button
+                      onClick={() => router.push("/join")}
+                      className="text-primary underline-offset-2 hover:underline"
+                    >
+                      Enter it here
+                    </button>
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       ) : (
         <div className="py-16 text-center">
@@ -180,8 +144,8 @@ export default function DirectoryPage() {
               className="mt-4 gap-2"
               onClick={() => router.push("/join")}
             >
+              <KeyRound className="h-4 w-4" />
               Enter a Code
-              <ArrowRight className="h-4 w-4" />
             </Button>
           )}
         </div>

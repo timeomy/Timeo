@@ -14,8 +14,8 @@ import {
   cn,
 } from "@timeo/ui/web";
 import { getInitials } from "@timeo/shared";
+import { TimeoLogo } from "@/timeo-logo";
 import {
-  Zap,
   Menu,
   X,
   Calendar,
@@ -86,10 +86,7 @@ export function NavHeader() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <Zap className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <span className="text-xl font-bold">Timeo</span>
+          <TimeoLogo size="md" />
         </Link>
 
         {/* Desktop Navigation */}

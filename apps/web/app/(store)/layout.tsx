@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { NavHeader } from "../../components/nav-header";
-import { Zap } from "lucide-react";
+import { TimeoLogo } from "@/timeo-logo";
 import Link from "next/link";
 
 export default function StoreLayout({
@@ -37,10 +37,7 @@ export default function StoreLayout({
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <div className="flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded bg-primary">
-                <Zap className="h-3.5 w-3.5 text-primary-foreground" />
-              </div>
-              <span className="text-sm font-semibold">Timeo</span>
+              <TimeoLogo size="xs" />
             </div>
             <div className="flex items-center gap-6">
               <Link

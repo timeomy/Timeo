@@ -31,6 +31,7 @@ export const paymentGatewayEnum = pgEnum("payment_gateway", [
 export const memberRoleEnum = pgEnum("member_role", [
   "customer",
   "staff",
+  "coach",
   "admin",
   "platform_admin",
 ]);
@@ -223,4 +224,16 @@ export const fileTypeEnum = pgEnum("file_type", [
   "avatar",
   "logo",
   "document",
+]);
+
+// ─── Payment Requests (DuitNow) ──────────────────────────────────────────────
+export const paymentRequestStatusEnum = pgEnum("payment_request_status", [
+  "pending_verification",
+  "approved",
+  "rejected",
+]);
+
+export const paymentRequestPlanTypeEnum = pgEnum("payment_request_plan_type", [
+  "membership",
+  "session_package",
 ]);

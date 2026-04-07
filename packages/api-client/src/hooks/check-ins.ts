@@ -6,12 +6,14 @@ interface CheckIn {
   id: string;
   tenantId: string;
   userId: string;
-  method: "qr" | "nfc" | "manual";
+  method: "qr" | "face" | "nfc" | "manual";
   checkedInAt: string;
   userName?: string;
   userEmail?: string;
   checkedInByName?: string;
   membershipName?: string;
+  location?: string;
+  status?: "granted" | "denied";
 }
 
 interface CheckInStats {
@@ -75,7 +77,15 @@ export function useCheckInByQr(tenantId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (qrCode: string) =>
-      api.post<{ checkInId: string }>(`/api/tenants/${tenantId}/check-ins`, {
+      api.post<{
+        checkInId: string;
+        member?: {
+          name: string;
+          email?: string;
+          membershipName?: string;
+          photoUrl?: string;
+        };
+      }>(`/api/tenants/${tenantId}/check-ins`, {
         qrCode,
         method: "qr",
       }),
@@ -83,5 +93,27 @@ export function useCheckInByQr(tenantId: string) {
       queryClient.invalidateQueries({
         queryKey: queryKeys.checkIns.all(tenantId),
       }),
+  });
+}
+
+export function useMyCheckInHistory(
+  tenantId: string | null | undefined,
+  options?: { page?: number; limit?: number },
+) {
+  const page = options?.page ?? 1;
+  const limit = options?.limit ?? 20;
+  return useQuery({
+    queryKey: [...queryKeys.checkIns.myHistory(tenantId ?? ""), page, limit],
+    queryFn: () =>
+      api.get<{
+        items: CheckIn[];
+        total: number;
+        page: number;
+        limit: number;
+      }>(
+        `/api/tenants/${tenantId}/check-ins/my-history?page=${page}&limit=${limit}`,
+      ),
+    enabled: !!tenantId,
+    staleTime: 30_000,
   });
 }

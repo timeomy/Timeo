@@ -4,16 +4,24 @@ import { queryKeys } from "../query-keys";
 
 interface Membership {
   id: string;
-  tenantId: string;
+  tenant_id?: string;
+  tenantId?: string;
   name: string;
   description?: string;
   price: number;
   currency: string;
-  billingInterval: "monthly" | "yearly";
-  benefits: string[];
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  interval?: "monthly" | "yearly";
+  billingInterval?: "monthly" | "yearly";
+  duration_months?: number;
+  durationMonths?: number;
+  plan_type?: string;
+  planType?: string;
+  features?: string[];
+  benefits?: string[];
+  is_active?: boolean;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export function useMemberships(tenantId: string | null | undefined) {

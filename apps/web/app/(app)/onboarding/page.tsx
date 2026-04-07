@@ -85,10 +85,23 @@ export default function OnboardingPage() {
       <div className="w-full max-w-lg">
         {/* Logo */}
         <div className="mb-8 flex items-center justify-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary glow-yellow-sm">
-            <Zap className="h-6 w-6 text-primary-foreground" />
+          <img
+            src="/tenants/ws-fitness-logo.png"
+            alt="WS Fitness"
+            className="h-12 w-auto"
+            onError={(e) => {
+              const el = e.currentTarget as HTMLImageElement;
+              el.style.display = "none";
+              const fallback = el.nextElementSibling as HTMLElement | null;
+              if (fallback) fallback.style.display = "flex";
+            }}
+          />
+          <div className="hidden items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary glow-yellow-sm">
+              <Zap className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <span className="text-2xl font-bold">Timeo</span>
           </div>
-          <span className="text-2xl font-bold">Timeo</span>
         </div>
 
         {/* Step Indicators */}

@@ -9,7 +9,6 @@ import { formatPrice } from "@timeo/shared";
 import {
   Card,
   CardHeader,
-  CardTitle,
   CardContent,
   CardFooter,
   Input,

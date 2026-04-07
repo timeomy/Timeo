@@ -27,14 +27,16 @@ export default function PostLoginPage() {
       return;
     }
 
-    // No tenant memberships — go to portal (which may redirect to onboarding)
+    // No tenant memberships — go to portal (onboarding)
     if (tenants.length === 0) {
       router.replace("/portal");
       return;
     }
 
-    // Route based on role
-    const homePath = getRoleHomePath(activeRole, tenants.length > 0);
+    // Use the first tenant's role directly — activeRole may still be "customer"
+    // at this point because activeTenantId hasn't been auto-selected yet (timing).
+    const primaryRole = tenants[0]?.role ?? "customer";
+    const homePath = getRoleHomePath(primaryRole, true);
     router.replace(homePath);
   }, [isLoaded, isLoading, isSignedIn, activeRole, tenants, router]);
 

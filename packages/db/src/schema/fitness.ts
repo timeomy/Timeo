@@ -3,6 +3,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgTable,
   text,
   timestamp,
@@ -143,11 +144,123 @@ export const sessionLogs = pgTable(
     updated_at: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    published: boolean("published").notNull().default(false),
+    published_at: timestamp("published_at", { withTimezone: true }),
+    training_types: text("training_types").array(),
+    weight_kg: numeric("weight_kg"),
+    sessions_used: integer("sessions_used").notNull().default(1),
   },
   (t) => [
     index("session_logs_tenant_id_idx").on(t.tenant_id),
     index("session_logs_client_id_idx").on(t.client_id),
     index("session_logs_coach_id_idx").on(t.coach_id),
     index("session_logs_tenant_client_idx").on(t.tenant_id, t.client_id),
+  ],
+);
+
+// ─── Coach Availability ───────────────────────────────────────────────────────
+export const coachAvailability = pgTable(
+  "coach_availability",
+  {
+    id: text("id").primaryKey(),
+    tenant_id: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    coach_id: text("coach_id")
+      .notNull()
+      .references(() => users.id),
+    day_of_week: integer("day_of_week"),
+    start_time: text("start_time"),
+    end_time: text("end_time"),
+    is_recurring: boolean("is_recurring").notNull().default(true),
+    specific_date: text("specific_date"),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("coach_availability_tenant_id_idx").on(t.tenant_id),
+    index("coach_availability_coach_id_idx").on(t.coach_id),
+  ],
+);
+
+// ─── Coach Bookings ───────────────────────────────────────────────────────────
+export const coachBookings = pgTable(
+  "coach_bookings",
+  {
+    id: text("id").primaryKey(),
+    tenant_id: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    coach_id: text("coach_id")
+      .notNull()
+      .references(() => users.id),
+    client_id: text("client_id")
+      .notNull()
+      .references(() => users.id),
+    booking_date: text("booking_date"),
+    start_time: text("start_time"),
+    end_time: text("end_time"),
+    status: text("status").notNull().default("confirmed"),
+    notes: text("notes"),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("coach_bookings_tenant_id_idx").on(t.tenant_id),
+    index("coach_bookings_coach_id_idx").on(t.coach_id),
+    index("coach_bookings_client_id_idx").on(t.client_id),
+  ],
+);
+// ─── Exercises Library ────────────────────────────────────────────────────────
+export const exercises = pgTable(
+  "exercises",
+  {
+    id: text("id").primaryKey(),
+    tenant_id: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    training_type: text("training_type").notNull(),
+    equipment: text("equipment"),
+    is_custom: boolean("is_custom").notNull().default(false),
+    created_by: text("created_by").references(() => users.id),
+    video_url: text("video_url"),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("exercises_tenant_id_idx").on(t.tenant_id),
+    index("exercises_training_type_idx").on(t.training_type),
+  ],
+);
+
+// ─── Coach Client Notes ───────────────────────────────────────────────────────
+export const coachClientNotes = pgTable(
+  "coach_client_notes",
+  {
+    id: text("id").primaryKey(),
+    tenant_id: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    coach_id: text("coach_id")
+      .notNull()
+      .references(() => users.id),
+    client_id: text("client_id")
+      .notNull()
+      .references(() => users.id),
+    notes: text("notes"),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updated_at: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("coach_client_notes_coach_client_idx").on(t.coach_id, t.client_id),
+    index("coach_client_notes_tenant_id_idx").on(t.tenant_id),
   ],
 );

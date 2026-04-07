@@ -6,6 +6,7 @@ import Link from "next/link";
 import { authClient } from "@timeo/auth/web";
 import { Button, Input } from "@timeo/ui/web";
 import { Loader2 } from "lucide-react";
+import { TimeoIcon } from "@/timeo-logo";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -38,8 +39,6 @@ export default function SignInPage() {
       });
 
       if (result.error) {
-        // Always use a generic message — never expose whether the email exists
-        // or the password was wrong, as that enables email enumeration attacks.
         setError("Invalid email or password");
         setLoading(false);
         return;
@@ -47,87 +46,88 @@ export default function SignInPage() {
 
       router.push(redirect);
     } catch {
-      // Generic fallback — do not leak server error details to the client.
       setError("Invalid email or password");
       setLoading(false);
     }
   };
 
   return (
-    <div className="w-full max-w-md">
-      <div className="rounded-xl border bg-card p-8 shadow-sm">
-        <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold">Welcome back</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Sign in to your Timeo account
-          </p>
+    <div className="w-full max-w-sm">
+      {/* Logo */}
+      <div className="mb-8 flex justify-center">
+        <TimeoIcon size={72} />
+      </div>
+
+      {/* Header */}
+      <div className="mb-6 text-center">
+        <h1 className="text-xl font-semibold text-white">Sign in to Timeo</h1>
+      </div>
+
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="email" className="mb-1.5 block text-sm text-white/60">
+            Email
+          </label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); setError(""); }}
+            disabled={loading}
+            autoComplete="email"
+            className="h-11 bg-white/[0.06] border-white/[0.1] focus-visible:ring-[#0066FF]/50"
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="email" className="mb-1.5 block text-sm font-medium">
-              Email
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label htmlFor="password" className="text-sm text-white/60">
+              Password
             </label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                setError("");
-              }}
-              disabled={loading}
-              autoComplete="email"
-            />
+            <Link href="/forgot-password" className="text-xs text-white/40 hover:text-white/60">
+              Forgot password?
+            </Link>
           </div>
+          <Input
+            id="password"
+            type="password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => { setPassword(e.target.value); setError(""); }}
+            disabled={loading}
+            autoComplete="current-password"
+            className="h-11 bg-white/[0.06] border-white/[0.1] focus-visible:ring-[#0066FF]/50"
+          />
+        </div>
 
-          <div>
-            <div className="flex items-center justify-between">
-              <label htmlFor="password" className="mb-1.5 block text-sm font-medium">
-                Password
-              </label>
-              <Link href="/forgot-password" className="mb-1.5 text-xs text-primary hover:underline">
-                Forgot password?
-              </Link>
-            </div>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setError("");
-              }}
-              disabled={loading}
-              autoComplete="current-password"
-            />
-          </div>
+        {error && (
+          <p className="text-sm text-red-400">{error}</p>
+        )}
 
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
+        <Button
+          type="submit"
+          className="w-full h-11 bg-[#0066FF] hover:bg-[#0052CC] text-white font-medium"
+          disabled={loading}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Signing in…
+            </>
+          ) : (
+            "Sign in"
           )}
+        </Button>
+      </form>
 
-          <Button type="submit" className="w-full" size="lg" disabled={loading}>
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Signing in...
-              </>
-            ) : (
-              "Sign In"
-            )}
-          </Button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{" "}
-          <Link href="/sign-up" className="font-medium text-primary hover:underline">
-            Sign up
-          </Link>
-        </p>
-      </div>
+      <p className="mt-6 text-center text-sm text-white/30">
+        Don&apos;t have an account?{" "}
+        <Link href="/sign-up" className="text-[#0066FF] hover:text-[#3388FF]">
+          Sign up
+        </Link>
+      </p>
     </div>
   );
 }

@@ -1,0 +1,14 @@
+**/__tests__/**
+**/*.test.*
+**/*.spec.*
+**/docs/**
+**/specs/**
+../../infra
+../../store-assets
+../../wsfitness
+../../.git
+../../.github
+../../test-results
+**/android/build/**
+**/ios/build/**
+**/ios/Pods/**

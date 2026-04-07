@@ -58,6 +58,28 @@ export const authMiddleware = createMiddleware(async (c, next) => {
     role: appUser.role ?? "user",
   });
 
+  // Enforce forced password reset: block all routes except the change-password endpoint
+  if (appUser.force_password_reset) {
+    const path = c.req.path;
+    const isChangePasswordPath =
+      path === "/api/users/me/change-password" ||
+      path.endsWith("/change-password");
+    if (!isChangePasswordPath) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "MUST_RESET_PASSWORD",
+            message:
+              "You must change your temporary password before continuing.",
+          },
+          redirect: "/change-password",
+        },
+        403,
+      );
+    }
+  }
+
   await next();
 });
 

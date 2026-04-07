@@ -89,6 +89,8 @@ export const tenantMemberships = pgTable(
     status: membershipStatusEnum("status").notNull().default("active"),
     notes: text("notes"),
     tags: jsonb("tags").notNull().default([]),
+    coach_id: text("coach_id").references(() => users.id),
+    member_id: text("member_id"),
     joined_at: timestamp("joined_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

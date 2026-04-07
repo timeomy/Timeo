@@ -231,6 +231,8 @@ export const CreateMembershipPlanSchema = z.object({
   price: z.number().int().min(0),
   currency: z.string().length(3).default("MYR"),
   interval: z.enum(["monthly", "yearly"]),
+  durationMonths: z.number().int().min(1).optional(),
+  planType: z.string().default("all_access"),
   features: z.array(z.string()).default([]),
   isActive: z.boolean().default(true),
 });

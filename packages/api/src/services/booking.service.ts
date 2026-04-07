@@ -10,7 +10,7 @@ import {
   blockedSlots,
   auditLogs,
 } from "@timeo/db/schema";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { generateId } from "@timeo/db";
 import { emitToTenant } from "../realtime/socket.js";
 import { SocketEvents } from "../realtime/events.js";
@@ -39,17 +39,33 @@ interface CreateBookingInput {
 export async function createBooking(input: CreateBookingInput) {
   const { tenantId, serviceId, startTime, staffId, notes, customerId } = input;
 
-  // Get service
+  // Get service - check services table first, then service_catalog
   const [service] = await db
     .select()
     .from(services)
     .where(and(eq(services.id, serviceId), eq(services.tenant_id, tenantId)))
     .limit(1);
-  if (!service) throw new Error("Service not found in this tenant");
-  if (!service.is_active) throw new Error("Service is not currently available");
+  
+  let serviceDuration = 60;
+  let serviceIsActive = true;
+  
+  if (!service) {
+    // Check service_catalog table
+    const catalogRows = await db.execute(
+      sql`SELECT duration_minutes, is_active FROM service_catalog WHERE id = ${serviceId} AND tenant_id = ${tenantId} LIMIT 1`
+    );
+    if (catalogRows.length === 0) throw new Error("Service not found in this tenant");
+    const catalogService = catalogRows[0] as { duration_minutes: number; is_active: boolean };
+    if (!catalogService.is_active) throw new Error("Service is not currently available");
+    serviceDuration = catalogService.duration_minutes || 60;
+    serviceIsActive = catalogService.is_active;
+  } else {
+    if (!service.is_active) throw new Error("Service is not currently available");
+    serviceDuration = service.duration_minutes ?? 60;
+  }
 
   const endTime = new Date(
-    startTime.getTime() + service.duration_minutes * 60 * 1000,
+    startTime.getTime() + serviceDuration * 60 * 1000,
   );
 
   // Get tenant for timezone + autoConfirm settings
@@ -87,8 +103,8 @@ export async function createBooking(input: CreateBookingInput) {
     const bookingDateStr = startTime.toLocaleDateString("en-CA", { timeZone: timezone }); // "YYYY-MM-DD"
     const [year, month, day] = bookingDateStr.split("-").map(Number);
     const tzOffsetMs = getTzOffsetMs(startTime, timezone);
-    const openMs = Date.UTC(year, month - 1, day) - tzOffsetMs + (openH * 60 + openM) * 60_000;
-    const closeMs = Date.UTC(year, month - 1, day) - tzOffsetMs + (closeH * 60 + closeM) * 60_000;
+    const openMs = Date.UTC(year, month - 1, day) + tzOffsetMs + (openH * 60 + openM) * 60_000;
+    const closeMs = Date.UTC(year, month - 1, day) + tzOffsetMs + (closeH * 60 + closeM) * 60_000;
 
     if (startTime.getTime() < openMs || endTime.getTime() > closeMs) {
       throw new Error("Requested time is outside business hours");

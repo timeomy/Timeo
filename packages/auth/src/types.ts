@@ -1,5 +1,5 @@
 /** Timeo role hierarchy — lower index = more power */
-export const ROLES = ["platform_admin", "admin", "staff", "customer"] as const;
+export const ROLES = ["platform_admin", "admin", "staff", "coach", "customer"] as const;
 
 export type TimeoRole = (typeof ROLES)[number];
 

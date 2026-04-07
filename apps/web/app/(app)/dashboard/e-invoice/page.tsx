@@ -10,7 +10,7 @@ import {
   useRevertEInvoiceToPending,
 } from "@timeo/api-client";
 import { useTenantId } from "@/hooks/use-tenant-id";
-import { formatPrice } from "@timeo/shared";
+
 import {
   Card,
   CardContent,
@@ -41,7 +41,6 @@ import {
   XCircle,
   AlertCircle,
   Eye,
-  Building2,
   Clock,
   Copy,
   ExternalLink,

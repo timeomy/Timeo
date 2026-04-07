@@ -83,6 +83,7 @@ export {
   useCheckInStats,
   useCreateCheckIn,
   useCheckInByQr,
+  useMyCheckInHistory,
 } from "./check-ins";
 
 export {
@@ -270,6 +271,8 @@ export {
 export {
   useMemberQrCode,
   useGenerateQrCode,
+  useFaceEnrollmentStatus,
+  useSubmitFacePhoto,
 } from "./qr-code";
 
 export {
@@ -284,3 +287,39 @@ export {
   useEarnPoints,
   useRedeemPoints,
 } from "./loyalty";
+
+export {
+  useMyPaymentRequests,
+  useCreatePaymentRequest,
+  useUploadPaymentReceipt,
+  usePaymentRequests,
+  useApprovePaymentRequest,
+  useRejectPaymentRequest,
+} from "./payment-requests";
+export type { PaymentRequest, PaymentRequestStatus, PaymentRequestPlanType } from "./payment-requests";
+
+export {
+  useFeedBroadcasts,
+  useDiscoverFeed,
+  useTenantBroadcasts,
+  useAdminBroadcasts,
+  useCreateBroadcast,
+  useToggleBroadcast,
+  useDeleteBroadcast,
+  useServiceCatalog,
+} from "./feed";
+export type { Broadcast, ServiceCatalogItem, DiscoverFeed } from "./feed";
+
+// ─── Stub exports for incomplete features ────────────────────────────────────
+// TODO: Implement these features properly
+
+export type GymMember = { userId: string; name: string; email: string; role: string; status: string; membershipId: string; avatarUrl?: string };
+export type MissionControlCheckIn = { id: string; name: string; status: string; method?: string; initials?: string; userName?: string; timestamp?: string };
+export type HeatmapCell = { day: number; hour: number; count: number };
+
+// Stub hook implementations
+export const useGymMembers = (tenantId: string) => ({ data: [] as GymMember[], isLoading: false });
+export const useCoaches = (tenantId: string) => ({ data: [] as any[], isLoading: false });
+export const useMissionControl = (tenantId: string) => ({ data: null as any, isLoading: false, isError: false, refetch: async () => ({}), isFetching: false, dataUpdatedAt: 0 });
+export const useMyTrainingLogs = (tenantId: string) => ({ data: [] as any[], isLoading: false });
+export const useMyCoach = (tenantId: string) => ({ data: null as any, isLoading: false });

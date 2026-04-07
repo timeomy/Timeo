@@ -43,7 +43,7 @@ export default function CheckoutPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
 
-  const { data: orders, isLoading: ordersLoading } = useOrders(activeTenantId ?? "");
+  const { data: orders } = useOrders(activeTenantId ?? "");
   const order = orders?.find((o) => o.id === orderId);
 
   const { mutateAsync: createPaymentIntent } = useCreateStripePayment(activeTenantId ?? "");
