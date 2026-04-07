@@ -13,8 +13,6 @@
  *   - Export file at the path specified by EXPORT_FILE below
  */
 
-import fs from "fs";
-import path from "path";
 import "dotenv/config";
 
 import { drizzle } from "drizzle-orm/postgres-js";

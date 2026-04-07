@@ -3,12 +3,13 @@ import { db } from "@timeo/db";
 import { tenantMemberships } from "@timeo/db/schema";
 import { and, eq } from "drizzle-orm";
 
-type Role = "customer" | "staff" | "admin" | "platform_admin";
+type Role = "customer" | "staff" | "coach" | "admin" | "platform_admin";
 
 const ROLE_RANK: Record<Role, number> = {
   platform_admin: 4,
   admin: 3,
   staff: 2,
+  coach: 2,
   customer: 1,
 };
 

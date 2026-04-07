@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -163,7 +164,7 @@ class _QrScreenState extends ConsumerState<QrScreen> {
     final authState = ref.watch(authProvider);
     final memberId = authState.memberId ?? 'unknown';
     final memberName = authState.memberName ?? 'Member';
-    const role = 'Member';
+    final role = _getRoleLabel(authState.role);
 
     final displayId = memberId.length >= 8
         ? memberId.substring(memberId.length - 8).toUpperCase()
@@ -361,7 +362,7 @@ class _QrScreenState extends ConsumerState<QrScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Show this QR code at the gym entrance for quick access',
+                  'Scan this QR at the door to enter — no staff needed',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: AppTheme.onSurfaceMuted,
@@ -388,7 +389,22 @@ class _QrScreenState extends ConsumerState<QrScreen> {
                     ),
                   ),
                 ] else ...[
-                  const SizedBox(height: 24),
+                  
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        // Share QR info as text
+                        Share.share('My Timeo QR Code - Use this at the entrance for quick check-in!');
+                      },
+                      icon: const Icon(Icons.share, size: 18),
+                      label: const Text('Share QR'),
+                    ),
+                  ],
+                ),
+const SizedBox(height: 24),
                   OutlinedButton.icon(
                     onPressed: _addToGoogleWallet,
                     icon: const Icon(
@@ -414,5 +430,18 @@ class _QrScreenState extends ConsumerState<QrScreen> {
         ),
       ),
     );
+  }
+
+  String _getRoleLabel(String? role) {
+    switch (role) {
+      case 'admin':
+        return 'Admin';
+      case 'staff':
+        return 'Coach';
+      case 'customer':
+        return 'Member';
+      default:
+        return 'Member';
+    }
   }
 }

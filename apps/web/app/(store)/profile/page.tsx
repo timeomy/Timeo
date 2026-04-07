@@ -69,10 +69,7 @@ export default function ProfilePage() {
         <CardContent className="pt-6">
           <div className="flex flex-col items-center text-center sm:flex-row sm:items-start sm:text-left">
             <Avatar className="h-20 w-20">
-              <AvatarImage
-                src={user.imageUrl ?? undefined}
-                alt={displayName}
-              />
+              {(user.imageUrl) && <AvatarImage src={user.imageUrl} alt={displayName} />}
               <AvatarFallback className="text-xl">
                 {getInitials(displayName)}
               </AvatarFallback>

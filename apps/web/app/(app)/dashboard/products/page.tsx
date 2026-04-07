@@ -51,8 +51,6 @@ import {
 
 const CURRENCY_OPTIONS = [
   { label: "MYR (RM)", value: "MYR" },
-  { label: "USD ($)", value: "USD" },
-  { label: "SGD (S$)", value: "SGD" },
 ];
 
 const LOW_STOCK_THRESHOLD = 10;

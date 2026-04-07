@@ -84,6 +84,11 @@ export const subscriptions = pgTable(
     cancel_at_period_end: boolean("cancel_at_period_end")
       .notNull()
       .default(false),
+    total_classes: integer("total_classes"),
+    remaining_classes: integer("remaining_classes"),
+    package_preset: text("package_preset"),
+    carry_over_sessions: integer("carry_over_sessions").default(0),
+    package_type: text("package_type").default("membership"),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

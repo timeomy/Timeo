@@ -11,7 +11,12 @@ class ApiClient {
         _storage = const FlutterSecureStorage() {
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        // Use cookie-based auth (better-auth requires session cookie)
+        // Try Bearer token first (more reliable on mobile)
+        final token = await _storage.read(key: 'auth_token');
+        if (token != null && token.isNotEmpty) {
+          options.headers['Authorization'] = 'Bearer \$token';
+        }
+        // Also send cookie as fallback
         final cookie = await _storage.read(key: 'session_cookie');
         if (cookie != null && cookie.isNotEmpty) {
           options.headers['Cookie'] = cookie;

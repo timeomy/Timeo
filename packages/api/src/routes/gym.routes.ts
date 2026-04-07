@@ -10,14 +10,23 @@ import {
   subscriptions,
   tenants,
   faceRegistrations,
+  sessionPackages,
+  sessionCredits,
 } from "@timeo/db/schema";
-import { eq, desc, and, like, count, or, gt } from "drizzle-orm";
+import { eq, desc, and, like, count, or, gt, gte, sql } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
 import { requireRole } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
 import * as CheckInService from "../services/check-in.service.js";
 import * as AccessControlService from "../services/access-control.service.js";
+import { generateId } from "@timeo/db";
+import { user as authUser, account as authAccount } from "@timeo/db/schema";
+
+async function hashPassword(password: string): Promise<string> {
+  const { hashPassword: _hash } = await import("better-auth/crypto");
+  return _hash(password);
+}
 
 const app = new Hono();
 
@@ -74,6 +83,100 @@ const ManualOpenBodySchema = z.object({
 const PhotoUploadSchema = z.object({
   photoUrl: z.string().url(),
 });
+
+const CreateMemberSchema = z.object({
+  name: z.string().min(1).max(200),
+  email: z.string().email(),
+  phone: z.string().optional(),
+  membershipPlan: z.string().optional(),
+  coachId: z.string().optional(),
+  packageId: z.string().optional(),
+});
+
+// ─── GET /overview — Gym dashboard stats ────────────────────────────────────
+
+app.get(
+  "/overview",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin", "staff"),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    try {
+      // Active members (with active subscription)
+      const [activeRow] = await db
+        .select({ count: count() })
+        .from(subscriptions)
+        .where(
+          and(
+            eq(subscriptions.tenant_id, tenantId),
+            eq(subscriptions.status, "active"),
+            gt(subscriptions.current_period_end, now),
+          ),
+        );
+
+      // Today check-ins
+      const [todayRow] = await db
+        .select({ count: count() })
+        .from(checkIns)
+        .where(
+          and(
+            eq(checkIns.tenant_id, tenantId),
+            gte(checkIns.timestamp, todayStart),
+          ),
+        );
+
+      // Enrolled faces
+      const [faceRow] = await db
+        .select({ count: count() })
+        .from(faceRegistrations)
+        .where(
+          and(
+            eq(faceRegistrations.tenant_id, tenantId),
+            eq(faceRegistrations.status, "synced"),
+          ),
+        );
+
+      // Recent activity (last 15 check-ins)
+      const recentRows = await db
+        .select({
+          id: checkIns.id,
+          method: checkIns.method,
+          time: checkIns.timestamp,
+          memberName: users.name,
+        })
+        .from(checkIns)
+        .leftJoin(users, eq(checkIns.user_id, users.id))
+        .where(eq(checkIns.tenant_id, tenantId))
+        .orderBy(desc(checkIns.timestamp))
+        .limit(15);
+
+      const recentActivity = recentRows.map((r) => ({
+        id: r.id,
+        memberName: r.memberName ?? "Unknown",
+        action: "check-in",
+        method: r.method,
+        time: r.time?.toISOString() ?? new Date().toISOString(),
+      }));
+
+      return c.json(
+        success({
+          activeMembers: Number(activeRow?.count ?? 0),
+          todayCheckIns: Number(todayRow?.count ?? 0),
+          enrolledFaces: Number(faceRow?.count ?? 0),
+          devicesOnline: 0,
+          recentActivity,
+        }),
+      );
+    } catch (err) {
+      return c.json(error("GYM_OVERVIEW_ERROR", (err as Error).message), 500);
+    }
+  },
+);
+
 
 // ─── POST /checkin — QR/card check-in (device API key auth, no user auth) ──
 
@@ -325,6 +428,7 @@ app.get(
             notes: tenantMemberships.notes,
             tags: tenantMemberships.tags,
             joinedAt: tenantMemberships.joined_at,
+            coachId: tenantMemberships.coach_id,
           },
           user: {
             id: users.id,
@@ -386,6 +490,7 @@ app.get(
             notes: tenantMemberships.notes,
             tags: tenantMemberships.tags,
             joinedAt: tenantMemberships.joined_at,
+            coachId: tenantMemberships.coach_id,
           },
         })
         .from(tenantMemberships)
@@ -526,6 +631,142 @@ app.post(
       );
     } catch (err) {
       return c.json(error("PHOTO_UPLOAD_ERROR", (err as Error).message), 500);
+    }
+  },
+);
+
+// ─── POST /members — Create a new gym member ──────────────────────────────
+
+app.post(
+  "/members",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin", "staff"),
+  zValidator("json", CreateMemberSchema),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+    const body = c.req.valid("json");
+
+    try {
+      // Check if user already exists
+      const [existingUser] = await db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(eq(users.email, body.email.toLowerCase()))
+        .limit(1);
+
+      let userId: string;
+
+      if (existingUser) {
+        userId = existingUser.id;
+      } else {
+        // Create new user with temporary password
+        const tempPassword = generateId().slice(0, 12);
+        const passwordHash = await hashPassword(tempPassword);
+        const authId = generateId();
+
+        await db.insert(authUser).values({
+          id: authId,
+          name: body.name,
+          email: body.email.toLowerCase(),
+          emailVerified: false,
+          image: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        await db.insert(authAccount).values({
+          id: generateId(),
+          accountId: authId,
+          providerId: "credential",
+          userId: authId,
+          password: passwordHash,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        // Map auth user to timeo user
+        userId = generateId();
+        await db.insert(users).values({
+          id: userId,
+          auth_id: authId,
+          name: body.name,
+          email: body.email.toLowerCase(),
+          created_at: new Date(),
+          updated_at: new Date(),
+        });
+      }
+
+      // Check if already a member of this tenant
+      const [existingMembership] = await db
+        .select({ id: tenantMemberships.id })
+        .from(tenantMemberships)
+        .where(
+          and(
+            eq(tenantMemberships.tenant_id, tenantId),
+            eq(tenantMemberships.user_id, userId),
+          ),
+        )
+        .limit(1);
+
+      let membershipId: string;
+      if (existingMembership) {
+        membershipId = existingMembership.id;
+        // Ensure status is active
+        await db
+          .update(tenantMemberships)
+          .set({ status: "active" })
+          .where(eq(tenantMemberships.id, membershipId));
+      } else {
+        membershipId = generateId();
+        await db.insert(tenantMemberships).values({
+          id: membershipId,
+          tenant_id: tenantId,
+          user_id: userId,
+          role: "customer",
+          status: "active",
+          joined_at: new Date(),
+        });
+      }
+
+      // Assign coach if provided
+      if (body.coachId) {
+        await db
+          .update(tenantMemberships)
+          .set({ coach_id: body.coachId })
+          .where(eq(tenantMemberships.id, membershipId));
+      }
+
+      // Assign session package if provided
+      if (body.packageId) {
+        const [pkg] = await db
+          .select({ sessionCount: sessionPackages.session_count })
+          .from(sessionPackages)
+          .where(eq(sessionPackages.id, body.packageId))
+          .limit(1);
+        if (pkg) {
+          await db.insert(sessionCredits).values({
+            id: generateId(),
+            tenant_id: tenantId,
+            user_id: userId,
+            package_id: body.packageId,
+            total_sessions: pkg.sessionCount,
+            used_sessions: 0,
+          });
+        }
+      }
+
+      return c.json(
+        success({
+          id: userId,
+          name: body.name,
+          email: body.email.toLowerCase(),
+          membershipId,
+        }),
+        existingMembership ? 200 : 201,
+      );
+    } catch (err) {
+      return c.json(error("CREATE_MEMBER_ERROR", (err as Error).message), 500);
     }
   },
 );

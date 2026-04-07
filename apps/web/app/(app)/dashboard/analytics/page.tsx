@@ -13,6 +13,8 @@ import {
   useRevenueTrend,
   useBookingTrend,
   useDownloadReport,
+  useCustomerAnalytics,
+  useCheckInStats,
 } from "@timeo/api-client";
 import {
   Card,
@@ -145,6 +147,8 @@ export default function AnalyticsDashboardPage() {
   const { data: revenueTrend, isLoading: rtLoading } = useRevenueTrend(tenantId, period);
   const { data: bookingTrend, isLoading: btLoading } = useBookingTrend(tenantId, period);
 
+  const { data: customers, isLoading: custLoading } = useCustomerAnalytics(tenantId);
+  const { data: checkInStats, isLoading: ciLoading } = useCheckInStats(tenantId);
   const { downloadRevenue, downloadBookings, downloadProducts } = useDownloadReport(tenantId ?? "");
   const { from, to } = useMemo(() => getDateRange(period), [period]);
 
@@ -237,6 +241,30 @@ export default function AnalyticsDashboardPage() {
           value={String(staff?.length ?? 0)}
           icon={Users}
           loading={staffLoading}
+        />
+        <StatCard
+          title="Total Members"
+          value={String(customers?.totalCustomers ?? 0)}
+          icon={Users}
+          loading={custLoading}
+        />
+        <StatCard
+          title="New This Month"
+          value={String(customers?.newThisMonth ?? customers?.newCustomers ?? 0)}
+          icon={Users}
+          loading={custLoading}
+        />
+        <StatCard
+          title="Check-ins Today"
+          value={String(checkInStats?.today ?? 0)}
+          icon={CalendarCheck}
+          loading={ciLoading}
+        />
+        <StatCard
+          title="Retention Rate"
+          value={customers?.retentionRate !== undefined ? `${Math.round(customers.retentionRate * 100)}%` : "—"}
+          icon={TrendingUp}
+          loading={custLoading}
         />
       </div>
 

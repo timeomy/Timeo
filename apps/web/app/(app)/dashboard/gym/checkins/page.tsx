@@ -27,40 +27,56 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 // ---- Types ----
 
-type GymCheckIn = {
-  id: string;
-  memberId: string;
-  memberName: string;
-  memberPhotoUrl: string | null;
-  membershipPlan: string | null;
-  method: "qr" | "face" | "manual";
-  status: "granted" | "denied";
-  time: string;
+type CheckInRow = {
+  checkIn: {
+    id: string;
+    userId: string;
+    method: "qr" | "nfc" | "manual" | "face";
+    timestamp: string;
+  };
+  user: {
+    name: string | null;
+    email: string | null;
+  };
 };
 
-type CheckInFeed = {
-  todayTotal: number;
-  checkIns: GymCheckIn[];
+type CheckInStats = {
+  today: number;
+  thisWeek: number;
+  monthCount: number;
 };
 
-// ---- Data hook ----
+// ---- Data hooks ----
 
-function useGymCheckIns(methodFilter: string | null) {
+function useCheckInFeed(methodFilter: string | null) {
   const { tenantId } = useTenantId();
-  const queryPath = methodFilter ? `/checkins?method=${methodFilter}` : "/checkins";
-  return useQuery<CheckInFeed>({
-    queryKey: ["gym", tenantId, queryPath],
+  return useQuery<CheckInRow[]>({
+    queryKey: ["check-ins", tenantId, "feed", methodFilter],
     queryFn: async () => {
-      const url = methodFilter
-        ? `${API_URL}/api/tenants/${tenantId}/gym/checkins?method=${methodFilter}`
-        : `${API_URL}/api/tenants/${tenantId}/gym/checkins`;
-      const res = await fetch(url, { credentials: "include" });
+      const url = new URL(`${API_URL}/api/tenants/${tenantId}/check-ins`);
+      if (methodFilter) url.searchParams.set("method", methodFilter);
+      const res = await fetch(url.toString(), { credentials: "include" });
       const data = await res.json();
       if (!data.success) throw new Error(data.error?.message || "Failed to load check-ins");
-      return data.data as CheckInFeed;
+      return (data.data as CheckInRow[]).slice(0, 100); // cap at 100 for perf
     },
     enabled: !!tenantId,
     refetchInterval: 5000,
+  });
+}
+
+function useCheckInStats() {
+  const { tenantId } = useTenantId();
+  return useQuery<CheckInStats>({
+    queryKey: ["check-ins", tenantId, "stats"],
+    queryFn: async () => {
+      const res = await fetch(`${API_URL}/api/tenants/${tenantId}/check-ins/stats`, { credentials: "include" });
+      const data = await res.json();
+      if (!data.success) return { today: 0, thisWeek: 0, monthCount: 0 };
+      return data.data as CheckInStats;
+    },
+    enabled: !!tenantId,
+    refetchInterval: 10000,
   });
 }
 
@@ -70,17 +86,14 @@ const METHOD_ICON: Record<string, React.ElementType> = {
   qr: QrCode,
   face: SmilePlus,
   manual: Hand,
+  nfc: ScanLine,
 };
 
 const METHOD_STYLE: Record<string, string> = {
   qr: "bg-blue-500/20 text-blue-400 border-blue-500/30",
   face: "bg-purple-500/20 text-purple-400 border-purple-500/30",
   manual: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-};
-
-const ACCESS_STYLE: Record<string, string> = {
-  granted: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  denied: "bg-red-500/20 text-red-400 border-red-500/30",
+  nfc: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
 };
 
 function formatRelativeTime(isoString: string) {
@@ -97,8 +110,8 @@ function formatRelativeTime(isoString: string) {
   });
 }
 
-function getInitial(name: string) {
-  return (name?.[0] ?? "?").toUpperCase();
+function getInitial(name: string | null, email: string | null) {
+  return (name?.[0] ?? email?.[0] ?? "?").toUpperCase();
 }
 
 // ---- Filter options ----
@@ -108,13 +121,15 @@ const FILTER_OPTIONS: Array<{ value: string | null; label: string }> = [
   { value: "qr", label: "QR Code" },
   { value: "face", label: "Face" },
   { value: "manual", label: "Manual" },
+  { value: "nfc", label: "NFC" },
 ];
 
 // ---- Page ----
 
 export default function GymCheckInsPage() {
   const [methodFilter, setMethodFilter] = useState<string | null>(null);
-  const { data, isLoading } = useGymCheckIns(methodFilter);
+  const { data: rows, isLoading } = useCheckInFeed(methodFilter);
+  const { data: stats } = useCheckInStats();
 
   return (
     <div className="space-y-6">
@@ -135,40 +150,41 @@ export default function GymCheckInsPage() {
         </div>
       </div>
 
-      {/* Today's Total Stat */}
-      <Card className="glass-card">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Today's Total</p>
-              {isLoading ? (
-                <Skeleton className="mt-1 h-8 w-20" />
-              ) : (
-                <p className="mt-1 text-3xl font-bold text-glow">
-                  {data?.todayTotal ?? 0}
-                </p>
-              )}
-              <p className="mt-1 text-xs text-muted-foreground">
-                Check-ins today
-              </p>
-            </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-              <ScanLine className="h-6 w-6 text-primary" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Stats Row */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card className="glass-card">
+          <CardContent className="p-5">
+            <p className="text-xs text-white/50 mb-1">Today</p>
+            <p className="text-3xl font-bold text-glow">{stats?.today ?? 0}</p>
+            <p className="text-xs text-white/30 mt-0.5">check-ins</p>
+          </CardContent>
+        </Card>
+        <Card className="glass-card">
+          <CardContent className="p-5">
+            <p className="text-xs text-white/50 mb-1">This Week</p>
+            <p className="text-3xl font-bold text-glow">{stats?.thisWeek ?? 0}</p>
+            <p className="text-xs text-white/30 mt-0.5">check-ins</p>
+          </CardContent>
+        </Card>
+        <Card className="glass-card">
+          <CardContent className="p-5">
+            <p className="text-xs text-white/50 mb-1">This Month</p>
+            <p className="text-3xl font-bold text-glow">{stats?.monthCount ?? 0}</p>
+            <p className="text-xs text-white/30 mt-0.5">check-ins</p>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Filter */}
-      <div className="flex items-center gap-2">
-        <Filter className="h-4 w-4 text-white/40" />
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <Filter className="h-4 w-4 text-white/40 shrink-0" />
         <div className="flex rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5">
           {FILTER_OPTIONS.map((opt) => (
             <button
               key={opt.label}
               onClick={() => setMethodFilter(opt.value)}
               className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap",
                 methodFilter === opt.value
                   ? "bg-primary text-primary-foreground"
                   : "text-white/50 hover:text-white",
@@ -193,12 +209,11 @@ export default function GymCheckInsPage() {
                     <Skeleton className="h-3 w-24 bg-white/[0.06]" />
                   </div>
                   <Skeleton className="h-5 w-14 rounded-full bg-white/[0.06]" />
-                  <Skeleton className="h-5 w-16 rounded-full bg-white/[0.06]" />
                   <Skeleton className="h-4 w-12 bg-white/[0.06]" />
                 </div>
               ))}
             </div>
-          ) : (data?.checkIns?.length ?? 0) === 0 ? (
+          ) : (rows?.length ?? 0) === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="rounded-full bg-white/[0.04] p-3 mb-3">
                 <Clock className="h-6 w-6 text-white/30" />
@@ -212,57 +227,43 @@ export default function GymCheckInsPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {data!.checkIns.map((ci) => {
-                const MethodIcon = METHOD_ICON[ci.method] ?? ScanLine;
+              {rows!.map((row) => {
+                const method = row.checkIn.method ?? "manual";
+                const MethodIcon = METHOD_ICON[method] ?? ScanLine;
+                const memberName = row.user.name ?? row.user.email ?? "Unknown Member";
                 return (
                   <div
-                    key={ci.id}
+                    key={row.checkIn.id}
                     className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 transition-colors hover:bg-white/[0.04]"
                   >
                     <Avatar className="h-10 w-10">
-                      <AvatarImage
-                        src={ci.memberPhotoUrl ?? undefined}
-                        alt={ci.memberName}
-                      />
                       <AvatarFallback className="text-xs bg-primary/10 text-primary font-bold">
-                        {getInitial(ci.memberName)}
+                        {getInitial(row.user.name, row.user.email)}
                       </AvatarFallback>
                     </Avatar>
 
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-white truncate">
-                        {ci.memberName}
+                        {memberName}
                       </p>
-                      {ci.membershipPlan && (
-                        <p className="text-xs text-white/40 truncate">
-                          {ci.membershipPlan}
-                        </p>
-                      )}
+                      <p className="text-xs text-white/40 truncate">
+                        {row.user.email}
+                      </p>
                     </div>
 
                     <Badge
                       variant="outline"
                       className={cn(
                         "gap-1 text-xs shrink-0",
-                        METHOD_STYLE[ci.method] ?? METHOD_STYLE.manual,
+                        METHOD_STYLE[method] ?? METHOD_STYLE.manual,
                       )}
                     >
                       <MethodIcon className="h-3 w-3" />
-                      {ci.method}
-                    </Badge>
-
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-xs shrink-0",
-                        ACCESS_STYLE[ci.status] ?? ACCESS_STYLE.denied,
-                      )}
-                    >
-                      {ci.status}
+                      {method}
                     </Badge>
 
                     <span className="text-xs text-white/40 shrink-0 w-16 text-right">
-                      {formatRelativeTime(ci.time)}
+                      {formatRelativeTime(row.checkIn.timestamp)}
                     </span>
                   </div>
                 );

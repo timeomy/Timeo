@@ -55,7 +55,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (cookies == null) return null;
     for (final c in cookies) {
       // Look for the session token cookie (handles both prefixed and plain)
-      if (c.contains('better-auth.session_token=')) {
+      if (c.contains('better-auth.session_token=') || c.contains('__Secure-better-auth.session_token=')) {
         // Extract cookie name=value before the first ';'
         final parts = c.split(';').first;
         return parts;
@@ -89,8 +89,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
         // Role is determined post-login via /api/tenants/mine
         final userRole = user['role'] as String? ?? 'customer';
 
+        // Save bearer token from response body
+        final bodyToken = body['token'] as String? ?? '';
+        if (bodyToken.isNotEmpty) {
+          await _safeWrite('auth_token', bodyToken);
+        }
         if (sessionCookie != null && sessionCookie.isNotEmpty) {
           await _safeWrite('session_cookie', sessionCookie);
+        } else if (bodyToken.isNotEmpty) {
+          // Construct cookie from token
+          await _safeWrite('session_cookie', 'better-auth.session_token=$bodyToken');
         }
         await _safeWrite('user_id', userId);
         await _safeWrite('member_name', name);
@@ -127,6 +135,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
         error: 'Sign in failed. Please try again.',
       );
     }
+  }
+
+  /// Update the user's role (called after selecting active tenant).
+  Future<void> updateRole(String role) async {
+    await _safeWrite('user_role', role);
+    state = state.copyWith(role: role);
   }
 
   Future<void> signOut() async {

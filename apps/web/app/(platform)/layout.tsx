@@ -142,7 +142,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <div className="p-3">
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9">
-            <AvatarImage src={user?.imageUrl ?? undefined} alt={displayName} />
+            {(user?.imageUrl) && <AvatarImage src={user?.imageUrl} alt={displayName} />}
             <AvatarFallback className="text-xs">
               {getInitials(displayName)}
             </AvatarFallback>

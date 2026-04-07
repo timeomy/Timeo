@@ -4,34 +4,37 @@ import 'api_client_provider.dart';
 class UserStats {
   final int visitsThisMonth;
   final int visitsThisWeek;
-  final int visitsToday;
+  final int totalVisits;
+  final DateTime? lastVisit;
 
   const UserStats({
     this.visitsThisMonth = 0,
     this.visitsThisWeek = 0,
-    this.visitsToday = 0,
+    this.totalVisits = 0,
+    this.lastVisit,
   });
 }
 
-/// Fetches check-in stats for a tenant.
-/// API: GET /api/tenants/:tenantId/check-ins/stats
-/// Note: This endpoint requires admin/staff role.
-/// For regular members, it will return null gracefully.
+/// Fetches check-in stats for the authenticated member.
+/// API: GET /api/tenants/:tenantId/check-ins/stats/me
 final statsProvider =
     FutureProvider.family<UserStats?, String>((ref, tenantId) async {
   final api = ref.read(apiClientProvider);
   try {
-    final r = await api.get('/api/tenants/$tenantId/check-ins/stats');
+    final r = await api.get('/api/tenants/$tenantId/check-ins/stats/me');
     final body = r.data as Map<String, dynamic>;
     final data = body['data'] as Map<String, dynamic>? ?? {};
 
+    final lastVisitStr = data['lastVisit'] as String?;
+    final lastVisit = lastVisitStr != null ? DateTime.tryParse(lastVisitStr) : null;
+
     return UserStats(
-      visitsThisMonth: (data['monthCount'] as num?)?.toInt() ?? 0,
+      visitsThisMonth: (data['thisMonth'] as num?)?.toInt() ?? 0,
       visitsThisWeek: (data['thisWeek'] as num?)?.toInt() ?? 0,
-      visitsToday: (data['today'] as num?)?.toInt() ?? 0,
+      totalVisits: (data['totalVisits'] as num?)?.toInt() ?? 0,
+      lastVisit: lastVisit,
     );
   } catch (_) {
-    // Endpoint may require admin role — return null for regular members
     return null;
   }
 });

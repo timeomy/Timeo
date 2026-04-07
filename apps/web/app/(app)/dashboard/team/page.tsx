@@ -32,15 +32,17 @@ import {
 } from "@timeo/ui/web";
 import { Users, UserPlus, Ban } from "lucide-react";
 
-type MemberRole = "admin" | "staff" | "customer";
+type MemberRole = "admin" | "staff" | "coach" | "customer";
 
 const ROLE_OPTIONS: Array<{ label: string; value: MemberRole }> = [
   { label: "Admin", value: "admin" },
   { label: "Staff", value: "staff" },
+  { label: "Coach", value: "coach" },
   { label: "Customer", value: "customer" },
 ];
 
 const ROLE_BADGE_VARIANTS: Record<string, string> = {
+  coach: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
   admin: "bg-primary/20 text-primary border-primary/30",
   staff: "bg-blue-500/20 text-blue-400 border-blue-500/30",
   customer: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
@@ -63,11 +65,13 @@ export default function TeamPage() {
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
   const [inviteRole, setInviteRole] = useState<MemberRole>("staff");
   const [saving, setSaving] = useState<string | null>(null);
 
   function resetInviteForm() {
     setInviteEmail("");
+    setInviteName("");
   }
 
   async function handleInvite() {
@@ -77,6 +81,7 @@ export default function TeamPage() {
       await inviteMember({
         email: inviteEmail.trim(),
         role: inviteRole,
+        name: inviteName.trim() || undefined,
       });
       setInviteOpen(false);
       resetInviteForm();
@@ -145,6 +150,16 @@ export default function TeamPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Full Name</label>
+                <Input
+                  placeholder="John Doe"
+                  value={inviteName}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    setInviteName(e.target.value);
+                  }}
+                />
+              </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Email Address</label>
                 <Input
@@ -226,17 +241,17 @@ export default function TeamPage() {
                       <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                           {(
-                            member.userName?.[0] ||
-                            member.userEmail?.[0] ||
+                            member.name?.[0] ||
+                            member.email?.[0] ||
                             "?"
                           ).toUpperCase()}
                         </div>
                         <div>
                           <p className="text-sm font-medium">
-                            {member.userName || "Unknown User"}
+                            {member.name || "Unknown User"}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {member.userEmail || "—"}
+                            {member.email || "—"}
                           </p>
                         </div>
                       </div>

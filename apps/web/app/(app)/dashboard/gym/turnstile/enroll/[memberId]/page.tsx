@@ -187,10 +187,7 @@ export default function FaceEnrollmentPage() {
         <CardContent className="p-6">
           <div className="flex items-center gap-4">
             <Avatar className="h-14 w-14">
-              <AvatarImage
-                src={member.photoUrl ?? undefined}
-                alt={member.name}
-              />
+              {(member.photoUrl) && <AvatarImage src={member.photoUrl} alt={member.name} />}
               <AvatarFallback className="text-lg bg-primary/10 text-primary font-bold">
                 {getInitial(member.name)}
               </AvatarFallback>

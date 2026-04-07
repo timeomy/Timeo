@@ -60,7 +60,25 @@ function useGymMembers() {
       );
       const data = await res.json();
       if (!data.success) throw new Error(data.error?.message || "Failed to load members");
-      return data.data as GymMember[];
+      const result = data.data;
+      // API returns { members: [{membership: {...}, user: {...}}], pagination: {...} }
+      const rawList: Array<{membership?: {id?: string; status?: string; role?: string}; user?: {id?: string; name?: string; email?: string; avatarUrl?: string}}> = Array.isArray(result) ? result : (result?.members ?? []);
+      return rawList.map((item) => {
+        if (item.user) {
+          return {
+            id: item.user.id ?? item.membership?.id ?? "",
+            name: item.user.name ?? "",
+            email: item.user.email ?? "",
+            phone: null,
+            photoUrl: item.user.avatarUrl ?? null,
+            membershipStatus: (item.membership?.status as "active" | "expired" | "suspended") ?? "active",
+            membershipPlan: item.membership?.role ?? null,
+            faceEnrolled: false,
+            lastCheckIn: null,
+          } as GymMember;
+        }
+        return item as unknown as GymMember;
+      });
     },
     enabled: !!tenantId,
   });
@@ -181,10 +199,7 @@ export default function GymMembersPage() {
                   >
                     <TableCell>
                       <Avatar className="h-9 w-9">
-                        <AvatarImage
-                          src={member.photoUrl ?? undefined}
-                          alt={member.name}
-                        />
+                        {(member.photoUrl) && <AvatarImage src={member.photoUrl} alt={member.name} />}
                         <AvatarFallback className="text-xs bg-primary/10 text-primary font-bold">
                           {getInitial(member.name, member.email)}
                         </AvatarFallback>

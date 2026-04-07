@@ -31,6 +31,7 @@ export const paymentGatewayEnum = pgEnum("payment_gateway", [
 export const memberRoleEnum = pgEnum("member_role", [
   "customer",
   "staff",
+  "coach",
   "admin",
   "platform_admin",
 ]);
