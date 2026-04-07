@@ -8,9 +8,10 @@ import {
   featureFlags,
   featureFlagOverrides,
 } from "@timeo/db/schema";
-import { and, eq, ilike, inArray } from "drizzle-orm";
+import { and, eq, ilike, inArray, sql } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
+import { requireRole } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
 import {
   CreateTenantSchema,
@@ -134,49 +135,10 @@ app.get("/mine", authMiddleware, async (c) => {
   return c.json(success({ tenants: normalized, platformRole }));
 });
 
-// POST /tenants/join - join a tenant as a customer (by slug)
+// POST /tenants/join — DISABLED: self-joining is not permitted.
+// Members must be invited by a business admin.
 app.post("/join", authMiddleware, async (c) => {
-  const user = c.get("user");
-  const { slug } = await c.req.json().catch(() => ({ slug: "" }));
-
-  if (!slug) {
-    return c.json(error("VALIDATION_ERROR", "slug is required"), 400);
-  }
-
-  const [tenant] = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.slug, slug))
-    .limit(1);
-
-  if (!tenant) {
-    return c.json(error("NOT_FOUND", "Business not found"), 404);
-  }
-
-  // Upsert customer membership
-  const [existing] = await db
-    .select()
-    .from(tenantMemberships)
-    .where(
-      and(
-        eq(tenantMemberships.tenant_id, tenant.id),
-        eq(tenantMemberships.user_id, user.id),
-      ),
-    )
-    .limit(1);
-
-  if (!existing) {
-    const { generateId } = await import("@timeo/db");
-    await db.insert(tenantMemberships).values({
-      id: generateId(),
-      tenant_id: tenant.id,
-      user_id: user.id,
-      role: "customer",
-      status: "active",
-    });
-  }
-
-  return c.json(success({ tenantId: tenant.id, tenantName: tenant.name }));
+  return c.json(error("FORBIDDEN", "Self-joining is not permitted. Please contact the business for an invitation."), 403);
 });
 
 // GET /tenants/by-slug/:slug
@@ -437,5 +399,52 @@ app.get(
     return c.json(success(result));
   },
 );
+
+
+// GET /tenants/:tenantId/settings/payments — get payment method settings
+app.get(
+  "/:tenantId/settings/payments",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+    const [row] = await db
+      .select({ settings: tenants.settings })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
+    const settings = (row?.settings ?? {}) as Record<string, unknown>;
+    const paymentMethods = (settings.paymentMethods ?? {
+      fpx: true,
+      duitnow: true,
+      card: false,
+      cash: true,
+    }) as Record<string, boolean>;
+    return c.json(success({ paymentMethods }));
+  }
+);
+
+// PATCH /tenants/:tenantId/settings/payments — save payment method settings
+app.patch(
+  "/:tenantId/settings/payments",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+    const body = await c.req.json() as { paymentMethods?: Record<string, boolean> };
+    const currentSettings = await db
+      .select({ settings: tenants.settings })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
+    const existingSettings = (currentSettings[0]?.settings ?? {}) as Record<string, unknown>;
+    const updatedSettings = { ...existingSettings, paymentMethods: body.paymentMethods ?? {} };
+    await db.update(tenants).set({ settings: updatedSettings }).where(eq(tenants.id, tenantId));
+    return c.json(success({ message: "Payment settings updated" }));
+  }
+);
+
 
 export { app as tenantsRouter };

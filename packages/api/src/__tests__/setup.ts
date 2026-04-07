@@ -1,8 +1,9 @@
 import { vi } from "vitest";
 
-// Set env vars before any module-level constants are evaluated
-// (gym.routes.ts captures GYM_DEVICE_KEY_SECRET at module load time)
+// Set environment variables before any modules are imported
 process.env.GYM_DEVICE_KEY_SECRET = "test-device-secret-for-tests";
+process.env.BETTER_AUTH_SECRET = "test-secret-key-for-tests";
+process.env.JWT_SECRET = "test-jwt-secret-for-tests";
 
 // Mock rm-api-sdk — Revenue Monster SDK (not installed in test env)
 vi.mock("rm-api-sdk", () => ({

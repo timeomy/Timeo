@@ -3,7 +3,6 @@ import { ExpoConfig, ConfigContext } from "expo/config";
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "Timeo",
-  shortName: "Timeo",
   slug: "timeo",
   owner: "oxloz",
   version: "1.0.0",

@@ -25,10 +25,13 @@ class ProfileScreen extends ConsumerWidget {
         'Member';
     final email = userAsync.whenOrNull(data: (u) => u?.email) ?? '';
     final avatarUrl = userAsync.whenOrNull(data: (u) => u?.avatarUrl);
-    final membershipBadge = membershipAsync.whenOrNull(
-          data: (m) => m?.planName,
-        ) ??
-        'Standard Customer';
+    final role = authState.role ?? 'customer';
+    final isCustomer = role == 'customer';
+    // For customers: show plan name (or role badge); for others: always show role badge
+    final planName = isCustomer
+        ? membershipAsync.whenOrNull(data: (m) => m?.planName)
+        : null;
+    final membershipBadge = planName ?? _getRoleBadge(role);
     const appVersion = '1.0.0';
 
     return Scaffold(
@@ -172,18 +175,20 @@ class ProfileScreen extends ConsumerWidget {
                 label: 'Edit Profile',
                 onTap: () => context.push('/edit-profile'),
               ),
-              _MenuTile(
-                icon: Icons.card_membership_rounded,
-                iconColor: const Color(0xFF7C3AED),
-                label: 'My Subscription',
-                onTap: () => context.go('/membership'),
-              ),
-              _MenuTile(
-                icon: Icons.receipt_long_rounded,
-                iconColor: const Color(0xFF059669),
-                label: 'Order History',
-                onTap: () => context.push('/order-history'),
-              ),
+              if (isCustomer) ...[
+                _MenuTile(
+                  icon: Icons.card_membership_rounded,
+                  iconColor: const Color(0xFF7C3AED),
+                  label: 'My Subscription',
+                  onTap: () => context.go('/membership'),
+                ),
+                _MenuTile(
+                  icon: Icons.receipt_long_rounded,
+                  iconColor: const Color(0xFF059669),
+                  label: 'Order History',
+                  onTap: () => context.push('/order-history'),
+                ),
+              ],
               _MenuTile(
                 icon: Icons.lock_outline_rounded,
                 iconColor: AppTheme.warning,
@@ -249,6 +254,22 @@ class ProfileScreen extends ConsumerWidget {
                       color: AppTheme.error,
                       fontWeight: FontWeight.w600,
                       fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // ── Delete Account ──
+              Center(
+                child: TextButton(
+                  onPressed: () => _showDeleteAccountDialog(context, ref),
+                  child: const Text(
+                    'Delete Account',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
                     ),
                   ),
                 ),
@@ -321,6 +342,50 @@ class ProfileScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  void _showDeleteAccountDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: const Text('Delete Account', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'To permanently delete your account and all associated data, please email support@timeo.my with the subject "Account Deletion Request".\n\nThis action is irreversible.',
+          style: TextStyle(color: AppTheme.onSurfaceMuted, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel',
+                style: TextStyle(color: AppTheme.onSurfaceMuted)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              // Open support page in browser
+              // ignore: deprecated_member_use
+              // Users can email support@timeo.my to complete deletion
+            },
+            child: const Text('OK', style: TextStyle(color: AppTheme.primary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getRoleBadge(String? role) {
+    switch (role) {
+      case 'admin':
+        return 'Administrator';
+      case 'staff':
+      case 'coach':
+        return 'Coach';
+      case 'customer':
+        return 'Standard Member';
+      default:
+        return 'Standard Member';
+    }
   }
 }
 

@@ -20,31 +20,30 @@ class TimeoLogo extends StatelessWidget {
           ),
         ],
       ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Text(
-            't',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: size * 0.62,
-              fontWeight: FontWeight.w800,
-              height: 1.0,
-            ),
-          ),
-          Positioned(
-            right: size * 0.14,
-            bottom: size * 0.14,
-            child: Container(
-              width: size * 0.22,
-              height: size * 0.22,
-              decoration: const BoxDecoration(
-                color: Color(0xFF0066FF),
-                shape: BoxShape.circle,
+      child: Center(
+        child: Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: 't',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: size * 0.5,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-            ),
+              TextSpan(
+                text: '.',
+                style: TextStyle(
+                  color: const Color(0xFF0066FF),
+                  fontSize: size * 0.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
-        ],
+          textAlign: TextAlign.center,
+        ),
       ),
     );
   }

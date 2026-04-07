@@ -6,6 +6,7 @@ import Link from "next/link";
 import { authClient } from "@timeo/auth/web";
 import { Button, Input } from "@timeo/ui/web";
 import { Loader2 } from "lucide-react";
+import { TimeoIcon } from "@/timeo-logo";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -38,8 +39,6 @@ export default function SignInPage() {
       });
 
       if (result.error) {
-        // Always use a generic message — never expose whether the email exists
-        // or the password was wrong, as that enables email enumeration attacks.
         setError("Invalid email or password");
         setLoading(false);
         return;
@@ -47,103 +46,88 @@ export default function SignInPage() {
 
       router.push(redirect);
     } catch {
-      // Generic fallback — do not leak server error details to the client.
       setError("Invalid email or password");
       setLoading(false);
     }
   };
 
   return (
-    <div className="w-full max-w-md">
-      <div className="rounded-2xl border border-border/60 bg-card p-8 shadow-lg shadow-black/20">
-        {/* Header */}
-        <div className="mb-7 text-center">
-          <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Sign in to your Timeo account
-          </p>
+    <div className="w-full max-w-sm">
+      {/* Logo */}
+      <div className="mb-8 flex justify-center">
+        <TimeoIcon size={72} />
+      </div>
+
+      {/* Header */}
+      <div className="mb-6 text-center">
+        <h1 className="text-xl font-semibold text-white">Sign in to Timeo</h1>
+      </div>
+
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="email" className="mb-1.5 block text-sm text-white/60">
+            Email
+          </label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); setError(""); }}
+            disabled={loading}
+            autoComplete="email"
+            className="h-11 bg-white/[0.06] border-white/[0.1] focus-visible:ring-[#0066FF]/50"
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="email" className="mb-1.5 block text-sm font-medium">
-              Email
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label htmlFor="password" className="text-sm text-white/60">
+              Password
             </label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                setError("");
-              }}
-              disabled={loading}
-              autoComplete="email"
-              className="transition-colors focus-visible:ring-blue-500"
-            />
+            <Link href="/forgot-password" className="text-xs text-white/40 hover:text-white/60">
+              Forgot password?
+            </Link>
           </div>
-
-          <div>
-            <div className="flex items-center justify-between">
-              <label htmlFor="password" className="mb-1.5 block text-sm font-medium">
-                Password
-              </label>
-              <Link
-                href="/forgot-password"
-                className="mb-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors"
-              >
-                Forgot password?
-              </Link>
-            </div>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setError("");
-              }}
-              disabled={loading}
-              autoComplete="current-password"
-              className="transition-colors focus-visible:ring-blue-500"
-            />
-          </div>
-
-          {error && (
-            <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {error}
-            </p>
-          )}
-
-          <Button
-            type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-            size="lg"
+          <Input
+            id="password"
+            type="password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => { setPassword(e.target.value); setError(""); }}
             disabled={loading}
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Signing in…
-              </>
-            ) : (
-              "Sign In"
-            )}
-          </Button>
-        </form>
+            autoComplete="current-password"
+            className="h-11 bg-white/[0.06] border-white/[0.1] focus-visible:ring-[#0066FF]/50"
+          />
+        </div>
 
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{" "}
-          <Link
-            href="/sign-up"
-            className="font-medium text-blue-400 hover:text-blue-300 transition-colors"
-          >
-            Sign up
-          </Link>
-        </p>
-      </div>
+        {error && (
+          <p className="text-sm text-red-400">{error}</p>
+        )}
+
+        <Button
+          type="submit"
+          className="w-full h-11 bg-[#0066FF] hover:bg-[#0052CC] text-white font-medium"
+          disabled={loading}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Signing in…
+            </>
+          ) : (
+            "Sign in"
+          )}
+        </Button>
+      </form>
+
+      <p className="mt-6 text-center text-sm text-white/30">
+        Don&apos;t have an account?{" "}
+        <Link href="/sign-up" className="text-[#0066FF] hover:text-[#3388FF]">
+          Sign up
+        </Link>
+      </p>
     </div>
   );
 }

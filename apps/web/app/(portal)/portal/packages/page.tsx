@@ -626,20 +626,20 @@ export default function MyPackagesPage() {
           </h2>
           <div className="grid gap-4 sm:grid-cols-2">
             {credits.map((credit) => {
-              const remaining = credit.remaining;
-              const total = credit.totalSessions;
-              const used = credit.usedSessions;
+              const total = (credit as any).credit?.totalSessions ?? (credit as any).totalSessions ?? 0;
+              const used = (credit as any).credit?.usedSessions ?? (credit as any).usedSessions ?? 0;
+              const remaining = (credit as any).credit ? total - used : ((credit as any).remaining ?? 0);
               const progressPercent =
                 total > 0 ? Math.round((used / total) * 100) : 0;
               const isExpired =
-                credit.expiresAt !== undefined &&
-                credit.expiresAt !== null &&
-                new Date(credit.expiresAt).getTime() < Date.now();
+                ((credit as any).credit?.expiresAt ?? (credit as any).expiresAt) !== undefined &&
+                ((credit as any).credit?.expiresAt ?? (credit as any).expiresAt) !== null &&
+                new Date((credit as any).credit?.expiresAt ?? (credit as any).expiresAt).getTime() < Date.now();
               const isFullyUsed = remaining <= 0;
 
               return (
                 <Card
-                  key={credit.id}
+                  key={(credit as any).credit?.id ?? (credit as any).id}
                   className={cn(
                     "glass border-white/[0.08]",
                     (isExpired || isFullyUsed) && "opacity-60",
@@ -653,7 +653,7 @@ export default function MyPackagesPage() {
                         </div>
                         <div>
                           <p className="font-medium text-white">
-                            {credit.packageName}
+                            {(credit as any).package?.name ?? (credit as any).packageName ?? "Session Package"}
                           </p>
                           {isExpired ? (
                             <span className="text-xs text-red-400">Expired</span>
@@ -688,10 +688,10 @@ export default function MyPackagesPage() {
                         />
                       </div>
                     </div>
-                    {credit.expiresAt && (
+                    {((credit as any).credit?.expiresAt ?? (credit as any).expiresAt) && (
                       <p className="mt-3 text-xs text-white/30">
                         {isExpired ? "Expired" : "Expires"}{" "}
-                        {new Date(credit.expiresAt).toLocaleDateString("en-MY", {
+                        {new Date((credit as any).credit?.expiresAt ?? (credit as any).expiresAt).toLocaleDateString("en-MY", {
                           day: "numeric",
                           month: "short",
                           year: "numeric",

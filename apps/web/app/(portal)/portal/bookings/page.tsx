@@ -13,7 +13,8 @@ import {
   TabsContent,
   cn,
 } from "@timeo/ui/web";
-import { Calendar, Clock, User, AlertCircle } from "lucide-react";
+import { Calendar, Clock, User, AlertCircle, Plus } from "lucide-react";
+import Link from "next/link";
 
 type BookingStatus = "all" | "upcoming" | "completed" | "cancelled";
 
@@ -206,11 +207,17 @@ function EmptyState({ tab }: { tab: BookingStatus }) {
 
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="mb-3 rounded-full bg-white/[0.04] p-3">
-        <AlertCircle className="h-6 w-6 text-white/30" />
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/[0.04] border border-white/[0.06]">
+        <Calendar className="h-7 w-7 text-white/20" />
       </div>
-      <p className="text-sm font-medium text-white/50">{msg.title}</p>
-      <p className="mt-1 text-xs text-white/30">{msg.desc}</p>
+      <p className="text-base font-semibold text-white/60">{msg.title}</p>
+      <p className="mt-1.5 text-sm text-white/30 max-w-xs">{msg.desc}</p>
+      {tab === "all" && (
+        <Link href="/portal/bookings/new" className="mt-5 flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity">
+          <Plus className="h-4 w-4" />
+          Book a Session
+        </Link>
+      )}
     </div>
   );
 }

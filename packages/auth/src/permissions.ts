@@ -28,7 +28,18 @@ export const PERMISSIONS = {
     tenants: [] as string[],
     system: [] as string[],
   },
-  admin: {
+  coach: {
+    services: ["read"],
+    bookings: ["read", "create", "update"],
+    products: ["read"],
+    orders: [] as string[],
+    staff: [] as string[],
+    settings: [] as string[],
+    analytics: [] as string[],
+    tenants: [] as string[],
+    system: [] as string[],
+  },
+    admin: {
     services: ["read", "create", "update", "delete"],
     bookings: ["read", "create", "update", "cancel", "delete"],
     products: ["read", "create", "update", "delete"],

@@ -31,7 +31,7 @@ vi.mock("@timeo/db", () => ({
 
 // Mock @timeo/db/schema
 vi.mock("@timeo/db/schema", () => ({
-  users: { id: "id", auth_id: "auth_id", email: "email", name: "name", avatar_url: "avatar_url", created_at: "created_at", updated_at: "updated_at" },
+  users: { id: "id", auth_id: "auth_id", email: "email", name: "name", avatar_url: "avatar_url", nfc_card_id: "nfc_card_id", created_at: "created_at", updated_at: "updated_at", role: "role", force_password_reset: "force_password_reset" },
   tenants: { id: "id", slug: "slug" },
   tenantMemberships: { id: "id", user_id: "user_id", tenant_id: "tenant_id", role: "role", status: "status", notes: "notes", tags: "tags", joined_at: "joined_at" },
   checkIns: { id: "id", tenant_id: "tenant_id", user_id: "user_id", method: "method", timestamp: "timestamp" },
@@ -203,11 +203,19 @@ describe("POST /api/tenants/:tenantId/gym/checkin", () => {
       memberName: "Expired User",
       userId: "usr_expired12345678",
     });
+    vi.mocked(AccessControlService.logAccessAttempt).mockResolvedValueOnce("log_123");
+    vi.mocked(CheckInService.createCheckIn).mockResolvedValueOnce("ci_123");
 
-    // Need to mock tenant lookup too
+    // Setup database mocks for tenant and subscription queries
+    let callCount = 0;
     const chainEnd = {
       where: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockResolvedValue([{ id: TEST_TENANT.id }]),
+      and: vi.fn().mockReturnThis(),
+      limit: vi.fn(() => {
+        callCount++;
+        if (callCount === 1) return Promise.resolve([{ id: TEST_TENANT.id }]); // tenant
+        return Promise.resolve([]); // subscriptions - no active
+      }),
     };
     mockDb.select.mockReturnValue({ from: vi.fn().mockReturnValue(chainEnd) });
 
@@ -244,6 +252,8 @@ describe("POST /api/tenants/:tenantId/gym/checkin", () => {
       memberName: "Active Member",
       userId: "usr_member123456789",
     });
+    vi.mocked(CheckInService.createCheckIn).mockResolvedValueOnce("ci_test_123");
+    vi.mocked(AccessControlService.logAccessAttempt).mockResolvedValueOnce("log_456");
 
     let callCount = 0;
     const chainEnd = {

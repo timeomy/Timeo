@@ -218,10 +218,7 @@ export default function GymScannerPage() {
               {result.member && (
                 <div className="flex items-center gap-4 rounded-lg border border-white/[0.06] bg-white/[0.02] p-4 w-full max-w-sm">
                   <Avatar className="h-14 w-14">
-                    <AvatarImage
-                      src={result.member.photoUrl ?? undefined}
-                      alt={result.member.name}
-                    />
+                    {(result.member.photoUrl) && <AvatarImage src={result.member.photoUrl} alt={result.member.name} />}
                     <AvatarFallback className="text-lg bg-primary/10 text-primary font-bold">
                       {getInitial(result.member.name)}
                     </AvatarFallback>

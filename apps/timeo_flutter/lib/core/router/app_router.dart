@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import '../auth/auth_provider.dart';
 import '../auth/auth_state.dart';
@@ -24,36 +25,54 @@ import '../../features/admin/screens/admin_home_screen.dart';
 import '../../features/admin/screens/admin_members_screen.dart';
 import '../../features/admin/screens/admin_checkins_screen.dart';
 import '../../features/coach/screens/coach_home_screen.dart';
+import '../../features/explore/screens/explore_screen.dart';
+import '../../features/explore/screens/select_business_screen.dart';
+import '../../features/explore/screens/store_detail_screen.dart';
+import '../../features/coach/screens/my_clients_screen.dart';
+import '../../features/coach/screens/log_session_screen.dart';
 import '../providers/packages_provider.dart' show MembershipPlan;
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
 
   return GoRouter(
-    initialLocation: '/splash',
+    initialLocation: '/explore',
     redirect: (context, state) {
       final isAuthenticated = authState.status == AuthStatus.authenticated;
-      final isSplash = state.matchedLocation == '/splash';
-      final isAuthRoute = state.matchedLocation == '/sign-in' ||
-          state.matchedLocation == '/sign-up';
-      final isSelectShop = state.matchedLocation == '/select-shop';
-      final isPostLogin = state.matchedLocation == '/post-login';
-      final isAdminRoute = state.matchedLocation.startsWith('/admin');
-      final isCoachRoute = state.matchedLocation.startsWith('/coach');
+      final location = state.matchedLocation;
+      final isSplash = location == '/splash';
+      final isAuthRoute = location == '/sign-in' || location == '/sign-up';
+      final isPublicRoute = location == '/explore' ||
+          location == '/select-business' ||
+          location.startsWith('/store');
+      final isSelectShop = location == '/select-shop';
+      final isPostLogin = location == '/post-login';
+      final isAdminRoute = location.startsWith('/admin');
+      final isCoachRoute = location.startsWith('/coach');
 
-      if (isSplash) return null;
+      if (isSplash) return isAuthenticated ? '/post-login' : '/explore';
+
+      // Allow public routes (explore, store detail) for everyone
+      if (isPublicRoute) return null;
+
+      // Unauthenticated users trying to access protected routes → explore
       if (!isAuthenticated && !isAuthRoute) {
-        return '/sign-in';
+        return '/explore';
       }
+
+      // Authenticated users trying to access auth routes → post-login
       if (isAuthenticated && isAuthRoute) {
         return '/post-login';
       }
-      if (isAuthenticated && state.matchedLocation == '/') {
+
+      // Authenticated user at root → role-based home
+      if (isAuthenticated && location == '/') {
         final role = authState.role;
         if (role == 'admin') return '/admin-home';
         if (role == 'staff') return '/coach-home';
         return '/home';
       }
+
       // Allow role-specific, select-shop, and post-login routes
       if (isAuthenticated &&
           (isSelectShop || isPostLogin || isAdminRoute || isCoachRoute)) {
@@ -64,9 +83,45 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/splash',
-        builder: (context, state) => SplashScreen(
-          onComplete: () => context.go('/sign-in'),
-        ),
+        builder: (context, state) {
+          return SplashScreen(
+            onComplete: () async {
+              final isAuthed =
+                  authState.status == AuthStatus.authenticated;
+              if (isAuthed) {
+                if (context.mounted) context.go('/post-login');
+                return;
+              }
+              // Check for a previously selected business
+              try {
+                const storage = FlutterSecureStorage();
+                final savedSlug =
+                    await storage.read(key: 'selected_business');
+                if (savedSlug != null && savedSlug.isNotEmpty) {
+                  if (context.mounted) context.go('/store/$savedSlug');
+                  return;
+                }
+              } catch (_) {}
+              if (context.mounted) context.go('/explore');
+            },
+          );
+        },
+      ),
+      // Public explore routes (no auth needed)
+      GoRoute(
+        path: '/explore',
+        builder: (context, state) => const ExploreScreen(),
+      ),
+      GoRoute(
+        path: '/store/:slug',
+        builder: (context, state) {
+          final slug = state.pathParameters['slug'] ?? '';
+          return StoreDetailScreen(slug: slug);
+        },
+      ),
+      GoRoute(
+        path: '/select-business',
+        builder: (context, state) => const SelectBusinessScreen(),
       ),
       GoRoute(
         path: '/',
@@ -153,6 +208,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/coach-home',
         builder: (context, state) => const CoachHomeScreen(),
       ),
+      GoRoute(
+        path: '/coach-clients',
+        builder: (context, state) => const MyClientsScreen(),
+      ),
+      GoRoute(
+        path: '/coach-log-session',
+        builder: (context, state) => const LogSessionScreen(),
+      ),
       // Shell with bottom nav
       ShellRoute(
         builder: (context, state, child) => HomeShell(child: child),
@@ -181,14 +244,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-/// Shell widget with bottom nav bar + center QR FAB
-class HomeShell extends StatelessWidget {
+/// Shell widget with bottom nav bar + center QR FAB (role-aware)
+class HomeShell extends ConsumerWidget {
   final Widget child;
   const HomeShell({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context) {
-    final currentIndex = _calculateSelectedIndex(context);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final role = ref.watch(authProvider).role ?? 'customer';
+    final currentIndex = _calculateSelectedIndex(context, role);
 
     return Scaffold(
       body: child,
@@ -203,37 +267,100 @@ class HomeShell extends StatelessWidget {
         height: 64,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _NavItem(
-              icon: Icons.home_rounded,
-              label: 'Home',
-              isActive: currentIndex == 0,
-              onTap: () => context.go('/home'),
-            ),
-            _NavItem(
-              icon: Icons.calendar_today_rounded,
-              label: 'Bookings',
-              isActive: false,
-              onTap: () => context.push('/bookings'),
-            ),
-            // Spacer for center FAB
-            const SizedBox(width: 48),
-            _NavItem(
-              icon: Icons.card_membership_rounded,
-              label: 'Membership',
-              isActive: currentIndex == 1,
-              onTap: () => context.go('/membership'),
-            ),
-            _NavItem(
-              icon: Icons.person_rounded,
-              label: 'Profile',
-              isActive: currentIndex == 2,
-              onTap: () => context.go('/profile'),
-            ),
-          ],
+          children: _buildNavItems(context, role, currentIndex),
         ),
       ),
     );
+  }
+
+  List<Widget> _buildNavItems(
+      BuildContext context, String role, int currentIndex) {
+    if (role == 'admin') {
+      return [
+        _NavItem(
+          icon: Icons.home_rounded,
+          label: 'Home',
+          isActive: currentIndex == 0,
+          onTap: () => context.go('/home'),
+        ),
+        _NavItem(
+          icon: Icons.people_rounded,
+          label: 'Members',
+          isActive: currentIndex == 1,
+          onTap: () => context.push('/admin-members'),
+        ),
+        const SizedBox(width: 48),
+        _NavItem(
+          icon: Icons.how_to_reg_rounded,
+          label: 'Check-ins',
+          isActive: currentIndex == 2,
+          onTap: () => context.push('/admin-checkins'),
+        ),
+        _NavItem(
+          icon: Icons.person_rounded,
+          label: 'Profile',
+          isActive: currentIndex == 3,
+          onTap: () => context.go('/profile'),
+        ),
+      ];
+    } else if (role == 'staff' || role == 'coach') {
+      return [
+        _NavItem(
+          icon: Icons.home_rounded,
+          label: 'Home',
+          isActive: currentIndex == 0,
+          onTap: () => context.go('/home'),
+        ),
+        _NavItem(
+          icon: Icons.people_rounded,
+          label: 'Clients',
+          isActive: currentIndex == 1,
+          onTap: () => context.push('/coach-clients'),
+        ),
+        const SizedBox(width: 48),
+        _NavItem(
+          icon: Icons.fitness_center_rounded,
+          label: 'Sessions',
+          isActive: currentIndex == 2,
+          onTap: () => context.push('/coach-log-session'),
+        ),
+        _NavItem(
+          icon: Icons.person_rounded,
+          label: 'Profile',
+          isActive: currentIndex == 3,
+          onTap: () => context.go('/profile'),
+        ),
+      ];
+    } else {
+      // Customer / default
+      return [
+        _NavItem(
+          icon: Icons.home_rounded,
+          label: 'Home',
+          isActive: currentIndex == 0,
+          onTap: () => context.go('/home'),
+        ),
+        _NavItem(
+          icon: Icons.calendar_today_rounded,
+          label: 'Bookings',
+          isActive: false,
+          onTap: () => context.push('/bookings'),
+        ),
+        const SizedBox(width: 48),
+        _NavItem(
+          icon: Icons.card_membership_rounded,
+          label: 'Membership',
+          isActive: currentIndex == 1,
+          onTap: () => context.go('/membership'),
+        ),
+        _NavItem(
+          icon: Icons.person_rounded,
+          label: 'Profile',
+          isActive: currentIndex == 2,
+          onTap: () => context.go('/profile'),
+        ),
+      ];
+    }
   }
 
   Widget _buildQrFab(BuildContext context) {
@@ -252,7 +379,6 @@ class HomeShell extends StatelessWidget {
       ),
       child: FloatingActionButton(
         onPressed: () {
-          // Show QR as a modal bottom sheet
           showModalBottomSheet(
             context: context,
             isScrollControlled: true,
@@ -274,11 +400,21 @@ class HomeShell extends StatelessWidget {
     );
   }
 
-  int _calculateSelectedIndex(BuildContext context) {
+  int _calculateSelectedIndex(BuildContext context, String role) {
     final location = GoRouterState.of(context).matchedLocation;
     if (location.startsWith('/home')) return 0;
-    if (location.startsWith('/membership')) return 1;
-    if (location.startsWith('/profile')) return 2;
+    if (role == 'admin') {
+      if (location.startsWith('/admin-members')) return 1;
+      if (location.startsWith('/admin-checkins')) return 2;
+      if (location.startsWith('/profile')) return 3;
+    } else if (role == 'staff' || role == 'coach') {
+      if (location.startsWith('/coach-clients')) return 1;
+      if (location.startsWith('/coach-log-session')) return 2;
+      if (location.startsWith('/profile')) return 3;
+    } else {
+      if (location.startsWith('/membership')) return 1;
+      if (location.startsWith('/profile')) return 2;
+    }
     return 0;
   }
 }

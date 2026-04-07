@@ -12,7 +12,7 @@ import {
   blockedSlots,
 } from "@timeo/db/schema";
 import { alias } from "drizzle-orm/pg-core";
-import { and, eq, desc, gte, lt, inArray } from "drizzle-orm";
+import { and, eq, desc, gte, lt, inArray, sql } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
 import { requireRole } from "../middleware/rbac.js";
@@ -111,13 +111,23 @@ app.get(
       return c.json(error("BAD_REQUEST", "date must be in YYYY-MM-DD format"), 400);
     }
 
-    // 1. Fetch service for duration
+    // 1. Fetch service for duration (check services table first, then service_catalog)
+    let serviceDuration = 60; // default 60 min
     const [service] = await db
       .select()
       .from(services)
       .where(and(eq(services.id, serviceId), eq(services.tenant_id, tenantId)))
       .limit(1);
-    if (!service) return c.json(error("NOT_FOUND", "Service not found"), 404);
+    if (!service) {
+      // Try service_catalog table (used for booking catalog)
+      const [catalogService] = await db.execute(
+        sql`SELECT duration_minutes FROM service_catalog WHERE id = ${serviceId} AND tenant_id = ${tenantId} LIMIT 1`
+      );
+      if (!catalogService) return c.json(error("NOT_FOUND", "Service not found"), 404);
+      serviceDuration = Number((catalogService as { duration_minutes: number }).duration_minutes) || 60;
+    } else {
+      serviceDuration = service.duration_minutes ?? 60;
+    }
 
     // 2. Parse date and get day of week in Asia/Kuala_Lumpur
     const timezone = "Asia/Kuala_Lumpur";
@@ -225,7 +235,7 @@ app.get(
       );
 
     // 9. Generate 30-minute-interval start times
-    const durationMs = service.duration_minutes * 60_000;
+    const durationMs = serviceDuration * 60_000;
     const slotInterval = 30 * 60_000;
     const slots: Array<{ startTime: string; endTime: string; availableStaffCount: number }> = [];
 

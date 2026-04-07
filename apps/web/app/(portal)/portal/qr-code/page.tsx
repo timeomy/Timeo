@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useMemberQrCode, useGenerateQrCode } from "@timeo/api-client";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
 import { useTenantId } from "@/hooks/use-tenant-id";
@@ -11,20 +11,20 @@ import {
   Skeleton,
   cn,
 } from "@timeo/ui/web";
-import { QrCode, RefreshCw, Smartphone } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import { QrCode, RefreshCw, Printer, Download } from "lucide-react";
 
 export default function QrCodePage() {
   const { user } = useTimeoWebAuthContext();
   const { tenantId, tenant } = useTenantId();
   const [generating, setGenerating] = useState(false);
+  const qrRef = useRef<HTMLDivElement>(null);
 
   const { data: qrCode, isLoading } = useMemberQrCode(tenantId);
   const { mutateAsync: generateQrCode } = useGenerateQrCode(tenantId ?? "");
 
   const displayName = user
-    ? user.name ||
-      user.email ||
-      "Member"
+    ? user.name || user.email || "Member"
     : "Member";
 
   async function handleGenerate() {
@@ -51,17 +51,55 @@ export default function QrCodePage() {
     }
   }
 
+  function handlePrint() {
+    const gymName = tenant?.name ?? "Timeo";
+    const code = qrCode?.code ?? "";
+    const svgEl = qrRef.current?.querySelector("svg");
+    const svgString = svgEl ? new XMLSerializer().serializeToString(svgEl) : "";
+    const svgDataUrl = `data:image/svg+xml;base64,${btoa(svgString)}`;
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>QR Code — ${displayName}</title>
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #fff; }
+            .card { text-align: center; padding: 40px; border: 2px solid #e5e7eb; border-radius: 16px; max-width: 320px; }
+            .gym { font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
+            .name { font-size: 22px; font-weight: 700; color: #111827; margin-bottom: 20px; }
+            .qr { display: flex; justify-content: center; margin-bottom: 20px; }
+            .qr img { width: 200px; height: 200px; }
+            .code { font-family: monospace; font-size: 13px; color: #374151; background: #f3f4f6; padding: 8px 16px; border-radius: 8px; letter-spacing: 2px; display: inline-block; margin-bottom: 16px; }
+            .footer { font-size: 11px; color: #9ca3af; }
+            @media print { body { -webkit-print-color-adjust: exact; } }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <p class="gym">${gymName}</p>
+            <p class="name">${displayName}</p>
+            <div class="qr"><img src="${svgDataUrl}" alt="QR Code" /></div>
+            <p class="code">${code}</p>
+            <p class="footer">Show this QR code to check in at the gym</p>
+          </div>
+          <script>window.onload = function() { window.print(); }<\/script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  }
+
   // Loading state
   if (isLoading && tenantId) {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">
-            QR Code
-          </h1>
-          <p className="text-sm text-white/50">
-            Your personal check-in code
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-white">QR Code</h1>
+          <p className="text-sm text-white/50">Your personal check-in code</p>
         </div>
         <div className="flex justify-center py-16">
           <Skeleton className="h-80 w-80 rounded-2xl bg-white/[0.06]" />
@@ -74,12 +112,8 @@ export default function QrCodePage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white">
-          QR Code
-        </h1>
-        <p className="text-sm text-white/50">
-          Show this code at the front desk to check in
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight text-white">QR Code</h1>
+        <p className="text-sm text-white/50">Show this code at the front desk to check in</p>
       </div>
 
       {/* QR Code Display */}
@@ -89,63 +123,64 @@ export default function QrCodePage() {
             <CardContent className="flex flex-col items-center p-6">
               {/* Member Info */}
               <div className="mb-6 text-center">
-                <p className="text-lg font-semibold text-white">
-                  {displayName}
-                </p>
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/20 text-base font-bold text-primary">
+                  {(displayName[0] ?? "M").toUpperCase()}
+                </div>
+                <p className="text-lg font-semibold text-white">{displayName}</p>
                 {tenant?.name && (
                   <p className="text-sm text-white/50">{tenant.name}</p>
                 )}
               </div>
 
-              {/* QR Code Display Area */}
-              {/*
-                TODO: Install a QR code rendering library (e.g. `qrcode.react` or `react-qr-code`)
-                and replace the placeholder below with:
-                <QRCodeSVG value={qrCode.code} size={240} level="H" />
-              */}
-              <div className="relative flex h-64 w-64 items-center justify-center rounded-2xl bg-white p-4">
-                {/* Placeholder QR pattern */}
-                <div className="absolute inset-4 grid grid-cols-8 grid-rows-8 gap-0.5">
-                  {Array.from({ length: 64 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        "rounded-sm",
-                        // Pseudo-random pattern based on code hash for visual effect
-                        (i % 3 === 0 || i % 7 === 0 || i < 8 || i > 55)
-                          ? "bg-gray-900"
-                          : "bg-transparent"
-                      )}
-                    />
-                  ))}
-                </div>
-                {/* Center icon overlay */}
-                <div className="relative z-10 flex h-12 w-12 items-center justify-center rounded-lg bg-white shadow-md">
-                  <Smartphone className="h-6 w-6 text-gray-900" />
-                </div>
+              {/* Real QR Code — Large & Centered */}
+              <div
+                ref={qrRef}
+                className="flex items-center justify-center rounded-3xl bg-white p-6 shadow-2xl"
+              >
+                <QRCodeSVG
+                  value={qrCode.code}
+                  size={240}
+                  level="H"
+                  includeMargin={false}
+                />
+              </div>
+
+              {/* Member ID below QR */}
+              <div className="mt-5 text-center">
+                <p className="text-xs font-semibold uppercase tracking-widest text-white/30 mb-1">Member ID</p>
+                <p className="font-mono text-lg font-bold text-white tracking-wider">{qrCode.code.slice(0, 8).toUpperCase()}</p>
               </div>
 
               {/* Code String */}
-              <div className="mt-4 w-full rounded-lg bg-white/[0.04] px-4 py-3 text-center">
-                <p className="text-xs text-white/40">Check-in Code</p>
-                <p className="mt-1 font-mono text-sm font-semibold tracking-wider text-white">
+              <div className="w-full rounded-lg bg-white/[0.04] px-4 py-3 text-center">
+                <p className="text-xs text-white/40">Full Check-in Code</p>
+                <p className="mt-1 font-mono text-xs font-semibold tracking-wider text-white/60">
                   {qrCode.code}
                 </p>
               </div>
 
-              {/* Regenerate Button */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRegenerate}
-                disabled={generating}
-                className="mt-4 gap-2"
-              >
-                <RefreshCw
-                  className={cn("h-4 w-4", generating && "animate-spin")}
-                />
-                {generating ? "Regenerating..." : "Regenerate Code"}
-              </Button>
+              {/* Action Buttons */}
+              <div className="mt-4 flex w-full gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePrint}
+                  className="flex-1 gap-2 border-white/[0.08] text-white/70 hover:bg-white/[0.06] hover:text-white"
+                >
+                  <Printer className="h-4 w-4" />
+                  Print QR
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRegenerate}
+                  disabled={generating}
+                  className="flex-1 gap-2 border-white/[0.08] text-white/70 hover:bg-white/[0.06] hover:text-white"
+                >
+                  <RefreshCw className={cn("h-4 w-4", generating && "animate-spin")} />
+                  {generating ? "Regenerating..." : "Regenerate"}
+                </Button>
+              </div>
 
               {/* Created date */}
               {qrCode.createdAt && (
@@ -167,12 +202,9 @@ export default function QrCodePage() {
               <div className="mb-6 rounded-full bg-white/[0.04] p-4">
                 <QrCode className="h-12 w-12 text-white/30" />
               </div>
-              <h3 className="text-lg font-semibold text-white">
-                No QR Code Yet
-              </h3>
+              <h3 className="text-lg font-semibold text-white">No QR Code Yet</h3>
               <p className="mb-6 mt-2 text-center text-sm text-white/50">
-                Generate a personal QR code to use for quick check-ins at the
-                front desk.
+                Generate a personal QR code to use for quick check-ins at the front desk.
               </p>
               <Button onClick={handleGenerate} disabled={generating} className="gap-2">
                 <QrCode className="h-4 w-4" />
@@ -186,9 +218,7 @@ export default function QrCodePage() {
       {/* Instructions */}
       <Card className="glass border-white/[0.08]">
         <CardContent className="p-5">
-          <h3 className="mb-3 text-sm font-semibold text-white">
-            How to Check In
-          </h3>
+          <h3 className="mb-3 text-sm font-semibold text-white">How to Check In</h3>
           <ol className="space-y-2 text-sm text-white/50">
             <li className="flex items-start gap-2">
               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">

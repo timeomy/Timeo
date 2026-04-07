@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
+import { authClient } from "@timeo/auth/web";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import { getInitials } from "@timeo/shared";
 import {
@@ -12,19 +14,63 @@ import {
   AvatarImage,
   AvatarFallback,
   Separator,
+  Button,
+  Input,
 } from "@timeo/ui/web";
 import {
   User,
   Mail,
   Building2,
   Shield,
-  ExternalLink,
+  Lock,
+  CheckCircle2,
+  Loader2,
 } from "lucide-react";
 
 export default function ProfilePage() {
   const { user, activeRole } = useTimeoWebAuthContext();
   const { activeTenant } = useTimeoWebTenantContext();
   const { tenant } = useTenantId();
+
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [pwSuccess, setPwSuccess] = useState(false);
+  const [pwError, setPwError] = useState("");
+
+  const passwordsMatch = newPassword === confirmPassword;
+  const isValid =
+    currentPassword.length > 0 &&
+    newPassword.length >= 8 &&
+    passwordsMatch;
+
+  async function handleChangePassword() {
+    if (!isValid) return;
+    setSaving(true);
+    setPwError("");
+    setPwSuccess(false);
+    try {
+      const res = await authClient.changePassword({
+        currentPassword,
+        newPassword,
+      });
+      if (res.error) {
+        setPwError(res.error.message ?? "Failed to change password");
+      } else {
+        setPwSuccess(true);
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setTimeout(() => setPwSuccess(false), 3000);
+      }
+    } catch {
+      setPwError("An unexpected error occurred");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const displayName = user
     ? user.name ||
@@ -49,10 +95,7 @@ export default function ProfilePage() {
         <CardContent className="p-6">
           <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
             <Avatar className="h-20 w-20">
-              <AvatarImage
-                src={user?.imageUrl ?? undefined}
-                alt={displayName}
-              />
+              {user?.imageUrl && <AvatarImage src={user.imageUrl} alt={displayName} />}
               <AvatarFallback className="text-xl">
                 {getInitials(displayName)}
               </AvatarFallback>
@@ -85,25 +128,15 @@ export default function ProfilePage() {
             <User className="h-4 w-4 text-white/40" />
             <div className="flex-1">
               <p className="text-xs text-white/40">Full Name</p>
-              <p className="text-sm text-white">{displayName}</p>
+              <p className="text-sm text-white">{user?.name ?? "—"}</p>
             </div>
           </div>
           <Separator className="bg-white/[0.06]" />
           <div className="flex items-center gap-3 py-3">
             <Mail className="h-4 w-4 text-white/40" />
             <div className="flex-1">
-              <p className="text-xs text-white/40">Email</p>
-              <p className="text-sm text-white">{user?.email ?? "Not set"}</p>
-            </div>
-          </div>
-          <Separator className="bg-white/[0.06]" />
-          <div className="flex items-center gap-3 py-3">
-            <Shield className="h-4 w-4 text-white/40" />
-            <div className="flex-1">
-              <p className="text-xs text-white/40">Role</p>
-              <p className="text-sm text-white">
-                {activeRole.charAt(0).toUpperCase() + activeRole.slice(1)}
-              </p>
+              <p className="text-xs text-white/40">Email Address</p>
+              <p className="text-sm text-white">{user?.email ?? "—"}</p>
             </div>
           </div>
         </CardContent>
@@ -131,7 +164,7 @@ export default function ProfilePage() {
               <>
                 <Separator className="bg-white/[0.06]" />
                 <div className="flex items-center gap-3 py-3">
-                  <ExternalLink className="h-4 w-4 text-white/40" />
+                  <Building2 className="h-4 w-4 text-white/40" />
                   <div className="flex-1">
                     <p className="text-xs text-white/40">Business Slug</p>
                     <p className="text-sm text-white">
@@ -145,23 +178,77 @@ export default function ProfilePage() {
         </Card>
       )}
 
-      {/* Manage Account Link */}
+      {/* Change Password */}
       <Card className="glass border-white/[0.08]">
-        <CardContent className="p-5">
-          <a
-            href="/user-profile"
-            className="flex items-center justify-between rounded-lg px-1 py-1 text-sm text-white/60 transition-colors hover:text-white"
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base text-white flex items-center gap-2">
+            <Lock className="h-4 w-4 text-white/60" />
+            Change Password
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <label className="mb-1.5 block text-xs text-white/50">Current Password</label>
+            <Input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => { setCurrentPassword(e.target.value); setPwError(""); }}
+              placeholder="Enter current password"
+              className="bg-white/[0.04] border-white/[0.08]"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs text-white/50">New Password</label>
+            <Input
+              type="password"
+              value={newPassword}
+              onChange={(e) => { setNewPassword(e.target.value); setPwError(""); }}
+              placeholder="Min. 8 characters"
+              className="bg-white/[0.04] border-white/[0.08]"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs text-white/50">Confirm New Password</label>
+            <Input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => { setConfirmPassword(e.target.value); setPwError(""); }}
+              placeholder="Repeat new password"
+              className="bg-white/[0.04] border-white/[0.08]"
+            />
+            {confirmPassword && !passwordsMatch && (
+              <p className="mt-1 text-xs text-red-400">Passwords do not match</p>
+            )}
+          </div>
+
+          {pwError && (
+            <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {pwError}
+            </p>
+          )}
+
+          {pwSuccess && (
+            <p className="flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs text-emerald-400">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Password changed successfully!
+            </p>
+          )}
+
+          <Button
+            onClick={handleChangePassword}
+            disabled={!isValid || saving}
+            className="w-full bg-primary hover:bg-primary/90"
+            size="sm"
           >
-            <div className="flex items-center gap-3">
-              <User className="h-4 w-4" />
-              <span>Manage Account Settings</span>
-            </div>
-            <ExternalLink className="h-4 w-4" />
-          </a>
-          <p className="mt-2 pl-7 text-xs text-white/30">
-            Update your password, connected accounts, and more via your account
-            settings.
-          </p>
+            {saving ? (
+              <>
+                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              "Update Password"
+            )}
+          </Button>
         </CardContent>
       </Card>
     </div>

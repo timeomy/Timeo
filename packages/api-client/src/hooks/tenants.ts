@@ -7,7 +7,6 @@ interface Tenant {
   name: string;
   slug: string;
   logo?: string;
-  logoUrl?: string;
   industry?: string;
   currency: string;
   timezone: string;

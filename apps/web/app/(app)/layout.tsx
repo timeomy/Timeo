@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTimeoWebAuthContext, useTimeoWebTenantContext, isRoleAtLeast } from "@timeo/auth/web";
+import { useTenant } from "@timeo/api-client";
+import { LanguageSwitcher } from "@/language-switcher";
 import type { TimeoRole } from "@timeo/auth/web";
 import { getInitials } from "@timeo/shared";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
@@ -35,7 +37,6 @@ import {
   Menu,
   LogOut,
   ChevronDown,
-  ChevronRight,
   Building2,
   Check,
   Plus,
@@ -51,51 +52,128 @@ import {
   Dumbbell,
   Activity,
   Cpu,
+  Megaphone,
+  Monitor,
+  MonitorOff,
 } from "lucide-react";
 
 type SidebarLink = {
   href: string;
   label: string;
   icon: React.ElementType;
-  minRole?: TimeoRole;
   flagKey?: string;
-  children?: SidebarLink[];
 };
 
-const sidebarLinks: SidebarLink[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/services", label: "Services", icon: Calendar, minRole: "admin", flagKey: "appointments_enabled" },
-  { href: "/dashboard/products", label: "Products", icon: ShoppingBag, minRole: "admin" },
-  { href: "/dashboard/bookings", label: "Bookings", icon: ClipboardList, minRole: "staff", flagKey: "appointments_enabled" },
-  { href: "/dashboard/orders", label: "Orders", icon: Package, minRole: "admin" },
-  { href: "/dashboard/team", label: "Team", icon: Users, minRole: "admin" },
-  { href: "/dashboard/scheduling", label: "Scheduling", icon: Clock, minRole: "staff", flagKey: "appointments_enabled" },
-  { href: "/dashboard/check-ins", label: "Check-ins", icon: ScanLine, minRole: "staff", flagKey: "pos_enabled" },
+type SidebarSection = {
+  label?: string;
+  minRole?: TimeoRole;
+  maxRole?: TimeoRole;
+  links: SidebarLink[];
+};
+
+// ─── Coach-specific sidebar sections ──────────────────────────────────────────
+const coachSidebarSections: SidebarSection[] = [
   {
-    href: "/dashboard/gym", label: "Gym", icon: Dumbbell, minRole: "staff",
-    children: [
-      { href: "/dashboard/gym", label: "Overview", icon: Dumbbell },
-      { href: "/dashboard/gym/members", label: "Members", icon: UserCheck },
-      { href: "/dashboard/gym/checkins", label: "Check-ins", icon: Activity },
-      { href: "/dashboard/gym/scanner", label: "Scanner", icon: ScanLine },
-      { href: "/dashboard/gym/turnstile", label: "Turnstile", icon: Cpu },
-      { href: "/dashboard/gym/payments", label: "Payments", icon: CreditCard },
+    label: "COACHING",
+    links: [
+      { href: "/dashboard/my-clients", label: "My Clients", icon: Users2 },
+      { href: "/dashboard/training-logs", label: "Training Logs", icon: Dumbbell },
     ],
   },
-  { href: "/dashboard/session-logs", label: "Session Logs", icon: NotebookPen, minRole: "staff" },
-  { href: "/dashboard/packages", label: "Packages", icon: CreditCard, minRole: "admin" },
-  { href: "/dashboard/vouchers", label: "Gift Cards & Vouchers", icon: Ticket, minRole: "admin" },
-  { href: "/dashboard/members", label: "Members", icon: UserCheck, minRole: "staff" },
-  { href: "/dashboard/customers", label: "Customers", icon: Users2, minRole: "admin" },
-  { href: "/dashboard/pos", label: "POS", icon: Store, minRole: "staff", flagKey: "pos_enabled" },
-  { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3, minRole: "admin" },
-  { href: "/dashboard/e-invoice", label: "e-Invoice", icon: FileText, minRole: "admin" },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings, minRole: "admin" },
+  {
+    label: "ACCOUNT",
+    links: [
+      { href: "/dashboard/settings", label: "Settings", icon: Settings },
+    ],
+  },
+];
+
+
+// ─── Front Desk sidebar (limited view) ────────────────────────────────────────
+const frontDeskSections: SidebarSection[] = [
+  {
+    label: "FRONT DESK",
+    links: [
+      { href: "/dashboard/gym/checkins", label: "Check-in Feed", icon: Activity },
+      { href: "/dashboard/gym/scanner", label: "QR Scanner", icon: ScanLine },
+      { href: "/dashboard/gym/members", label: "Members", icon: UserCheck },
+    ],
+  },
+];
+
+const sidebarSections: SidebarSection[] = [
+  // ── OVERVIEW (all staff) ─────────────────────────────────────────────
+  {
+    label: "OVERVIEW",
+    links: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    ],
+  },
+  // ── CLIENTS (staff+) ────────────────────────────────────────────────
+  {
+    label: "CLIENTS",
+    links: [
+      { href: "/dashboard/clients", label: "My Clients", icon: Users2 },
+      { href: "/dashboard/session-logs", label: "Session Logs", icon: NotebookPen },
+      { href: "/dashboard/bookings", label: "Bookings", icon: ClipboardList, flagKey: "appointments_enabled" },
+    ],
+  },
+  // ── GYM FLOOR (staff+) ──────────────────────────────────────────────
+  {
+    label: "GYM FLOOR",
+    links: [
+      { href: "/dashboard/gym/checkins", label: "Check-in Feed", icon: Activity },
+      { href: "/dashboard/gym/scanner", label: "QR Scanner", icon: ScanLine },
+      { href: "/dashboard/scheduling", label: "Scheduling", icon: Clock, flagKey: "appointments_enabled" },
+    ],
+  },
+  // ── ACCOUNT (staff+) ────────────────────────────────────────────────
+  {
+    label: "ACCOUNT",
+    links: [
+      { href: "/dashboard/settings", label: "Settings", icon: Settings },
+    ],
+  },
+  // ── MARKETING (admin only) ──────────────────────────────────────────
+  {
+    label: "MARKETING",
+    minRole: "admin",
+    links: [
+      { href: "/dashboard/broadcasts", label: "Broadcasts", icon: Megaphone },
+    ],
+  },
+  // ── OPERATIONS (admin only) ─────────────────────────────────────────
+  {
+    label: "OPERATIONS",
+    minRole: "admin",
+    links: [
+      { href: "/dashboard/mission-control", label: "Mission Control", icon: Cpu },
+      { href: "/dashboard/gym/members", label: "Members", icon: UserCheck },
+      { href: "/dashboard/team", label: "Team", icon: Users },
+      { href: "/dashboard/gym/payments", label: "Payments", icon: CreditCard },
+      { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
+    ],
+  },
+];
+
+// Legacy flat list for any admin pages not in sections above
+const adminOnlyExtras: SidebarLink[] = [
+  { href: "/dashboard/customers", label: "Customers", icon: Users2 },
+  { href: "/dashboard/packages", label: "Packages", icon: CreditCard },
+  { href: "/dashboard/services", label: "Services", icon: Calendar, flagKey: "appointments_enabled" },
+  { href: "/dashboard/products", label: "Products", icon: ShoppingBag },
+  { href: "/dashboard/orders", label: "Orders", icon: Package },
+  { href: "/dashboard/vouchers", label: "Gift Cards & Vouchers", icon: Ticket },
+  { href: "/dashboard/pos", label: "POS", icon: Store, flagKey: "pos_enabled" },
+  { href: "/dashboard/e-invoice", label: "e-Invoice", icon: FileText },
 ];
 
 function TenantSwitcher() {
   const { tenants, activeTenant, switchTenant, isLoading } =
     useTimeoWebTenantContext();
+  const { data: switcherTenantData } = useTenant(activeTenant?.id);
+  const switcherLogoUrl: string | null = (switcherTenantData as any)?.branding?.logoUrl ?? null;
+
   const [open, setOpen] = useState(false);
 
   if (isLoading) return <Skeleton className="h-10 w-full rounded-lg" />;
@@ -106,8 +184,12 @@ function TenantSwitcher() {
         onClick={() => setOpen(!open)}
         className="flex w-full items-center gap-3 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.06]"
       >
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
-          <Building2 className="h-4 w-4 text-primary" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 overflow-hidden">
+          {switcherLogoUrl ? (
+            <img src={switcherLogoUrl} alt={activeTenant?.name || ""} className="h-8 w-8 object-cover rounded-md" />
+          ) : (
+            <Building2 className="h-4 w-4 text-primary" />
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">
@@ -125,7 +207,7 @@ function TenantSwitcher() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="glass absolute left-0 right-0 top-full z-50 mt-1.5 max-h-64 overflow-y-auto p-1.5">
+          <div className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-64 overflow-y-auto rounded-xl border border-white/[0.08] bg-[#1a1a2e] p-1.5 shadow-xl">
             {tenants.map((t) => (
               <button
                 key={t.id}
@@ -144,15 +226,7 @@ function TenantSwitcher() {
                 )}
               </button>
             ))}
-            <Separator className="my-1.5 bg-white/[0.06]" />
-            <Link
-              href="/onboarding"
-              onClick={() => setOpen(false)}
-              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
-            >
-              <Plus className="h-4 w-4" />
-              Add Business
-            </Link>
+
           </div>
         </>
       )}
@@ -164,17 +238,46 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, signOut, activeRole, isPlatformAdmin, setViewMode } = useTimeoWebAuthContext();
+  const { activeTenant } = useTimeoWebTenantContext();
+  const { data: tenantDetail } = useTenant(activeTenant?.id);
+  const tenantLogoUrl: string | null = (tenantDetail as any)?.branding?.logoUrl ?? null;
   const flags = useFeatureFlags();
 
   const displayName = user?.name || user?.email || "User";
 
-  function getVisibleLinks(role: TimeoRole) {
-    return sidebarLinks.filter(
-      (link) =>
-        (!link.minRole || isRoleAtLeast(role, link.minRole)) &&
-        (!link.flagKey || flags[link.flagKey] !== false),
-    );
+  const isAdminUser = isRoleAtLeast(activeRole, "admin");
+  const [frontDeskMode, setFrontDeskMode] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("timeo-front-desk-mode") === "true";
+  });
+
+  function toggleFrontDeskMode() {
+    const next = !frontDeskMode;
+    setFrontDeskMode(next);
+    localStorage.setItem("timeo-front-desk-mode", String(next));
   }
+
+  function isLinkActive(href: string) {
+    if (href === "/dashboard") return pathname === "/dashboard";
+    return pathname === href || pathname.startsWith(href + "/");
+  }
+
+  function isLinkVisible(link: SidebarLink) {
+    if (link.flagKey && flags[link.flagKey] === false) return false;
+    return true;
+  }
+
+  function isSectionVisible(section: SidebarSection) {
+    if (section.minRole && !isRoleAtLeast(activeRole, section.minRole)) return false;
+    return true;
+  }
+
+  const isCoach = activeRole === "coach";
+  const activeSections = isCoach
+    ? coachSidebarSections
+    : (isAdminUser && frontDeskMode)
+      ? frontDeskSections
+      : sidebarSections;
 
   return (
     <div className="flex h-full flex-col">
@@ -193,110 +296,114 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <Separator className="bg-white/[0.06]" />
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {getVisibleLinks(activeRole).map((link) => {
-          const isInSection = link.children && pathname.startsWith(link.href);
-          const isActive =
-            !link.children && (
-              pathname === link.href ||
-              (link.href !== "/dashboard" && pathname.startsWith(link.href + "/"))
-            );
-
-          if (link.children) {
-            return (
-              <div key={link.href}>
-                <motion.div
-                  whileHover={{ x: 2 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="relative"
-                >
-                  {isInSection && (
-                    <motion.div
-                      layoutId="activeNav"
-                      className="absolute inset-0 rounded-lg bg-primary/10"
-                      transition={{ type: "spring", duration: 0.2, bounce: 0.1 }}
-                    />
-                  )}
-                  <Link
-                    href={link.href}
-                    onClick={onNavigate}
-                    className={cn(
-                      "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                      isInSection
-                        ? "text-primary"
-                        : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
-                    )}
-                  >
-                    <link.icon className={cn("h-4 w-4", isInSection && "text-primary")} />
-                    {link.label}
-                    <ChevronRight className={cn(
-                      "ml-auto h-3.5 w-3.5 transition-transform",
-                      isInSection && "rotate-90"
-                    )} />
-                  </Link>
-                </motion.div>
-                {isInSection && (
-                  <div className="mt-1 ml-4 space-y-0.5 border-l border-white/[0.06] pl-3">
-                    {link.children.map((child) => {
-                      const isChildActive = pathname === child.href;
-                      return (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          onClick={onNavigate}
-                          className={cn(
-                            "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
-                            isChildActive
-                              ? "text-primary font-medium"
-                              : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
-                          )}
-                        >
-                          <child.icon className={cn("h-3.5 w-3.5", isChildActive && "text-primary")} />
-                          {child.label}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          }
+      <nav className="flex-1 overflow-y-auto p-3">
+        {activeSections.map((section, sectionIndex) => {
+          if (!isSectionVisible(section)) return null;
+          const visibleLinks = section.links.filter(isLinkVisible);
+          if (visibleLinks.length === 0) return null;
 
           return (
-            <motion.div
-              key={link.href}
-              whileHover={{ x: 2 }}
-              whileTap={{ scale: 0.98 }}
-              className="relative"
-            >
-              {isActive && (
-                <motion.div
-                  layoutId="activeNav"
-                  className="absolute inset-0 rounded-lg bg-primary/10"
-                  transition={{ type: "spring", duration: 0.2, bounce: 0.1 }}
-                />
+            <div key={sectionIndex} className={sectionIndex > 0 ? "mt-4" : ""}>
+              {section.label && (
+                <div className="mb-1 px-3 py-1">
+                  <span className="text-xs font-semibold tracking-wider text-white/40 uppercase">
+                    {section.label}
+                  </span>
+                </div>
               )}
-              <Link
-                href={link.href}
-                onClick={onNavigate}
-                className={cn(
-                  "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  isActive
-                    ? "text-primary"
-                    : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
-                )}
-              >
-                <link.icon className={cn("h-4 w-4", isActive && "text-primary")} />
-                {link.label}
-              </Link>
-            </motion.div>
+              <div className="space-y-0.5">
+                {visibleLinks.map((link) => {
+                  const isActive = isLinkActive(link.href);
+                  return (
+                    <motion.div
+                      key={link.href}
+                      whileHover={{ x: 2 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="relative"
+                    >
+                      {isActive && (
+                        <motion.div
+                          layoutId="activeNav"
+                          className="absolute inset-0 rounded-lg bg-primary/10"
+                          transition={{ type: "spring", duration: 0.2, bounce: 0.1 }}
+                        />
+                      )}
+                      {isActive && (
+                        <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-primary" />
+                      )}
+                      <Link
+                        href={link.href}
+                        onClick={onNavigate}
+                        className={cn(
+                          "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors min-h-[44px]",
+                          isActive
+                            ? "text-primary pl-4"
+                            : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
+                        )}
+                      >
+                        <link.icon className={cn("h-4 w-4 shrink-0", isActive && "text-primary")} />
+                        {link.label}
+                      </Link>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
+
+        {/* Admin extras (hidden in sidebar but accessible via URL) */}
+        {!isCoach && isRoleAtLeast(activeRole, "admin") && (
+          <div className="mt-4">
+            <div className="mb-1 px-3 py-1">
+              <span className="text-xs font-semibold tracking-wider text-white/40 uppercase">
+                STORE
+              </span>
+            </div>
+            <div className="space-y-0.5">
+              {adminOnlyExtras.filter(isLinkVisible).map((link) => {
+                const isActive = isLinkActive(link.href);
+                return (
+                  <motion.div
+                    key={link.href}
+                    whileHover={{ x: 2 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="relative"
+                  >
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeNavStore"
+                        className="absolute inset-0 rounded-lg bg-primary/10"
+                        transition={{ type: "spring", duration: 0.2, bounce: 0.1 }}
+                      />
+                    )}
+                    {isActive && (
+                      <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-primary" />
+                    )}
+                    <Link
+                      href={link.href}
+                      onClick={onNavigate}
+                      className={cn(
+                        "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors min-h-[44px]",
+                        isActive
+                          ? "text-primary pl-4"
+                          : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
+                      )}
+                    >
+                      <link.icon className={cn("h-4 w-4 shrink-0", isActive && "text-primary")} />
+                      {link.label}
+                    </Link>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </nav>
 
       <Separator className="bg-white/[0.06]" />
 
-      {/* Platform C2 Link (platform_admin only — visible in tenant mode too) */}
+      {/* Platform C2 Link (platform_admin only) */}
       {isPlatformAdmin && (
         <div className="p-3">
           <button
@@ -313,6 +420,39 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       )}
 
+      {/* Front Desk Mode Toggle */}
+      {isAdminUser && (
+        <>
+          <Separator className="bg-white/[0.06]" />
+          <div className="p-3">
+            <button
+              onClick={toggleFrontDeskMode}
+              className={cn(
+                "flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-medium transition-all",
+                frontDeskMode
+                  ? "border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
+                  : "border-white/[0.08] bg-white/[0.03] text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
+              )}
+            >
+              {frontDeskMode ? (
+                <MonitorOff className="h-4 w-4" />
+              ) : (
+                <Monitor className="h-4 w-4" />
+              )}
+              <span className="flex-1 text-left">
+                {frontDeskMode ? "Exit Front Desk" : "Front Desk Mode"}
+              </span>
+              <span className={cn(
+                "rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                frontDeskMode ? "bg-amber-500/20 text-amber-300" : "bg-white/10 text-white/40"
+              )}>
+                {frontDeskMode ? "ON" : "OFF"}
+              </span>
+            </button>
+          </div>
+        </>
+      )}
+
       <Separator className="bg-white/[0.06]" />
 
       {/* User Section */}
@@ -326,7 +466,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         )}
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9">
-            <AvatarImage src={user?.imageUrl ?? undefined} alt={displayName} />
+            {user?.imageUrl && <AvatarImage src={user.imageUrl} alt={displayName} />}
             <AvatarFallback className="text-xs">
               {getInitials(displayName)}
             </AvatarFallback>
@@ -361,9 +501,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Use the first tenant's role directly to avoid a timing race where
-  // activeTenantId starts as null, making activeRole default to "customer"
-  // even for admin/staff users on first render.
   const primaryRole = tenants[0]?.role ?? "customer";
 
   useEffect(() => {
@@ -427,12 +564,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <div className="flex flex-1 items-center gap-2">
                 <TimeoLogo size="sm" />
               </div>
-              <NotificationsBell />
+              <div className="flex items-center gap-2">
+                <LanguageSwitcher />
+                <NotificationsBell />
+              </div>
             </header>
 
             {/* Desktop Top Bar */}
             <header className="hidden h-12 items-center justify-end border-b border-white/[0.06] px-6 lg:flex">
-              <NotificationsBell />
+              <div className="flex items-center gap-2">
+                <LanguageSwitcher />
+                <NotificationsBell />
+              </div>
             </header>
 
             {/* Announcements */}

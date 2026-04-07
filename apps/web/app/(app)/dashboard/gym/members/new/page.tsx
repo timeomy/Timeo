@@ -17,7 +17,10 @@ import {
   UserPlus,
   Loader2,
   XCircle,
+  Users2,
+  Package,
 } from "lucide-react";
+import { useCoaches, useSessionPackages } from "@timeo/api-client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -34,6 +37,8 @@ type MemberFormData = {
   email: string;
   phone: string;
   membershipPlan: string;
+  coachId?: string;
+  packageId?: string;
 };
 
 // ---- Data hook ----
@@ -64,11 +69,16 @@ function useCreateMember() {
 export default function NewGymMemberPage() {
   const router = useRouter();
   const createMutation = useCreateMember();
+  const { tenantId } = useTenantId();
+  const { data: coaches = [] } = useCoaches(tenantId);
+  const { data: packages = [] } = useSessionPackages(tenantId);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [membershipPlan, setMembershipPlan] = useState("");
+  const [selectedCoachId, setSelectedCoachId] = useState("");
+  const [selectedPackageId, setSelectedPackageId] = useState("");
 
   const isValid = name.trim().length > 0 && email.trim().length > 0;
 
@@ -82,6 +92,8 @@ export default function NewGymMemberPage() {
         email: email.trim().toLowerCase(),
         phone: phone.trim(),
         membershipPlan: membershipPlan.trim(),
+        coachId: selectedCoachId || undefined,
+        packageId: selectedPackageId || undefined,
       });
       router.push(`/dashboard/gym/members/${result.id}`);
     } catch (err) {
@@ -183,6 +195,48 @@ export default function NewGymMemberPage() {
                 Leave blank to assign a plan later.
               </p>
             </div>
+
+            {/* Assign Coach */}
+            {coaches.length > 0 && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-white/70">
+                  <Users2 className="mr-1.5 inline h-4 w-4" />
+                  Assign Coach <span className="text-white/30 font-normal">(optional)</span>
+                </label>
+                <select
+                  value={selectedCoachId}
+                  onChange={(e) => setSelectedCoachId(e.target.value)}
+                  className="w-full rounded-md border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-sm text-white focus:border-primary/50 focus:outline-none"
+                >
+                  <option value="">No coach assigned</option>
+                  {coaches.map((coach) => (
+                    <option key={coach.id} value={coach.id}>{coach.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Assign Package */}
+            {packages.length > 0 && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-white/70">
+                  <Package className="mr-1.5 inline h-4 w-4" />
+                  Session Package <span className="text-white/30 font-normal">(optional)</span>
+                </label>
+                <select
+                  value={selectedPackageId}
+                  onChange={(e) => setSelectedPackageId(e.target.value)}
+                  className="w-full rounded-md border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-sm text-white focus:border-primary/50 focus:outline-none"
+                >
+                  <option value="">No package assigned</option>
+                  {packages.filter((p) => p.isActive).map((pkg) => (
+                    <option key={pkg.id} value={pkg.id}>
+                      {pkg.name} — {pkg.sessionCount} sessions ({pkg.currency} {pkg.price.toFixed(2)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Submit */}
             <div className="flex gap-3 pt-2">
