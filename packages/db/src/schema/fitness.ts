@@ -7,6 +7,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { checkInMethodEnum, sessionTypeEnum } from "./enums";
 import { tenants, users } from "./core";
@@ -24,7 +25,12 @@ export const checkIns = pgTable(
     user_id: text("user_id")
       .notNull()
       .references(() => users.id),
+    external_id: text("external_id"),
     method: checkInMethodEnum("method").notNull(),
+    gate: text("gate"),
+    device: text("device"),
+    entry_type: text("entry_type"),
+    notes: text("notes"),
     checked_in_by: text("checked_in_by").references(() => users.id),
     timestamp: timestamp("timestamp", { withTimezone: true })
       .notNull()
@@ -34,6 +40,10 @@ export const checkIns = pgTable(
     index("check_ins_tenant_id_idx").on(t.tenant_id),
     index("check_ins_user_id_idx").on(t.user_id),
     index("check_ins_tenant_date_idx").on(t.tenant_id, t.timestamp),
+    uniqueIndex("check_ins_tenant_external_id_idx").on(
+      t.tenant_id,
+      t.external_id,
+    ),
   ],
 );
 

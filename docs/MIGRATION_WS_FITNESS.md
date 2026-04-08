@@ -6,6 +6,58 @@
 - Target: Timeo users + tenant memberships + subscriptions + avatars.
 - Import endpoint: `POST /api/admin/migration/wsfitness/members`.
 
+## 2026 Full Export Runbook (Supabase JSON)
+
+This runbook is used for full tenant refresh from Supabase exports (profiles, plans, memberships,
+payments, invoices, check-ins, turnstile logs, media).
+
+### Scripts
+- `scripts/migration/wsfit-wipe.mjs`
+  - Tenant-scoped wipe for `7Kw87VeAnXg4qDXi6UTbu`.
+  - Requires explicit `--confirm`.
+  - Prints rows deleted per table.
+- `scripts/migration/wsfit-download-media.mjs`
+  - Downloads avatars and receipts from URL export JSON.
+  - Default output: `/tmp/wsfit-media`.
+  - Generates `/tmp/wsfit-media/manifest.json`.
+- `scripts/migration/wsfit-import.mjs`
+  - Reads full export JSON + media manifest.
+  - Sends batched payloads to `POST /api/admin/migration/wsfitness/bulk`.
+  - Uploads avatar/receipt files through `POST /api/admin/migration/wsfitness/media`.
+  - Writes import progress to `/tmp/wsfit-import.log`.
+
+### API endpoints
+- `POST /api/admin/migration/wsfitness/bulk`
+  - Platform-admin only.
+  - Accepts batched JSON payload with any of:
+    - `members`
+    - `plans`
+    - `memberships`
+    - `payments`
+    - `invoices`
+    - `checkIns`
+    - `turnstileEvents`
+    - `turnstileFaceLogs`
+    - `photos` (optional map: `memberExternalId -> base64`)
+  - Transactional per request batch.
+- `POST /api/admin/migration/wsfitness/media`
+  - Platform-admin only.
+  - Uploads a single `avatar` or `receipt` by external id.
+
+### Command sequence
+```bash
+# 1) Wipe tenant-scoped data (required explicit confirm)
+DATABASE_URL='postgresql://...' node scripts/migration/wsfit-wipe.mjs --confirm
+
+# 2) Download media
+node scripts/migration/wsfit-download-media.mjs
+
+# 3) Run import batches + media upload
+TIMEO_SESSION_COOKIE='better-auth.session=...' \
+TIMEO_API_BASE_URL='https://api.timeo.my' \
+node scripts/migration/wsfit-import.mjs
+```
+
 ## Access Notes
 - Gym host access is expected through Tailscale SSH (`user@100.85.207.121`).
 - In this coding environment, outbound SSH was blocked (`Operation not permitted`), so live probing could not run here.
@@ -157,4 +209,3 @@ Optional env overrides:
 - `WSFITNESS_BATCH_SIZE`
 - `WSFITNESS_INPUT_FILE`
 - `WSFITNESS_LOG_FILE`
-

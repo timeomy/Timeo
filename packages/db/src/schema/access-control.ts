@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -106,5 +107,74 @@ export const accessLogs = pgTable(
     index("access_logs_device_sn_idx").on(t.device_sn),
     index("access_logs_user_id_idx").on(t.user_id),
     index("access_logs_tenant_date_idx").on(t.tenant_id, t.created_at),
+  ],
+);
+
+// ─── Legacy Turnstile Events (WS Fitness import) ───────────────────────────
+export const turnstileEvents = pgTable(
+  "turnstile_events",
+  {
+    id: text("id").primaryKey(),
+    tenant_id: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    external_id: text("external_id"),
+    received_at: timestamp("received_at", { withTimezone: true }),
+    device_sn: text("device_sn"),
+    cmd: text("cmd"),
+    sequence_no: integer("sequence_no"),
+    cap_time: text("cap_time"),
+    match_result: text("match_result"),
+    match_failed_reason: text("match_failed_reason"),
+    person_id: text("person_id"),
+    person_name: text("person_name"),
+    customer_text: text("customer_text"),
+    raw_payload: jsonb("raw_payload"),
+    is_rejected: boolean("is_rejected").notNull().default(false),
+    reject_reason: text("reject_reason"),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("turnstile_events_tenant_id_idx").on(t.tenant_id),
+    index("turnstile_events_device_sn_idx").on(t.device_sn),
+    index("turnstile_events_tenant_date_idx").on(t.tenant_id, t.received_at),
+    uniqueIndex("turnstile_events_tenant_external_id_idx").on(
+      t.tenant_id,
+      t.external_id,
+    ),
+  ],
+);
+
+// ─── Legacy Turnstile Face Logs (WS Fitness import) ────────────────────────
+export const turnstileFaceLogs = pgTable(
+  "turnstile_face_logs",
+  {
+    id: text("id").primaryKey(),
+    tenant_id: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    external_id: text("external_id"),
+    device_sn: text("device_sn"),
+    user_id: text("user_id").references(() => users.id),
+    person_id: text("person_id"),
+    cap_time: text("cap_time"),
+    decision: text("decision"),
+    reason: text("reason"),
+    raw_payload: jsonb("raw_payload"),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("turnstile_face_logs_tenant_id_idx").on(t.tenant_id),
+    index("turnstile_face_logs_device_sn_idx").on(t.device_sn),
+    index("turnstile_face_logs_user_id_idx").on(t.user_id),
+    index("turnstile_face_logs_tenant_date_idx").on(t.tenant_id, t.created_at),
+    uniqueIndex("turnstile_face_logs_tenant_external_id_idx").on(
+      t.tenant_id,
+      t.external_id,
+    ),
   ],
 );

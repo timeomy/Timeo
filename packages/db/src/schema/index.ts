@@ -16,6 +16,7 @@ export * from "./promotions";
 export * from "./notifications";
 export * from "./platform";
 export * from "./files";
+export * from "./invoices";
 export * from "./einvoice";
 export * from "./loyalty";
 export * from "./access-control";

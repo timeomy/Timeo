@@ -1,6 +1,8 @@
 import {
   boolean,
+  date,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -24,6 +26,11 @@ export const users = pgTable(
     email: text("email").notNull().unique(),
     name: text("name").notNull(),
     avatar_url: text("avatar_url"),
+    nfc_card_id: text("nfc_card_id").unique(),
+    birthday: date("birthday"),
+    phone: text("phone"),
+    hourly_rate: integer("hourly_rate"),
+    face_image_url: text("face_image_url"),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -91,6 +98,9 @@ export const tenantMemberships = pgTable(
     tags: jsonb("tags").notNull().default([]),
     coach_id: text("coach_id").references(() => users.id),
     member_id: text("member_id"),
+    external_id: text("external_id"),
+    waiver_signature: text("waiver_signature"),
+    waiver_signed_at: timestamp("waiver_signed_at", { withTimezone: true }),
     joined_at: timestamp("joined_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -99,9 +109,14 @@ export const tenantMemberships = pgTable(
     index("tenant_memberships_tenant_id_idx").on(t.tenant_id),
     index("tenant_memberships_user_id_idx").on(t.user_id),
     index("tenant_memberships_tenant_role_idx").on(t.tenant_id, t.role),
+    index("tenant_memberships_external_id_idx").on(t.external_id),
     uniqueIndex("tenant_memberships_tenant_user_idx").on(
       t.tenant_id,
       t.user_id,
+    ),
+    uniqueIndex("tenant_memberships_tenant_external_idx").on(
+      t.tenant_id,
+      t.external_id,
     ),
   ],
 );

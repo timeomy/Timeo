@@ -6,6 +6,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import {
   paymentStatusEnum,
@@ -37,6 +38,9 @@ export const payments = pgTable(
     booking_id: text("booking_id").references(() => bookings.id),
     stripe_payment_intent_id: text("stripe_payment_intent_id"),
     rm_order_id: text("rm_order_id"), // Revenue Monster order ID
+    external_id: text("external_id"),
+    method: text("method"),
+    receipt_url: text("receipt_url"),
     amount: integer("amount").notNull(), // cents
     currency: text("currency").notNull().default("MYR"),
     status: paymentStatusEnum("status").notNull().default("pending"),
@@ -55,6 +59,7 @@ export const payments = pgTable(
     index("payments_booking_id_idx").on(t.booking_id),
     index("payments_stripe_pi_idx").on(t.stripe_payment_intent_id),
     index("payments_rm_order_id_idx").on(t.rm_order_id),
+    uniqueIndex("payments_tenant_external_id_idx").on(t.tenant_id, t.external_id),
   ],
 );
 
@@ -74,6 +79,8 @@ export const subscriptions = pgTable(
       .references(() => memberships.id),
     stripe_subscription_id: text("stripe_subscription_id"),
     stripe_customer_id: text("stripe_customer_id"),
+    external_id: text("external_id"),
+    price_paid: integer("price_paid"),
     status: subscriptionStatusEnum("status").notNull().default("active"),
     current_period_start: timestamp("current_period_start", {
       withTimezone: true,
@@ -101,6 +108,10 @@ export const subscriptions = pgTable(
     index("subscriptions_customer_id_idx").on(t.customer_id),
     index("subscriptions_membership_id_idx").on(t.membership_id),
     index("subscriptions_stripe_sub_idx").on(t.stripe_subscription_id),
+    uniqueIndex("subscriptions_tenant_external_id_idx").on(
+      t.tenant_id,
+      t.external_id,
+    ),
   ],
 );
 
@@ -173,6 +184,7 @@ export const paymentRequests = pgTable(
     customer_id: text("customer_id")
       .notNull()
       .references(() => users.id),
+    external_id: text("external_id"),
     // Plan info snapshot
     plan_id: text("plan_id"), // references memberships.id or session_packages.id
     plan_reference_type: paymentRequestPlanTypeEnum("plan_reference_type").notNull().default("membership"),
@@ -204,5 +216,9 @@ export const paymentRequests = pgTable(
     index("payment_requests_tenant_id_idx").on(t.tenant_id),
     index("payment_requests_customer_id_idx").on(t.customer_id),
     index("payment_requests_status_idx").on(t.tenant_id, t.status),
+    uniqueIndex("payment_requests_tenant_external_id_idx").on(
+      t.tenant_id,
+      t.external_id,
+    ),
   ],
 );

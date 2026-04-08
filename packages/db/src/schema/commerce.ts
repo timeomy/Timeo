@@ -130,7 +130,11 @@ export const memberships = pgTable(
     price: integer("price").notNull(), // cents
     currency: text("currency").notNull().default("MYR"),
     interval: membershipIntervalEnum("interval").notNull(),
+    external_id: text("external_id"),
     duration_months: integer("duration_months"), // explicit duration override (1, 3, 6, 12)
+    duration_days: integer("duration_days"),
+    access_level: text("access_level"),
+    display_order: integer("display_order"),
     plan_type: text("plan_type").notNull().default("all_access"), // 'all_access', 'studio_class'
     features: text("features").array().notNull(),
     is_active: boolean("is_active").notNull().default(true),
@@ -138,5 +142,8 @@ export const memberships = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("memberships_tenant_id_idx").on(t.tenant_id)],
+  (t) => [
+    index("memberships_tenant_id_idx").on(t.tenant_id),
+    index("memberships_tenant_external_id_idx").on(t.tenant_id, t.external_id),
+  ],
 );
