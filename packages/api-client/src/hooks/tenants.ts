@@ -26,6 +26,20 @@ interface Tenant {
   updatedAt: string;
 }
 
+type TenantPlan = "free" | "starter" | "pro" | "enterprise";
+
+type TenantIndustry =
+  | "fitness"
+  | "salon_beauty"
+  | "wellness_spa"
+  | "sports_recreation"
+  | "clinic"
+  | "retail"
+  | "food_beverage"
+  | "education"
+  | "professional_services"
+  | "other";
+
 type TimeoRole = "platform_admin" | "admin" | "staff" | "customer";
 
 interface TenantWithRole extends Tenant {
@@ -83,7 +97,8 @@ export function useCreateTenant() {
     mutationFn: (data: {
       name: string;
       slug: string;
-      industry?: string;
+      industry?: TenantIndustry;
+      plan?: TenantPlan;
       currency?: string;
       timezone?: string;
     }) => api.post<{ tenantId: string }>("/api/tenants", data),

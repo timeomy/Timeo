@@ -74,6 +74,7 @@ vi.mock("../services/tenant.service.js", () => ({
 // Import the mocked modules — vi.mock() is hoisted above imports
 import { auth } from "@timeo/auth/server";
 import { db } from "@timeo/db";
+import * as TenantService from "../services/tenant.service.js";
 
 const app = createApp();
 
@@ -373,6 +374,53 @@ describe("POST /api/tenants", () => {
     });
 
     expect(res.status).toBe(400);
+  });
+
+  it("forwards selected plan, industry, and onboarding settings", async () => {
+    setupAuth(TEST_ADMIN);
+
+    let callCount = 0;
+
+    const chainEnd = {
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn(() => {
+        callCount++;
+        if (callCount === 1) return Promise.resolve([TEST_ADMIN]);
+        return Promise.resolve([]);
+      }),
+    };
+    const selectChain = { from: vi.fn().mockReturnValue(chainEnd) };
+    mockDb.select.mockReturnValue(selectChain);
+
+    const res = await app.request("/api/tenants", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "http://localhost:3000",
+      },
+      body: JSON.stringify({
+        name: "Onboarding Business",
+        slug: "onboarding-business",
+        industry: "fitness",
+        plan: "pro",
+        currency: "sgd",
+        timezone: "Asia/Singapore",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(TenantService.createTenant).toHaveBeenCalledWith({
+      name: "Onboarding Business",
+      slug: "onboarding-business",
+      ownerId: TEST_ADMIN.id,
+      industry: "fitness",
+      plan: "pro",
+      settings: {
+        currency: "SGD",
+        timezone: "Asia/Singapore",
+      },
+      source: "self_serve",
+    });
   });
 });
 

@@ -196,6 +196,21 @@ export const CreateSessionLogSchema = z.object({
 
 // ─── Tenants ──────────────────────────────────────────────────────────────────
 
+const TenantIndustrySchema = z.enum([
+  "fitness",
+  "salon_beauty",
+  "wellness_spa",
+  "sports_recreation",
+  "clinic",
+  "retail",
+  "food_beverage",
+  "education",
+  "professional_services",
+  "other",
+]);
+
+const TenantPlanSchema = z.enum(["free", "starter", "pro", "enterprise"]);
+
 export const UpdateTenantSettingsSchema = z.object({
   timezone: z.string().optional(),
   bookingBuffer: z.number().int().min(0).optional(),
@@ -210,6 +225,10 @@ export const CreateTenantSchema = z.object({
     .min(3)
     .max(50)
     .regex(/^[a-z0-9-]+$/),
+  industry: TenantIndustrySchema.optional(),
+  plan: TenantPlanSchema.optional(),
+  currency: z.string().length(3).optional(),
+  timezone: z.string().min(2).max(100).optional(),
 });
 
 export const InviteStaffSchema = z.object({

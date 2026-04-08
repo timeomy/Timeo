@@ -214,10 +214,25 @@ app.post(
     }
 
     try {
+      const seededSettingOverrides: Record<string, unknown> = {};
+      if (body.currency) {
+        seededSettingOverrides.currency = body.currency.toUpperCase();
+      }
+      if (body.timezone) {
+        seededSettingOverrides.timezone = body.timezone;
+      }
+
       const tenantId = await TenantService.createTenant({
         name: body.name,
         slug: body.slug,
         ownerId: user.id,
+        industry: body.industry,
+        plan: body.plan,
+        settings:
+          Object.keys(seededSettingOverrides).length > 0
+            ? seededSettingOverrides
+            : undefined,
+        source: body.industry || body.plan ? "self_serve" : "manual",
       });
       return c.json(success({ tenantId }), 201);
     } catch (err) {

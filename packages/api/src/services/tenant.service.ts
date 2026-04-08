@@ -3,18 +3,99 @@ import { tenants, tenantMemberships, auditLogs } from "@timeo/db/schema";
 import { and, eq } from "drizzle-orm";
 import { generateId } from "@timeo/db";
 
+type TenantPlan = "free" | "starter" | "pro" | "enterprise";
+
+type TenantIndustry =
+  | "fitness"
+  | "salon_beauty"
+  | "wellness_spa"
+  | "sports_recreation"
+  | "clinic"
+  | "retail"
+  | "food_beverage"
+  | "education"
+  | "professional_services"
+  | "other";
+
+const DEFAULT_TENANT_SETTINGS: Record<string, unknown> = {
+  currency: "MYR",
+  timezone: "Asia/Kuala_Lumpur",
+  bookingBuffer: 15,
+  autoConfirmBookings: false,
+  appointmentsEnabled: true,
+  posEnabled: false,
+  loyaltyEnabled: false,
+};
+
+const INDUSTRY_SETTING_PRESETS: Partial<Record<TenantIndustry, Record<string, unknown>>> = {
+  fitness: {
+    bookingBuffer: 15,
+    autoConfirmBookings: false,
+    loyaltyEnabled: true,
+  },
+  salon_beauty: {
+    bookingBuffer: 10,
+    autoConfirmBookings: false,
+  },
+  wellness_spa: {
+    bookingBuffer: 15,
+    autoConfirmBookings: false,
+  },
+  sports_recreation: {
+    bookingBuffer: 10,
+    autoConfirmBookings: false,
+  },
+  clinic: {
+    bookingBuffer: 5,
+    autoConfirmBookings: false,
+  },
+  retail: {
+    bookingBuffer: 0,
+    autoConfirmBookings: true,
+    posEnabled: true,
+  },
+  food_beverage: {
+    bookingBuffer: 0,
+    autoConfirmBookings: true,
+    posEnabled: true,
+  },
+};
+
+function buildTenantSettings(
+  industry: TenantIndustry | undefined,
+  overrides?: Record<string, unknown>,
+): Record<string, unknown> {
+  const normalizedIndustry = industry ?? "other";
+  const industryDefaults = INDUSTRY_SETTING_PRESETS[normalizedIndustry] ?? {};
+
+  return {
+    ...DEFAULT_TENANT_SETTINGS,
+    ...industryDefaults,
+    ...(overrides ?? {}),
+    industry: normalizedIndustry,
+  };
+}
+
 export async function createTenant(input: {
   name: string;
   slug: string;
   ownerId: string;
+  plan?: TenantPlan;
+  industry?: TenantIndustry;
+  settings?: Record<string, unknown>;
+  source?: "manual" | "self_serve";
 }) {
   const tenantId = generateId();
+  const tenantPlan = input.plan ?? "free";
+  const seededSettings = buildTenantSettings(input.industry, input.settings);
 
   await db.insert(tenants).values({
     id: tenantId,
     name: input.name,
     slug: input.slug,
     owner_id: input.ownerId,
+    plan: tenantPlan,
+    settings: seededSettings,
   });
 
   // Add owner as admin
@@ -34,6 +115,11 @@ export async function createTenant(input: {
     action: "tenant.created",
     resource_type: "tenant",
     resource_id: tenantId,
+    details: {
+      plan: tenantPlan,
+      industry: seededSettings.industry,
+      source: input.source ?? "manual",
+    },
   });
 
   return tenantId;
