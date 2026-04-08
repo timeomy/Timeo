@@ -283,7 +283,7 @@ export default function SignUpBusinessPage() {
         timezone: detectedTimezone,
       });
 
-      router.push("/dashboard");
+      window.location.assign("/dashboard");
     } catch (err) {
       if (err instanceof ApiError && err.code === "CONFLICT") {
         setStep(1);
