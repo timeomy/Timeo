@@ -23,6 +23,10 @@ const MEDIA_ENDPOINT =
 
 const BATCH_SIZE = Math.max(1, Number(process.env.WSFIT_BATCH_SIZE ?? 100));
 const MEDIA_CONCURRENCY = Math.max(1, Number(process.env.WSFIT_MEDIA_UPLOAD_CONCURRENCY ?? 8));
+const HTTP_RETRIES = Math.max(0, Number(process.env.WSFIT_HTTP_RETRIES ?? 6));
+const SKIP_MEDIA_UPLOAD = ["1", "true", "yes"].includes(
+  String(process.env.WSFIT_SKIP_MEDIA_UPLOAD ?? "").toLowerCase(),
+);
 
 const SESSION_COOKIE = process.env.TIMEO_SESSION_COOKIE ?? "";
 const BEARER_TOKEN = process.env.TIMEO_PLATFORM_ADMIN_BEARER ?? "";
@@ -111,6 +115,10 @@ function chunk(items, size) {
   return chunks;
 }
 
+async function sleep(ms) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function appendLog(message) {
   const stamp = new Date().toISOString();
   await fs.appendFile(LOG_FILE, `[${stamp}] ${message}\n`);
@@ -133,31 +141,42 @@ function buildHeaders() {
 }
 
 async function postJson(url, payload) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: buildHeaders(),
-    body: JSON.stringify(payload),
-  });
+  for (let attempt = 0; ; attempt += 1) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: buildHeaders(),
+      body: JSON.stringify(payload),
+    });
 
-  const text = await response.text();
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    parsed = { raw: text };
+    const text = await response.text();
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      parsed = { raw: text };
+    }
+
+    if (response.status === 429 && attempt < HTTP_RETRIES) {
+      const retryAfterHeader = Number(response.headers.get("retry-after"));
+      const waitMs = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0
+        ? retryAfterHeader * 1000
+        : Math.min(10_000, 500 * 2 ** attempt);
+      await sleep(waitMs);
+      continue;
+    }
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${JSON.stringify(parsed)}`);
+    }
+
+    if (parsed?.success === false) {
+      throw new Error(
+        `${parsed?.error?.code ?? "UNKNOWN"}: ${parsed?.error?.message ?? "Unknown error"}`,
+      );
+    }
+
+    return parsed?.data ?? parsed;
   }
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${JSON.stringify(parsed)}`);
-  }
-
-  if (parsed?.success === false) {
-    throw new Error(
-      `${parsed?.error?.code ?? "UNKNOWN"}: ${parsed?.error?.message ?? "Unknown error"}`,
-    );
-  }
-
-  return parsed?.data ?? parsed;
 }
 
 function collectMappings(fullExport) {
@@ -196,40 +215,83 @@ function collectMappings(fullExport) {
     planByNormalizedName.set(normalizePlanKey(plan.title), mapped.externalId);
   }
 
-  const syntheticPlanByName = new Map();
+  const normalizedPlans = plans.map((plan) => ({
+    externalId: plan.externalId,
+    normalized: normalizePlanKey(plan.name),
+  }));
 
-  for (const membership of tables.memberships?.rows ?? []) {
-    const normalized = normalizePlanKey(membership.plan_type);
-    if (!normalized) continue;
-    if (planByNormalizedName.has(normalized) || syntheticPlanByName.has(normalized)) {
-      continue;
+  const topupPlanExternalId =
+    normalizedPlans.find((plan) => plan.normalized === "topup")?.externalId ?? null;
+  const defaultPlanExternalId = topupPlanExternalId ?? plans[0]?.externalId ?? null;
+
+  const findFirstPlanByNeedle = (...needles) => {
+    const match = normalizedPlans.find((plan) =>
+      needles.every((needle) => plan.normalized.includes(needle)),
+    );
+    return match?.externalId ?? null;
+  };
+
+  const resolveAliasPlanExternalId = (planName) => {
+    const normalized = normalizePlanKey(planName);
+
+    if (
+      normalized.includes("1monthmembership") ||
+      normalized.includes("1mthmembership") ||
+      normalized.includes("membership1month") ||
+      normalized.includes("membership1mth")
+    ) {
+      return findFirstPlanByNeedle("1", "membership");
     }
 
-    const syntheticExternalId = `synthetic:${normalized}`;
-    syntheticPlanByName.set(normalized, syntheticExternalId);
-    plans.push({
-      externalId: syntheticExternalId,
-      name: membership.plan_type,
-      description: `Synthetic imported plan (${membership.plan_type})`,
-      priceCents: 0,
-      durationMonths: null,
-      durationDays: null,
-      accessLevel: null,
-      displayOrder: null,
-      planType: inferPlanReferenceType(membership.plan_type) === "membership"
-        ? "all_access"
-        : "session_package",
-      isActive: true,
-      createdAt: membership.created_at ?? null,
-      features: ["Imported from WS Fitness"],
-    });
-  }
+    if (normalized.includes("3monthmembership") || normalized.includes("membership3months")) {
+      return findFirstPlanByNeedle("3", "membership");
+    }
+
+    if (normalized.includes("6monthmembership") || normalized.includes("membership6months")) {
+      return findFirstPlanByNeedle("6", "membership");
+    }
+
+    if (normalized.includes("zumba") && normalized.includes("10")) {
+      return findFirstPlanByNeedle("zumba", "10");
+    }
+
+    if (normalized.includes("coachtraining") && normalized.includes("48")) {
+      return findFirstPlanByNeedle("coachtraining", "48");
+    }
+
+    if (
+      (normalized.includes("personaltraining") || normalized.includes("coachtraining")) &&
+      normalized.includes("16")
+    ) {
+      return findFirstPlanByNeedle("coachtraining", "16");
+    }
+
+    if (normalized === "ct99" || (normalized.includes("coachtraining") && normalized.includes("99"))) {
+      return findFirstPlanByNeedle("coachtraining", "99");
+    }
+
+    if (normalized.includes("daypass")) {
+      return findFirstPlanByNeedle("walk", "day");
+    }
+
+    if (
+      normalized.includes("pending") ||
+      normalized.includes("vendor") ||
+      normalized === "staff" ||
+      normalized === "custom"
+    ) {
+      return defaultPlanExternalId;
+    }
+
+    return null;
+  };
 
   const findPlanExternalId = (planName) => {
     const normalized = normalizePlanKey(planName);
     return (
       planByNormalizedName.get(normalized) ??
-      syntheticPlanByName.get(normalized) ??
+      resolveAliasPlanExternalId(planName) ??
+      defaultPlanExternalId ??
       null
     );
   };
@@ -267,6 +329,8 @@ function collectMappings(fullExport) {
       createdAt: profile.created_at,
     };
   });
+
+  const knownMemberIds = new Set(members.map((member) => member.externalId));
 
   const memberships = [];
   for (const row of tables.memberships?.rows ?? []) {
@@ -366,16 +430,28 @@ function collectMappings(fullExport) {
     };
   });
 
-  const checkIns = (tables.check_ins?.rows ?? []).map((row) => ({
-    externalId: row.id,
-    userExternalId: row.member_id,
-    timestamp: row.checked_in_at,
-    method: row.location === "ZAH Gate" ? "face" : "manual",
-    gate: row.location ?? null,
-    device: row.location ?? null,
-    entryType: row.location === "ZAH Gate" ? "turnstile" : "manual",
-    notes: row.notes ?? null,
-  }));
+  const skippedCheckIns = [];
+  const checkIns = [];
+  for (const row of tables.check_ins?.rows ?? []) {
+    if (!knownMemberIds.has(row.member_id)) {
+      skippedCheckIns.push({
+        externalId: row.id,
+        userExternalId: row.member_id,
+      });
+      continue;
+    }
+
+    checkIns.push({
+      externalId: row.id,
+      userExternalId: row.member_id,
+      timestamp: row.checked_in_at,
+      method: row.location === "ZAH Gate" ? "face" : "manual",
+      gate: row.location ?? null,
+      device: row.location ?? null,
+      entryType: row.location === "ZAH Gate" ? "turnstile" : "manual",
+      notes: row.notes ?? null,
+    });
+  }
 
   const userIdByPersonId = new Map(
     (tables.turnstile_face_enrollments?.rows ?? [])
@@ -422,6 +498,7 @@ function collectMappings(fullExport) {
     checkIns,
     turnstileEvents,
     turnstileFaceLogs,
+    skippedCheckIns,
   };
 }
 
@@ -551,6 +628,13 @@ async function main() {
   await appendLog(`Loaded export file: ${EXPORT_FILE}`);
   const mapped = collectMappings(fullExport);
 
+  if (mapped.skippedCheckIns.length > 0) {
+    const uniqueMembers = new Set(mapped.skippedCheckIns.map((row) => row.userExternalId));
+    await appendLog(
+      `checkIns: skipped ${mapped.skippedCheckIns.length} rows referencing ${uniqueMembers.size} unknown members`,
+    );
+  }
+
   const counters = {
     members: 0,
     plans: 0,
@@ -591,8 +675,14 @@ async function main() {
       localPath: row.localPath,
     })) ?? (await listCategoryFiles(MEDIA_DIR, "receipts"));
 
-  await uploadMediaEntries("avatar", avatarEntries, counters);
-  await uploadMediaEntries("receipt", receiptEntries, counters);
+  if (SKIP_MEDIA_UPLOAD) {
+    await appendLog(
+      `media uploads skipped (avatars=${avatarEntries.length}, receipts=${receiptEntries.length})`,
+    );
+  } else {
+    await uploadMediaEntries("avatar", avatarEntries, counters);
+    await uploadMediaEntries("receipt", receiptEntries, counters);
+  }
 
   const activeMemberships = mapped.memberships.filter((row) => row.status === "active").length;
 
@@ -608,6 +698,8 @@ async function main() {
     turnstileFaceLogsImported: counters.turnstileFaceLogs,
     photosUploaded: counters.photos,
     receiptsUploaded: counters.receipts,
+    mediaUploadSkipped: SKIP_MEDIA_UPLOAD,
+    skippedCheckIns: mapped.skippedCheckIns.length,
     logFile: LOG_FILE,
   };
 
@@ -625,4 +717,3 @@ main().catch(async (error) => {
   }
   process.exit(1);
 });
-
