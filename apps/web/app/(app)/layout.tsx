@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useTimeoWebAuthContext, useTimeoWebTenantContext, isRoleAtLeast, hasNonCustomerTenant } from "@timeo/auth/web";
+import { resolveHomePath, useTimeoWebAuthContext, useTimeoWebTenantContext, isRoleAtLeast } from "@timeo/auth/web";
 import { useTenant } from "@timeo/api-client";
 import { LanguageSwitcher } from "@/language-switcher";
 import type { TimeoRole } from "@timeo/auth/web";
@@ -24,6 +24,7 @@ import {
 } from "@timeo/ui/web";
 import { NotificationsBell } from "@/notifications-bell";
 import { TimeoLogo } from "@/timeo-logo";
+import { ViewModeSwitcher } from "@/view-mode-switcher";
 import {
   LayoutDashboard,
   Calendar,
@@ -237,7 +238,7 @@ function TenantSwitcher() {
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, signOut, activeRole, isPlatformAdmin, setViewMode } = useTimeoWebAuthContext();
+  const { user, signOut, activeRole, isPlatformAdmin, setViewMode, setViewAsRole } = useTimeoWebAuthContext();
   const { activeTenant } = useTimeoWebTenantContext();
   const { data: tenantDetail } = useTenant(activeTenant?.id);
   const tenantLogoUrl: string | null = (tenantDetail as any)?.branding?.logoUrl ?? null;
@@ -408,6 +409,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <div className="p-3">
           <button
             onClick={() => {
+              setViewAsRole(null);
               setViewMode("platform");
               router.push("/admin");
               onNavigate?.();
@@ -494,22 +496,41 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { isLoaded, isSignedIn, activeRole } = useTimeoWebAuthContext();
+  const {
+    isLoaded,
+    isSignedIn,
+    isPlatformAdmin,
+    viewMode,
+    activeTenantId,
+    viewAsRole,
+  } = useTimeoWebAuthContext();
   const { tenants, isLoading: tenantsLoading } = useTimeoWebTenantContext();
   useEnsureUser(!!isSignedIn);
   const { data: userProfile } = useUserProfile();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const hasStaffMembership = hasNonCustomerTenant(tenants);
+
+  const homePath = resolveHomePath({
+    platformRole: isPlatformAdmin ? "platform_admin" : "user",
+    tenants,
+    viewMode,
+    activeTenantId,
+    viewAsRole,
+  });
 
   useEffect(() => {
     if (!isLoaded || tenantsLoading) return;
     if (!isSignedIn) { router.replace("/sign-in"); return; }
-    if (activeRole === "platform_admin") { router.replace("/admin"); return; }
-    if (tenants.length === 0) { router.replace("/portal"); return; }
-    if (!hasStaffMembership) { router.replace("/portal"); return; }
+    if (!homePath.startsWith("/dashboard")) { router.replace(homePath); return; }
     if (userProfile?.force_password_reset) { router.replace("/change-password"); return; }
-  }, [isLoaded, tenantsLoading, isSignedIn, tenants, activeRole, hasStaffMembership, userProfile, router]);
+  }, [
+    isLoaded,
+    tenantsLoading,
+    isSignedIn,
+    homePath,
+    userProfile,
+    router,
+  ]);
 
   if (!isLoaded || tenantsLoading) {
     return (
@@ -524,7 +545,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isSignedIn || tenants.length === 0 || !hasStaffMembership) {
+  if (!isSignedIn || !homePath.startsWith("/dashboard")) {
     return null;
   }
 
@@ -564,6 +585,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <TimeoLogo size="sm" />
               </div>
               <div className="flex items-center gap-2">
+                <ViewModeSwitcher />
                 <LanguageSwitcher />
                 <NotificationsBell />
               </div>
@@ -572,6 +594,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {/* Desktop Top Bar */}
             <header className="hidden h-12 items-center justify-end border-b border-white/[0.06] px-6 lg:flex">
               <div className="flex items-center gap-2">
+                <ViewModeSwitcher />
                 <LanguageSwitcher />
                 <NotificationsBell />
               </div>

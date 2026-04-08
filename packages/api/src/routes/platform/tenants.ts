@@ -14,6 +14,13 @@ import { tenantInviteEmail } from "@timeo/auth/email-templates";
 
 const SITE_URL = process.env.SITE_URL ?? "http://localhost:3000";
 
+function estimateMrrCents(plan: string | null | undefined): number {
+  if (plan === "enterprise") return 150000;
+  if (plan === "pro") return 50000;
+  if (plan === "starter") return 20000;
+  return 0;
+}
+
 async function hashTempPassword(password: string): Promise<string> {
   const { hashPassword } = await import("better-auth/crypto");
   return hashPassword(password);
@@ -80,7 +87,20 @@ app.get("/", authMiddleware, requirePlatformAdmin, async (c) => {
     .from(tenants)
     .orderBy(desc(tenants.created_at));
 
-  return c.json(success(rows));
+  const normalized = rows.map((row) => {
+    const settings = (row.settings ?? {}) as Record<string, unknown>;
+    const configuredMrr =
+      typeof settings.mrrCents === "number" ? settings.mrrCents : undefined;
+
+    return {
+      ...row,
+      settings,
+      mrr: configuredMrr ?? estimateMrrCents(row.plan),
+      revenue: 0,
+    };
+  });
+
+  return c.json(success(normalized));
 });
 
 // POST /tenants — onboard a new tenant
@@ -198,8 +218,17 @@ app.get("/:id", authMiddleware, requirePlatformAdmin, async (c) => {
     .from(tenantMemberships)
     .where(eq(tenantMemberships.tenant_id, id));
 
+  const settings = (tenant.settings ?? {}) as Record<string, unknown>;
+  const configuredMrr =
+    typeof settings.mrrCents === "number" ? settings.mrrCents : undefined;
+
   return c.json(
-    success({ ...tenant, member_count: memberCount?.count ?? 0 }),
+    success({
+      ...tenant,
+      member_count: memberCount?.count ?? 0,
+      mrr: configuredMrr ?? estimateMrrCents(tenant.plan),
+      revenue: 0,
+    }),
   );
 });
 

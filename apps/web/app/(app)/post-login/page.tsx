@@ -2,14 +2,17 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getPreferredTenant, useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
-import { getRoleHomePath } from "@/hooks/use-role-redirect";
+import { resolvePostLoginPath, useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
 import { Zap } from "lucide-react";
 
 export default function PostLoginPage() {
   const router = useRouter();
-  const { isLoaded, isSignedIn, activeRole } = useTimeoWebAuthContext();
+  const {
+    isLoaded,
+    isSignedIn,
+    isPlatformAdmin,
+  } = useTimeoWebAuthContext();
   const { tenants, isLoading } = useTimeoWebTenantContext();
   useEnsureUser(!!isSignedIn);
 
@@ -21,23 +24,20 @@ export default function PostLoginPage() {
       return;
     }
 
-    // Platform admin always goes to C2 control center
-    if (activeRole === "platform_admin") {
-      router.replace("/admin");
-      return;
-    }
+    const homePath = resolvePostLoginPath({
+      platformRole: isPlatformAdmin ? "platform_admin" : "user",
+      tenants,
+    });
 
-    // No tenant memberships — go to portal (onboarding)
-    if (tenants.length === 0) {
-      router.replace("/portal");
-      return;
-    }
-
-    const preferredTenant = getPreferredTenant(tenants);
-    const preferredRole = preferredTenant?.role ?? "customer";
-    const homePath = getRoleHomePath(preferredRole, true);
     router.replace(homePath);
-  }, [isLoaded, isLoading, isSignedIn, activeRole, tenants, router]);
+  }, [
+    isLoaded,
+    isLoading,
+    isSignedIn,
+    isPlatformAdmin,
+    tenants,
+    router,
+  ]);
 
   return (
     <div className="flex h-screen items-center justify-center bg-background">

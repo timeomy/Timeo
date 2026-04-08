@@ -40,11 +40,31 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}${path}`;
 
+  const contextHeaders: Record<string, string> = {};
+  if (typeof window !== "undefined") {
+    try {
+      const localStorageLike = (
+        globalThis as { localStorage?: { getItem: (key: string) => string | null } }
+      ).localStorage;
+
+      const activeTenantId = localStorageLike?.getItem("timeo.activeTenantId");
+      const viewMode = localStorageLike?.getItem("timeo.viewMode");
+      const viewAsRole = localStorageLike?.getItem("timeo.viewAsRole");
+
+      if (activeTenantId) contextHeaders["x-timeo-view-tenant"] = activeTenantId;
+      if (viewMode) contextHeaders["x-timeo-view-mode"] = viewMode;
+      if (viewAsRole) contextHeaders["x-timeo-view-role"] = viewAsRole;
+    } catch {
+      // localStorage may be unavailable in private mode; ignore safely.
+    }
+  }
+
   const response = await fetch(url, {
     ...options,
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...contextHeaders,
       ...options?.headers,
     },
   });

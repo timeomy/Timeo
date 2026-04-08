@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   useTenant,
@@ -38,12 +38,14 @@ import {
   TableHeader,
   TableRow,
 } from "@timeo/ui/web";
+import { useViewAs } from "@/hooks/use-view-as";
 import {
   ArrowLeft,
   Building2,
   Users,
   Calendar,
   Package,
+  DollarSign,
   Save,
   Settings,
   Flag,
@@ -127,6 +129,7 @@ export default function TenantDetailPage() {
   const addMemberMutation = useAddPlatformTenantMember();
   const updateMemberRoleMutation = useUpdatePlatformTenantMemberRole();
   const removeMemberMutation = useRemovePlatformTenantMember();
+  const { switchTenantRole } = useViewAs();
 
   const [editName, setEditName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -154,6 +157,20 @@ export default function TenantDetailPage() {
   }, [tenant]);
 
   const loading = isLoading;
+
+  const staffMembers = useMemo(
+    () =>
+      (members ?? []).filter(
+        (member) => member.role === "admin" || member.role === "staff" || member.role === "coach",
+      ),
+    [members],
+  );
+
+  const billingSummary = {
+    plan: platformTenant?.plan ?? tenant?.plan ?? "free",
+    status: platformTenant?.status ?? (tenant?.isActive ? "active" : "inactive"),
+    mrr: platformTenant?.mrr ?? 0,
+  };
 
   // Derived editable values
   const currentName = editName ?? tenant?.name ?? "";
@@ -254,6 +271,14 @@ export default function TenantDetailPage() {
       await removeMemberMutation.mutateAsync({ tenantId, memberId });
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Failed to remove member.");
+    }
+  }
+
+  async function handleViewAs(role: "admin" | "staff" | "customer") {
+    try {
+      await switchTenantRole(tenantId, role);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to switch view mode.");
     }
   }
 
@@ -376,6 +401,82 @@ export default function TenantDetailPage() {
           loading={loading}
         />
       </div>
+
+      {!loading && (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="glass border-white/[0.08] lg:col-span-1">
+            <CardHeader>
+              <CardTitle className="text-lg">View As</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button className="w-full justify-start" onClick={() => handleViewAs("admin")}>
+                View as Admin
+              </Button>
+              <Button variant="outline" className="w-full justify-start" onClick={() => handleViewAs("staff")}>
+                View as Staff
+              </Button>
+              <Button variant="outline" className="w-full justify-start" onClick={() => handleViewAs("customer")}>
+                View as Member
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="glass border-white/[0.08] lg:col-span-1">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Users className="h-5 w-5" />
+                Staff Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <p className="text-2xl font-semibold">{staffMembers.length}</p>
+              <p className="text-xs text-muted-foreground">
+                Staff and admins in this tenant
+              </p>
+              <Separator className="bg-white/[0.06]" />
+              <div className="space-y-1">
+                {staffMembers.slice(0, 5).map((member) => (
+                  <div key={member.id} className="flex items-center justify-between text-sm">
+                    <span className="truncate">{member.userName}</span>
+                    <span className="text-xs capitalize text-muted-foreground">{member.role}</span>
+                  </div>
+                ))}
+                {staffMembers.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No staff found.</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="glass border-white/[0.08] lg:col-span-1">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <DollarSign className="h-5 w-5" />
+                Billing Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Plan</span>
+                <span className="capitalize">{billingSummary.plan}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Status</span>
+                <span className="capitalize">{billingSummary.status}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">MRR</span>
+                <span>
+                  RM {(billingSummary.mrr / 100).toLocaleString("en-MY", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Billing values are placeholders when payment data is unavailable.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Editable Fields */}
       <Card className="glass border-white/[0.08]">

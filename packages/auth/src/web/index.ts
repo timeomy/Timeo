@@ -11,5 +11,14 @@ export { timeoMiddleware, middlewareMatcher } from "./middleware";
 export type { TimeoAuthContext, TenantSwitcherContext, TimeoRole, TenantInfo, RoleContext, ViewMode } from "../types";
 export { ROLES, isRoleAtLeast } from "../types";
 export { getHighestRoleTenant, getPreferredTenant, hasNonCustomerTenant } from "../tenant-selection";
+export {
+  getRoleHomePath,
+  normalizeTimeoRole,
+  resolveHomePath,
+  resolvePostLoginPath,
+  resolveEffectiveRole,
+  hasStaffLikeMembership,
+  hasAdminLikeMembership,
+} from "../routing";
 export { hasPermission, PERMISSIONS } from "../permissions";
 export type { Resource } from "../permissions";

@@ -14,6 +14,7 @@ import {
   cn,
 } from "@timeo/ui/web";
 import { TimeoLogo } from "@/timeo-logo";
+import { ViewModeSwitcher } from "@/view-mode-switcher";
 import {
   LayoutDashboard,
   Building2,
@@ -56,7 +57,7 @@ const sidebarLinks: SidebarLink[] = [
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, signOut, setViewMode } = useTimeoWebAuthContext();
+  const { user, signOut, setViewMode, setViewAsRole } = useTimeoWebAuthContext();
   const { tenants } = useTimeoWebTenantContext();
 
   const displayName = user?.name || user?.email || "User";
@@ -124,6 +125,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <div className="p-3">
           <button
             onClick={() => {
+              setViewAsRole(null);
               setViewMode("tenant");
               router.push("/dashboard");
               onNavigate?.();
@@ -170,14 +172,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export default function PlatformLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { isLoaded, isSignedIn, isPlatformAdmin, setViewMode } = useTimeoWebAuthContext();
+  const { isLoaded, isSignedIn, isPlatformAdmin } = useTimeoWebAuthContext();
   useEnsureUser(!!isSignedIn);
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  // Ensure viewMode is "platform" when on C2 pages
-  useEffect(() => {
-    if (isPlatformAdmin) setViewMode("platform");
-  }, [isPlatformAdmin, setViewMode]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -236,6 +233,13 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
             <TimeoLogo size="sm" />
             <span className="text-xs text-muted-foreground">C2</span>
           </div>
+          <div className="ml-auto">
+            <ViewModeSwitcher />
+          </div>
+        </header>
+
+        <header className="hidden h-12 items-center justify-end border-b border-white/[0.06] px-6 lg:flex">
+          <ViewModeSwitcher />
         </header>
 
         {/* Page Content */}
