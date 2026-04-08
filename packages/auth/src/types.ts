@@ -32,6 +32,10 @@ export interface TimeoAuthContext {
   viewMode: ViewMode;
   /** Switch between "platform" (C2) and "tenant" (business dashboard) views */
   setViewMode: (mode: ViewMode) => void;
+  /** Optional role override while viewing a tenant (admin/staff/customer) */
+  viewAsRole: TimeoRole | null;
+  /** Set or clear the tenant role override */
+  setViewAsRole: (role: TimeoRole | null) => void;
 }
 
 export interface TenantInfo {

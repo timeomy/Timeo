@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useTimeoWebAuthContext, useTimeoWebTenantContext, hasNonCustomerTenant } from "@timeo/auth/web";
+import { resolveHomePath, useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
 import { getInitials } from "@timeo/shared";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
 import { useEnsureMembership } from "@/hooks/use-ensure-membership";
@@ -20,6 +20,7 @@ import {
 import { TimeoLogo } from "@/timeo-logo";
 import { NotificationsBell } from "@/notifications-bell";
 import { LanguageSwitcher } from "@/language-switcher";
+import { ViewModeSwitcher } from "@/view-mode-switcher";
 import {
   Home,
   Calendar,
@@ -55,8 +56,16 @@ export default function PortalLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isLoaded, isSignedIn, user, signOut, activeRole } =
-    useTimeoWebAuthContext();
+  const {
+    isLoaded,
+    isSignedIn,
+    user,
+    signOut,
+    isPlatformAdmin,
+    viewMode,
+    activeTenantId,
+    viewAsRole,
+  } = useTimeoWebAuthContext();
   const { tenants, isLoading: tenantsLoading } = useTimeoWebTenantContext();
   useEnsureUser(!!isSignedIn);
   const { tenantId } = useTenantId();
@@ -65,7 +74,14 @@ export default function PortalLayout({
   const tenantLogoUrl = tenantData?.branding?.logoUrl ?? "/tenants/ws-fitness-logo.png";
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const hasBusinessMembership = hasNonCustomerTenant(tenants);
+
+  const homePath = resolveHomePath({
+    platformRole: isPlatformAdmin ? "platform_admin" : "user",
+    tenants,
+    viewMode,
+    activeTenantId,
+    viewAsRole,
+  });
 
   const displayName = user?.name || user?.email || "User";
 
@@ -78,17 +94,10 @@ export default function PortalLayout({
       return;
     }
 
-    // Platform admin always goes to C2
-    if (activeRole === "platform_admin") {
-      router.replace("/admin");
-      return;
+    if (!homePath.startsWith("/portal")) {
+      router.replace(homePath);
     }
-
-    // Staff/admin with any business membership go to business dashboard.
-    if (hasBusinessMembership) {
-      router.replace("/dashboard");
-    }
-  }, [isLoaded, tenantsLoading, isSignedIn, activeRole, hasBusinessMembership, router]);
+  }, [isLoaded, tenantsLoading, isSignedIn, homePath, router]);
 
   // Loading state
   if (!isLoaded || tenantsLoading) {
@@ -104,8 +113,8 @@ export default function PortalLayout({
     );
   }
 
-  // Show loading while redirecting (staff/admin go to dashboard, platform admin to C2)
-  if (!isSignedIn || hasBusinessMembership) {
+  // Show loading while redirecting users with non-portal home paths.
+  if (!isSignedIn || !homePath.startsWith("/portal")) {
     return null;
   }
 
@@ -156,6 +165,7 @@ export default function PortalLayout({
 
           {/* Right: Notifications + User Avatar Dropdown + Mobile Hamburger */}
           <div className="flex items-center gap-2">
+            <ViewModeSwitcher />
             <LanguageSwitcher />
             <NotificationsBell />
             {/* User Dropdown (Desktop) */}

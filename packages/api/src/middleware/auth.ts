@@ -12,10 +12,19 @@ export type AuthUser = {
   role: string;
 };
 
+export type ImpersonationContext = {
+  actorId: string;
+  tenantId: string;
+  asRole: "admin" | "staff" | "coach" | "customer";
+  source: "header" | "cookie";
+};
+
 declare module "hono" {
   interface ContextVariableMap {
     user: AuthUser;
     tenantId: string;
+    tenantRole: string;
+    impersonation?: ImpersonationContext;
   }
 }
 

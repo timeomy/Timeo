@@ -2,6 +2,7 @@ import React, { createContext, useContext, useMemo, useState } from "react";
 import { authClient } from "./auth-client";
 import type { TimeoAuthContext, TenantSwitcherContext, TenantInfo, TimeoRole } from "./types";
 import { getPreferredTenant } from "./tenant-selection";
+import { normalizeTimeoRole, resolveEffectiveRole } from "./routing";
 
 // ─── Contexts ───────────────────────────────────────────────────────
 const TimeoAuthCtx = createContext<TimeoAuthContext | null>(null);
@@ -20,6 +21,7 @@ function TimeoAuthInner({
   const session = authClient.useSession();
   const [activeTenantId, setActiveTenantId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"platform" | "tenant">("tenant");
+  const [viewAsRole, setViewAsRole] = useState<TimeoRole | null>(null);
 
   const isSignedIn = !!session.data?.user;
   const isLoaded = !session.isPending;
@@ -39,8 +41,14 @@ function TimeoAuthInner({
         }
       : null;
 
-    const activeRole: TimeoRole = preferredTenant?.role ?? "customer";
-    const isPlatformAdmin = activeRole === "platform_admin";
+    const membershipRole = normalizeTimeoRole(preferredTenant?.role);
+    const isPlatformAdmin = membershipRole === "platform_admin";
+    const activeRole: TimeoRole = resolveEffectiveRole({
+      platformRole: isPlatformAdmin ? "platform_admin" : "user",
+      membershipRole,
+      viewMode,
+      viewAsRole,
+    });
 
     return {
       user: timeoUser,
@@ -55,8 +63,18 @@ function TimeoAuthInner({
       isPlatformAdmin,
       viewMode,
       setViewMode,
+      viewAsRole,
+      setViewAsRole,
     };
-  }, [session.data, isLoaded, isSignedIn, resolvedTenantId, preferredTenant, viewMode]);
+  }, [
+    session.data,
+    isLoaded,
+    isSignedIn,
+    resolvedTenantId,
+    preferredTenant,
+    viewAsRole,
+    viewMode,
+  ]);
 
   const tenantSwitcher = useMemo<TenantSwitcherContext>(() => {
     return {

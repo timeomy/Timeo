@@ -100,6 +100,7 @@ export function createApp() {
   // Platform admin routes
   app.route("/api/platform", platformRouter);
   app.route("/api/admin/migration/wsfitness", wsFitnessMigrationRouter);
+  app.route("/api/admin", platformRouter);
 
   // Webhooks (no auth middleware - verified via signatures)
   app.route("/webhooks/stripe", stripeWebhookRouter);

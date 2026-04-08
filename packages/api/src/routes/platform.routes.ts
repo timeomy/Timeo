@@ -11,6 +11,7 @@ import { apiKeysRouter } from "./platform/api-keys.js";
 import { healthRouter } from "./platform/health.js";
 import { analyticsRouter } from "./platform/analytics.js";
 import { dataRouter } from "./platform/data.js";
+import { viewAsRouter } from "./platform/view-as.js";
 
 const app = new Hono();
 
@@ -49,5 +50,8 @@ app.route("/analytics", analyticsRouter);
 
 // Module 12 — Data
 app.route("/data", dataRouter);
+
+// Module 13 — View As audit
+app.route("/view-as", viewAsRouter);
 
 export { app as platformRouter };

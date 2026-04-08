@@ -17,6 +17,7 @@ export function requireRole(...roles: Role[]) {
   return async (c: Context, next: Next) => {
     const user = c.get("user");
     const tenantId = c.get("tenantId");
+    const tenantRole = c.get("tenantRole") as string | undefined;
 
     if (!user || !tenantId) {
       return c.json(
@@ -28,29 +29,37 @@ export function requireRole(...roles: Role[]) {
       );
     }
 
-    const [membership] = await db
-      .select()
-      .from(tenantMemberships)
-      .where(
-        and(
-          eq(tenantMemberships.tenant_id, tenantId),
-          eq(tenantMemberships.user_id, user.id),
-          eq(tenantMemberships.status, "active"),
-        ),
-      )
-      .limit(1);
+    let resolvedRole: Role | null = null;
 
-    if (!membership) {
-      return c.json(
-        {
-          success: false,
-          error: { code: "FORBIDDEN", message: "No tenant access" },
-        },
-        403,
-      );
+    if (tenantRole) {
+      resolvedRole = tenantRole as Role;
+    } else {
+      const [membership] = await db
+        .select()
+        .from(tenantMemberships)
+        .where(
+          and(
+            eq(tenantMemberships.tenant_id, tenantId),
+            eq(tenantMemberships.user_id, user.id),
+            eq(tenantMemberships.status, "active"),
+          ),
+        )
+        .limit(1);
+
+      if (!membership) {
+        return c.json(
+          {
+            success: false,
+            error: { code: "FORBIDDEN", message: "No tenant access" },
+          },
+          403,
+        );
+      }
+
+      resolvedRole = membership.role as Role;
     }
 
-    const userRank = ROLE_RANK[membership.role as Role] ?? 0;
+    const userRank = ROLE_RANK[resolvedRole] ?? 0;
     const minRank = Math.min(...roles.map((r) => ROLE_RANK[r]));
 
     if (userRank < minRank) {
