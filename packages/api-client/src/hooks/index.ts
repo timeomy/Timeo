@@ -310,16 +310,23 @@ export {
 } from "./feed";
 export type { Broadcast, ServiceCatalogItem, DiscoverFeed } from "./feed";
 
+export {
+  useGymMembers,
+  useCoaches,
+} from "./gym";
+export type { GymMember, CoachOption } from "./gym";
+
+export {
+  useMissionControl,
+} from "./mission-control";
+export type {
+  MissionControlData,
+  MissionControlMetrics,
+  MissionControlCheckIn,
+  HeatmapCell,
+} from "./mission-control";
+
 // ─── Stub exports for incomplete features ────────────────────────────────────
 // TODO: Implement these features properly
-
-export type GymMember = { userId: string; name: string; email: string; role: string; status: string; membershipId: string; avatarUrl?: string };
-export type MissionControlCheckIn = { id: string; name: string; status: string; method?: string; initials?: string; userName?: string; timestamp?: string };
-export type HeatmapCell = { day: number; hour: number; count: number };
-
-// Stub hook implementations
-export const useGymMembers = (tenantId: string) => ({ data: [] as GymMember[], isLoading: false });
-export const useCoaches = (tenantId: string) => ({ data: [] as any[], isLoading: false });
-export const useMissionControl = (tenantId: string) => ({ data: null as any, isLoading: false, isError: false, refetch: async () => ({}), isFetching: false, dataUpdatedAt: 0 });
 export const useMyTrainingLogs = (tenantId: string) => ({ data: [] as any[], isLoading: false });
 export const useMyCoach = (tenantId: string) => ({ data: null as any, isLoading: false });

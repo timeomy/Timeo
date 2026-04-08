@@ -33,6 +33,7 @@ export type {
   RoleContext,
 } from "./types";
 export { ROLES, isRoleAtLeast } from "./types";
+export { getHighestRoleTenant, getPreferredTenant, hasNonCustomerTenant } from "./tenant-selection";
 
 // Permissions
 export { hasPermission, PERMISSIONS } from "./permissions";

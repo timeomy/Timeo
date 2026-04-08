@@ -85,6 +85,15 @@ app.get("/", authMiddleware, async (c) => {
 app.get("/mine", authMiddleware, async (c) => {
   const user = c.get("user");
 
+  const tenantRolePriority = sql<number>`
+    CASE ${tenantMemberships.role}
+      WHEN 'admin' THEN 0
+      WHEN 'staff' THEN 1
+      WHEN 'coach' THEN 2
+      ELSE 3
+    END
+  `;
+
   const rows = await db
     .select({
       id: tenants.id,
@@ -106,7 +115,8 @@ app.get("/mine", authMiddleware, async (c) => {
         eq(tenantMemberships.user_id, user.id),
         eq(tenantMemberships.status, "active"),
       ),
-    );
+    )
+    .orderBy(tenantRolePriority, sql`${tenantMemberships.joined_at} DESC`);
 
   // Flatten JSONB fields for the client
   const normalized = rows.map((row) => {

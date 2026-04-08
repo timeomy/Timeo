@@ -162,6 +162,87 @@ describe("GET /api/tenants", () => {
   });
 });
 
+describe("GET /api/tenants/mine", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("applies membership ordering and returns normalized tenant rows", async () => {
+    setupAuth(TEST_ADMIN);
+
+    const authChainEnd = {
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([TEST_ADMIN]),
+      orderBy: vi.fn().mockReturnThis(),
+      leftJoin: vi.fn().mockReturnThis(),
+      innerJoin: vi.fn().mockReturnThis(),
+    };
+
+    const mineRows = [
+      {
+        id: "tnt_admin",
+        name: "Admin Tenant",
+        slug: "admin-tenant",
+        plan: "pro",
+        status: "active",
+        settings: { industry: "fitness" },
+        branding: { logoUrl: "https://cdn.timeo.my/logo.png" },
+        paymentGateway: "stripe",
+        createdAt: new Date("2026-01-01"),
+        updatedAt: new Date("2026-01-02"),
+        role: "admin",
+      },
+      {
+        id: "tnt_customer",
+        name: "Customer Tenant",
+        slug: "customer-tenant",
+        plan: "starter",
+        status: "active",
+        settings: {},
+        branding: {},
+        paymentGateway: "stripe",
+        createdAt: new Date("2026-01-03"),
+        updatedAt: new Date("2026-01-04"),
+        role: "customer",
+      },
+    ];
+
+    const mineChainEnd = {
+      innerJoin: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockResolvedValue(mineRows),
+      limit: vi.fn().mockReturnThis(),
+      leftJoin: vi.fn().mockReturnThis(),
+    };
+
+    let selectCallCount = 0;
+    mockDb.select.mockImplementation(() => {
+      selectCallCount += 1;
+      if (selectCallCount === 1) {
+        return { from: vi.fn().mockReturnValue(authChainEnd) };
+      }
+
+      return { from: vi.fn().mockReturnValue(mineChainEnd) };
+    });
+
+    const res = await app.request("/api/tenants/mine", {
+      headers: { Origin: "http://localhost:3000" },
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    const data = expectSuccess(body) as {
+      tenants: Array<{ role: string; name: string }>;
+      platformRole: string;
+    };
+
+    expect(mineChainEnd.orderBy).toHaveBeenCalledTimes(1);
+    expect(data.platformRole).toBe("user");
+    expect(data.tenants).toHaveLength(2);
+    expect(data.tenants[0]).toMatchObject({ role: "admin", name: "Admin Tenant" });
+  });
+});
+
 describe("GET /api/tenants/by-slug/:slug", () => {
   beforeEach(() => {
     vi.clearAllMocks();

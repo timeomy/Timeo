@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
 import { authClient } from "./auth-client";
 import type { TimeoAuthContext, TenantSwitcherContext, TenantInfo, TimeoRole } from "./types";
+import { getPreferredTenant } from "./tenant-selection";
 
 // ─── Contexts ───────────────────────────────────────────────────────
 const TimeoAuthCtx = createContext<TimeoAuthContext | null>(null);
@@ -24,6 +25,8 @@ function TimeoAuthInner({
   const isLoaded = !session.isPending;
 
   const tenants = externalTenants ?? [];
+  const preferredTenant = getPreferredTenant(tenants, activeTenantId);
+  const resolvedTenantId = preferredTenant?.id ?? null;
 
   const authContext = useMemo<TimeoAuthContext>(() => {
     const user = session.data?.user;
@@ -36,8 +39,7 @@ function TimeoAuthInner({
         }
       : null;
 
-    const activeTenant = tenants.find((t) => t.id === activeTenantId);
-    const activeRole: TimeoRole = activeTenant?.role ?? "customer";
+    const activeRole: TimeoRole = preferredTenant?.role ?? "customer";
     const isPlatformAdmin = activeRole === "platform_admin";
 
     return {
@@ -47,33 +49,30 @@ function TimeoAuthInner({
       signOut: async () => {
         await authClient.signOut();
       },
-      activeTenantId,
+      activeTenantId: resolvedTenantId,
       activeRole,
       setActiveTenant: setActiveTenantId,
       isPlatformAdmin,
       viewMode,
       setViewMode,
     };
-  }, [session.data, isLoaded, isSignedIn, activeTenantId, tenants, viewMode]);
+  }, [session.data, isLoaded, isSignedIn, resolvedTenantId, preferredTenant, viewMode]);
 
   const tenantSwitcher = useMemo<TenantSwitcherContext>(() => {
-    const activeTenant = tenants.find((t) => t.id === activeTenantId) ?? null;
-
     return {
       tenants,
-      activeTenant,
+      activeTenant: preferredTenant,
       switchTenant: setActiveTenantId,
       isLoading: tenantsLoading ?? false,
     };
-  }, [tenants, activeTenantId, tenantsLoading]);
+  }, [tenants, preferredTenant, tenantsLoading]);
 
-  // Auto-select first tenant if none selected
+  // Keep selected tenant valid and always prefer elevated roles over customer-only memberships.
   React.useEffect(() => {
-    if (!activeTenantId && tenants.length > 0) {
-      const first = tenants[0];
-      if (first) setActiveTenantId(first.id);
+    if (resolvedTenantId !== activeTenantId) {
+      setActiveTenantId(resolvedTenantId);
     }
-  }, [activeTenantId, tenants]);
+  }, [activeTenantId, resolvedTenantId]);
 
   return (
     <TimeoAuthCtx.Provider value={authContext}>

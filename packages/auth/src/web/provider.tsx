@@ -3,6 +3,9 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
 import { authClient } from "./auth-client";
 import type { TimeoAuthContext, TenantSwitcherContext, TenantInfo, TimeoRole, ViewMode } from "../types";
+import { getPreferredTenant } from "../tenant-selection";
+
+const ACTIVE_TENANT_STORAGE_KEY = "timeo.activeTenantId";
 
 // ─── Contexts ───────────────────────────────────────────────────────
 const TimeoWebAuthCtx = createContext<TimeoAuthContext | null>(null);
@@ -22,7 +25,14 @@ function TimeoWebAuthInner({
   platformRole?: string;
 }) {
   const session = authClient.useSession();
-  const [activeTenantId, setActiveTenantId] = useState<string | null>(null);
+  const [activeTenantId, setActiveTenantId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      return window.localStorage.getItem(ACTIVE_TENANT_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  });
   const isPlatformAdmin = platformRole === "platform_admin";
   // Platform admins start in "platform" mode (C2), can switch to "tenant" mode
   const [viewMode, setViewMode] = useState<ViewMode>(
@@ -33,6 +43,8 @@ function TimeoWebAuthInner({
   const isLoaded = !session.isPending;
 
   const tenants = externalTenants ?? [];
+  const preferredTenant = getPreferredTenant(tenants, activeTenantId);
+  const resolvedTenantId = preferredTenant?.id ?? null;
 
   const authContext = useMemo<TimeoAuthContext>(() => {
     const user = session.data?.user;
@@ -45,13 +57,12 @@ function TimeoWebAuthInner({
         }
       : null;
 
-    const activeTenant = tenants.find((t) => t.id === activeTenantId);
     // In "platform" mode, platform admins get platform_admin role
     // In "tenant" mode, they get their tenant-level role
     const activeRole: TimeoRole =
       isPlatformAdmin && viewMode === "platform"
         ? "platform_admin"
-        : activeTenant?.role ?? "customer";
+        : preferredTenant?.role ?? "customer";
 
     return {
       user: timeoUser,
@@ -60,33 +71,44 @@ function TimeoWebAuthInner({
       signOut: async () => {
         await authClient.signOut();
       },
-      activeTenantId,
+      activeTenantId: resolvedTenantId,
       activeRole,
       setActiveTenant: setActiveTenantId,
       isPlatformAdmin,
       viewMode,
       setViewMode,
     };
-  }, [session.data, isLoaded, isSignedIn, activeTenantId, tenants, platformRole, viewMode, isPlatformAdmin]);
+  }, [session.data, isLoaded, isSignedIn, preferredTenant, resolvedTenantId, viewMode, isPlatformAdmin]);
 
   const tenantSwitcher = useMemo<TenantSwitcherContext>(() => {
-    const activeTenant = tenants.find((t) => t.id === activeTenantId) ?? null;
-
     return {
       tenants,
-      activeTenant,
+      activeTenant: preferredTenant,
       switchTenant: setActiveTenantId,
       isLoading: tenantsLoading ?? false,
     };
-  }, [tenants, activeTenantId, tenantsLoading]);
+  }, [tenants, preferredTenant, tenantsLoading]);
 
-  // Auto-select first tenant if none selected
+  // Keep selected tenant valid and prefer elevated memberships over customer-only profiles.
   React.useEffect(() => {
-    if (!activeTenantId && tenants.length > 0) {
-      const first = tenants[0];
-      if (first) setActiveTenantId(first.id);
+    if (resolvedTenantId !== activeTenantId) {
+      setActiveTenantId(resolvedTenantId);
     }
-  }, [activeTenantId, tenants]);
+  }, [activeTenantId, resolvedTenantId]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      if (activeTenantId) {
+        window.localStorage.setItem(ACTIVE_TENANT_STORAGE_KEY, activeTenantId);
+      } else {
+        window.localStorage.removeItem(ACTIVE_TENANT_STORAGE_KEY);
+      }
+    } catch {
+      // localStorage may be unavailable in private mode; ignore safely.
+    }
+  }, [activeTenantId]);
 
   return (
     <TimeoWebAuthCtx.Provider value={authContext}>
