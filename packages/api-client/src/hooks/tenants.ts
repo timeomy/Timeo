@@ -57,7 +57,7 @@ export function useMyTenants(options?: UseMyTenantsOptions) {
     /** Flat tenant list (backwards-compatible) */
     tenants: query.data?.tenants ?? [],
     /** Platform-level role from users table */
-    platformRole: query.data?.platformRole ?? "user",
+    platformRole: query.data?.platformRole,
   };
 }
 
