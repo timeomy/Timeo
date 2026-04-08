@@ -105,18 +105,32 @@ export const auth = betterAuth({
       create: {
         after: async (newUser) => {
           // Sync the Better Auth user to our app-level users table
+          const normalizedEmail = newUser.email.trim().toLowerCase();
+          const shouldGrantPlatformAdmin =
+            normalizedEmail === "jabez@oxloz.com";
+
           const existing = await db
-            .select({ id: users.id })
+            .select({ id: users.id, role: users.role })
             .from(users)
             .where(eq(users.auth_id, newUser.id))
             .limit(1);
+
           if (existing.length === 0) {
             await db.insert(users).values({
               id: generateId(),
               auth_id: newUser.id,
               email: newUser.email,
               name: newUser.name ?? newUser.email,
+              role: shouldGrantPlatformAdmin ? "platform_admin" : "user",
             });
+            return;
+          }
+
+          if (shouldGrantPlatformAdmin && existing[0].role !== "platform_admin") {
+            await db
+              .update(users)
+              .set({ role: "platform_admin", updated_at: new Date() })
+              .where(eq(users.id, existing[0].id));
           }
         },
       },
