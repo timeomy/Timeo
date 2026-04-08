@@ -23,7 +23,7 @@ export default function ForgotPasswordPage() {
       // distinguish "email not found" from "reset email sent".
       await authClient.requestPasswordReset({
         email: email.trim(),
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://timeo.my"}/reset-password`,
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://app.timeo.my"}/reset-password`,
       });
       setSent(true);
     } catch {
