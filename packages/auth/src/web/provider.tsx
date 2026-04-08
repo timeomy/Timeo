@@ -56,17 +56,29 @@ function TimeoWebAuthInner({
 }) {
   const session = authClient.useSession();
   const isPlatformAdmin = platformRole === "platform_admin";
+  const hasResolvedPlatformRole =
+    platformRole === "platform_admin" || platformRole === "user";
 
   const [activeTenantId, setActiveTenantId] = useState<string | null>(() => {
     return readStorage(ACTIVE_TENANT_STORAGE_KEY) ?? readCookie(ACTIVE_TENANT_STORAGE_KEY);
   });
 
-  // Platform admins start in "platform" mode (C2), can switch to "tenant" mode
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+  const [initialViewModeState] = useState<{ value: ViewMode; hasPersisted: boolean }>(() => {
     const stored = readStorage(VIEW_MODE_STORAGE_KEY) ?? readCookie(VIEW_MODE_STORAGE_KEY);
-    if (stored === "platform" || stored === "tenant") return stored;
-    return isPlatformAdmin ? "platform" : "tenant";
+    if (stored === "platform" || stored === "tenant") {
+      return { value: stored, hasPersisted: true };
+    }
+
+    return {
+      value: isPlatformAdmin ? "platform" : "tenant",
+      hasPersisted: false,
+    };
   });
+
+  const hasPersistedViewModeRef = React.useRef(initialViewModeState.hasPersisted);
+
+  // Platform admins start in "platform" mode (C2), can switch to "tenant" mode
+  const [viewMode, setViewMode] = useState<ViewMode>(initialViewModeState.value);
 
   const [viewAsRole, setViewAsRole] = useState<TimeoRole | null>(() => {
     const stored = readStorage(VIEW_ROLE_STORAGE_KEY) ?? readCookie(VIEW_ROLE_STORAGE_KEY);
@@ -109,6 +121,7 @@ function TimeoWebAuthInner({
         setActiveTenantId(null);
         setViewAsRole(null);
         setViewMode("tenant");
+        hasPersistedViewModeRef.current = false;
         writeCookie(ACTIVE_TENANT_STORAGE_KEY, null);
         writeCookie(VIEW_MODE_STORAGE_KEY, null);
         writeCookie(VIEW_ROLE_STORAGE_KEY, null);
@@ -150,19 +163,17 @@ function TimeoWebAuthInner({
   }, [activeTenantId, resolvedTenantId]);
 
   React.useEffect(() => {
+    if (!hasResolvedPlatformRole) return;
+
     if (!isPlatformAdmin && viewMode !== "tenant") {
       setViewMode("tenant");
       return;
     }
 
-    if (isPlatformAdmin) {
-      const hasPersistedMode =
-        !!readStorage(VIEW_MODE_STORAGE_KEY) || !!readCookie(VIEW_MODE_STORAGE_KEY);
-      if (!hasPersistedMode && viewMode !== "platform") {
-        setViewMode("platform");
-      }
+    if (isPlatformAdmin && !hasPersistedViewModeRef.current && viewMode !== "platform") {
+      setViewMode("platform");
     }
-  }, [isPlatformAdmin, viewMode]);
+  }, [hasResolvedPlatformRole, isPlatformAdmin, viewMode]);
 
   React.useEffect(() => {
     if (!isSignedIn && viewAsRole) {
@@ -205,6 +216,10 @@ function TimeoWebAuthInner({
   }, [activeTenantId]);
 
   React.useEffect(() => {
+    if (!hasResolvedPlatformRole) return;
+
+    hasPersistedViewModeRef.current = true;
+
     try {
       window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
     } catch {
@@ -212,7 +227,7 @@ function TimeoWebAuthInner({
     }
 
     writeCookie(VIEW_MODE_STORAGE_KEY, viewMode);
-  }, [viewMode]);
+  }, [hasResolvedPlatformRole, viewMode]);
 
   React.useEffect(() => {
     try {
