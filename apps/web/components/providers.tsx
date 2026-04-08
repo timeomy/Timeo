@@ -2,7 +2,7 @@
 
 import { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { TimeoWebAuthProvider } from "@timeo/auth/web";
+import { authClient, TimeoWebAuthProvider } from "@timeo/auth/web";
 import { TimeoWebAnalyticsProvider } from "@timeo/analytics/web";
 import { useMyTenants } from "@timeo/api-client";
 import { LanguageProvider } from "@/language-context";
@@ -15,9 +15,18 @@ const queryClient = new QueryClient({
 
 /** Loads tenant list and wires it into the auth provider. Must be inside QueryClientProvider. */
 function TenantsLoader({ children }: { children: ReactNode }) {
-  const { tenants, platformRole, isLoading } = useMyTenants();
+  const session = authClient.useSession();
+  const userId = session.data?.user?.id ?? null;
+  const isSignedIn = !!session.data?.user;
+  const { tenants, platformRole, isLoading } = useMyTenants({
+    enabled: isSignedIn,
+    userId,
+  });
+
+  const tenantsLoading = session.isPending || (isSignedIn && isLoading);
+
   return (
-    <TimeoWebAuthProvider tenants={tenants} tenantsLoading={isLoading} platformRole={platformRole}>
+    <TimeoWebAuthProvider tenants={tenants} tenantsLoading={tenantsLoading} platformRole={platformRole}>
       {children}
     </TimeoWebAuthProvider>
   );

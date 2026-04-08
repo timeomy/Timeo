@@ -37,11 +37,19 @@ interface MyTenantsResponse {
   platformRole: "platform_admin" | "user";
 }
 
-export function useMyTenants() {
+interface UseMyTenantsOptions {
+  enabled?: boolean;
+  userId?: string | null;
+}
+
+export function useMyTenants(options?: UseMyTenantsOptions) {
+  const isEnabled = options?.enabled ?? true;
+
   const query = useQuery({
-    queryKey: queryKeys.tenants.mine(),
+    queryKey: queryKeys.tenants.mine(options?.userId),
     queryFn: () => api.get<MyTenantsResponse>("/api/tenants/mine"),
     staleTime: 60_000,
+    enabled: isEnabled,
   });
 
   return {

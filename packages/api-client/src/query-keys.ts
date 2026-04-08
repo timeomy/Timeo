@@ -1,7 +1,8 @@
 export const queryKeys = {
   tenants: {
     all: () => ["tenants"] as const,
-    mine: () => ["tenants", "mine"] as const,
+    mine: (userId?: string | null) =>
+      userId ? (["tenants", "mine", userId] as const) : (["tenants", "mine"] as const),
     public: (search?: string) => ["tenants", "public", search ?? ""] as const,
     byId: (id: string) => ["tenants", id] as const,
     bySlug: (slug: string) => ["tenants", "slug", slug] as const,
