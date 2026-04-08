@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
+import { useTimeoWebAuthContext, useTimeoWebTenantContext, hasNonCustomerTenant } from "@timeo/auth/web";
 import { getInitials } from "@timeo/shared";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
 import { useEnsureMembership } from "@/hooks/use-ensure-membership";
@@ -65,6 +65,7 @@ export default function PortalLayout({
   const tenantLogoUrl = tenantData?.branding?.logoUrl ?? "/tenants/ws-fitness-logo.png";
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const hasBusinessMembership = hasNonCustomerTenant(tenants);
 
   const displayName = user?.name || user?.email || "User";
 
@@ -83,14 +84,11 @@ export default function PortalLayout({
       return;
     }
 
-    // Staff/admin with tenants go to business dashboard
-    // Use tenants[0]?.role directly to avoid race where activeRole defaults
-    // to "customer" before activeTenantId is auto-selected.
-    const primaryRole = tenants.length > 0 ? tenants[0]?.role : undefined;
-    if (tenants.length > 0 && primaryRole && primaryRole !== "customer") {
+    // Staff/admin with any business membership go to business dashboard.
+    if (hasBusinessMembership) {
       router.replace("/dashboard");
     }
-  }, [isLoaded, tenantsLoading, isSignedIn, tenants, activeRole, router]);
+  }, [isLoaded, tenantsLoading, isSignedIn, activeRole, hasBusinessMembership, router]);
 
   // Loading state
   if (!isLoaded || tenantsLoading) {
@@ -107,7 +105,7 @@ export default function PortalLayout({
   }
 
   // Show loading while redirecting (staff/admin go to dashboard, platform admin to C2)
-  if (!isSignedIn || (tenants.length > 0 && tenants[0]?.role !== "customer")) {
+  if (!isSignedIn || hasBusinessMembership) {
     return null;
   }
 

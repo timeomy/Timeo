@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useTimeoWebAuthContext, useTimeoWebTenantContext, isRoleAtLeast } from "@timeo/auth/web";
+import { useTimeoWebAuthContext, useTimeoWebTenantContext, isRoleAtLeast, hasNonCustomerTenant } from "@timeo/auth/web";
 import { useTenant } from "@timeo/api-client";
 import { LanguageSwitcher } from "@/language-switcher";
 import type { TimeoRole } from "@timeo/auth/web";
@@ -500,17 +500,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: userProfile } = useUserProfile();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  const primaryRole = tenants[0]?.role ?? "customer";
+  const hasStaffMembership = hasNonCustomerTenant(tenants);
 
   useEffect(() => {
     if (!isLoaded || tenantsLoading) return;
     if (!isSignedIn) { router.replace("/sign-in"); return; }
     if (activeRole === "platform_admin") { router.replace("/admin"); return; }
     if (tenants.length === 0) { router.replace("/portal"); return; }
-    if (primaryRole === "customer") { router.replace("/portal"); return; }
+    if (!hasStaffMembership) { router.replace("/portal"); return; }
     if (userProfile?.force_password_reset) { router.replace("/change-password"); return; }
-  }, [isLoaded, tenantsLoading, isSignedIn, tenants, activeRole, primaryRole, userProfile, router]);
+  }, [isLoaded, tenantsLoading, isSignedIn, tenants, activeRole, hasStaffMembership, userProfile, router]);
 
   if (!isLoaded || tenantsLoading) {
     return (
@@ -525,7 +524,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isSignedIn || tenants.length === 0 || primaryRole === "customer") {
+  if (!isSignedIn || tenants.length === 0 || !hasStaffMembership) {
     return null;
   }
 

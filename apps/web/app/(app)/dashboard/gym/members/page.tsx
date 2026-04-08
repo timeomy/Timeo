@@ -54,31 +54,52 @@ function useGymMembers() {
   return useQuery<GymMember[]>({
     queryKey: ["gym", tenantId, "/members"],
     queryFn: async () => {
-      const res = await fetch(
-        `${API_URL}/api/tenants/${tenantId}/gym/members`,
-        { credentials: "include" },
-      );
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error?.message || "Failed to load members");
-      const result = data.data;
-      // API returns { members: [{membership: {...}, user: {...}}], pagination: {...} }
-      const rawList: Array<{membership?: {id?: string; status?: string; role?: string}; user?: {id?: string; name?: string; email?: string; avatarUrl?: string}}> = Array.isArray(result) ? result : (result?.members ?? []);
-      return rawList.map((item) => {
-        if (item.user) {
-          return {
-            id: item.user.id ?? item.membership?.id ?? "",
-            name: item.user.name ?? "",
-            email: item.user.email ?? "",
-            phone: null,
-            photoUrl: item.user.avatarUrl ?? null,
-            membershipStatus: (item.membership?.status as "active" | "expired" | "suspended") ?? "active",
-            membershipPlan: item.membership?.role ?? null,
-            faceEnrolled: false,
-            lastCheckIn: null,
-          } as GymMember;
+      const rows: GymMember[] = [];
+      let page = 1;
+      let totalPages = 1;
+
+      while (page <= totalPages) {
+        const res = await fetch(
+          `${API_URL}/api/tenants/${tenantId}/gym/members?page=${page}&limit=100`,
+          { credentials: "include" },
+        );
+        const data = await res.json();
+
+        if (!data.success) {
+          throw new Error(data.error?.message || "Failed to load members");
         }
-        return item as unknown as GymMember;
-      });
+
+        const result = data.data;
+        const rawList: Array<{
+          membership?: { id?: string; status?: string; role?: string };
+          user?: { id?: string; name?: string; email?: string; avatarUrl?: string };
+        }> = Array.isArray(result) ? result : (result?.members ?? []);
+
+        rows.push(
+          ...rawList.map((item) => {
+            if (item.user) {
+              return {
+                id: item.user.id ?? item.membership?.id ?? "",
+                name: item.user.name ?? "",
+                email: item.user.email ?? "",
+                phone: null,
+                photoUrl: item.user.avatarUrl ?? null,
+                membershipStatus: (item.membership?.status as "active" | "expired" | "suspended") ?? "active",
+                membershipPlan: item.membership?.role ?? null,
+                faceEnrolled: false,
+                lastCheckIn: null,
+              } as GymMember;
+            }
+
+            return item as unknown as GymMember;
+          }),
+        );
+
+        totalPages = Math.max(1, result?.pagination?.totalPages ?? 1);
+        page += 1;
+      }
+
+      return rows;
     },
     enabled: !!tenantId,
   });

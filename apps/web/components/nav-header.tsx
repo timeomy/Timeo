@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
+import { useTimeoWebAuthContext } from "@timeo/auth/web";
 import {
   Button,
   Avatar,
@@ -37,8 +37,7 @@ const navLinks = [
 ];
 
 function NotificationBellWidget() {
-  const { tenants } = useTimeoWebTenantContext();
-  const activeTenantId = tenants[0]?.id ?? null;
+  const { activeTenantId } = useTimeoWebAuthContext();
 
   // Notifications widget renders as a static bell when no active tenant
   if (!activeTenantId) {

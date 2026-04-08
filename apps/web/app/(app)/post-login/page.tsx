@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
+import { getPreferredTenant, useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
 import { getRoleHomePath } from "@/hooks/use-role-redirect";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
 import { Zap } from "lucide-react";
@@ -33,10 +33,9 @@ export default function PostLoginPage() {
       return;
     }
 
-    // Use the first tenant's role directly — activeRole may still be "customer"
-    // at this point because activeTenantId hasn't been auto-selected yet (timing).
-    const primaryRole = tenants[0]?.role ?? "customer";
-    const homePath = getRoleHomePath(primaryRole, true);
+    const preferredTenant = getPreferredTenant(tenants);
+    const preferredRole = preferredTenant?.role ?? "customer";
+    const homePath = getRoleHomePath(preferredRole, true);
     router.replace(homePath);
   }, [isLoaded, isLoading, isSignedIn, activeRole, tenants, router]);
 
