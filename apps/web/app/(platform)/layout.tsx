@@ -173,16 +173,17 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 export default function PlatformLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isLoaded, isSignedIn, isPlatformAdmin } = useTimeoWebAuthContext();
+  const { isLoading: tenantsLoading } = useTimeoWebTenantContext();
   useEnsureUser(!!isSignedIn);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded || tenantsLoading) return;
     if (!isSignedIn) { router.replace("/sign-in"); return; }
     if (!isPlatformAdmin) { router.replace("/dashboard"); }
-  }, [isLoaded, isSignedIn, isPlatformAdmin, router]);
+  }, [isLoaded, tenantsLoading, isSignedIn, isPlatformAdmin, router]);
 
-  if (!isLoaded) {
+  if (!isLoaded || tenantsLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
