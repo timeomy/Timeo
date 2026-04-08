@@ -12,13 +12,18 @@ import {
 
 const siteUrl = process.env.SITE_URL ?? "http://localhost:3000";
 const apiUrl = process.env.API_URL ?? "http://localhost:4000";
+const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://app.timeo.my";
+const marketingUrl = process.env.MARKETING_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? "https://timeo.my";
 
-// Trusted origins: always include the configured site + API URLs plus dev defaults.
-// In production SITE_URL=https://timeo.my and API_URL=https://api.timeo.my.
+// Trusted origins must include every real browser origin that can initiate auth flows.
 const trustedOrigins = Array.from(
   new Set([
     siteUrl,
     apiUrl,
+    appUrl,
+    marketingUrl,
+    "https://app.timeo.my",
+    "https://timeo.my",
     "http://localhost:3000",
     "http://localhost:3001",
     "http://localhost:4000",
