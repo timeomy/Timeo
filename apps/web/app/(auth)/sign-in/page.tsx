@@ -124,8 +124,8 @@ export default function SignInPage() {
 
       <p className="mt-6 text-center text-sm text-white/30">
         Don&apos;t have an account?{" "}
-        <Link href="/sign-up" className="text-[#0066FF] hover:text-[#3388FF]">
-          Sign up
+        <Link href="/sign-up-business" className="text-[#0066FF] hover:text-[#3388FF]">
+          Start your business
         </Link>
       </p>
     </div>
