@@ -21,14 +21,44 @@ import { Hono } from "hono";
 import { createHmac } from "crypto";
 import { db } from "@timeo/db";
 import { generateId } from "@timeo/db";
-import { checkIns, users, auditLogs, tenantMemberships } from "@timeo/db/schema";
-import { eq, and } from "drizzle-orm";
+import {
+  checkIns,
+  users,
+  auditLogs,
+  tenantMemberships,
+  tenants,
+  subscriptions,
+  memberships,
+} from "@timeo/db/schema";
+import { eq, and, ilike, desc } from "drizzle-orm";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import { authMiddleware } from "../middleware/auth.js";
 import { success, error } from "../lib/response.js";
 import * as AccessControl from "../services/access-control.service.js";
 
 const app = new Hono();
 const QR_SECRET = process.env.QR_TOKEN_SECRET ?? "timeo-qr-secret-change-me";
+
+const ValidateCardSchema = z.object({
+  cardNo: z.string().min(1),
+  tenantId: z.string().min(1),
+});
+
+function normalizeCardNo(cardNo: string): string {
+  return cardNo.trim().replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+}
+
+function getCardCandidates(cardNo: string): string[] {
+  const normalized = normalizeCardNo(cardNo);
+  if (!normalized) return [];
+  const lastEight = normalized.length > 8 ? normalized.slice(-8) : normalized;
+  return Array.from(new Set([normalized, lastEight].filter(Boolean)));
+}
+
+function daysUntil(date: Date): number {
+  return Math.max(0, Math.ceil((date.getTime() - Date.now()) / 86400000));
+}
 
 // ─── Permanent QR helpers ────────────────────────────────────────────────────
 
@@ -91,6 +121,117 @@ app.get("/qr-token", authMiddleware, async (c) => {
   const expiresAt = (window + 1) * 30000;
 
   return c.json(success({ token, expiresAt, windowMs: 30000 }));
+});
+
+// ─── POST /validate-card — Kiosk card validation against Timeo DB ────────────
+
+app.post("/validate-card", zValidator("json", ValidateCardSchema), async (c) => {
+  const { cardNo, tenantId } = c.req.valid("json");
+  const providedToken = (c.req.header("X-Kiosk-Token") ?? "").trim();
+
+  try {
+    const [tenantRow] = await db
+      .select({ settings: tenants.settings })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
+
+    if (!tenantRow) {
+      return c.json({ valid: false, error: 8, tts: "Not registered" }, 404);
+    }
+
+    const tenantSettings = (tenantRow.settings ?? {}) as Record<string, unknown>;
+    const expectedToken =
+      typeof tenantSettings.kioskToken === "string"
+        ? tenantSettings.kioskToken.trim()
+        : "";
+
+    if (!providedToken || !expectedToken || providedToken !== expectedToken) {
+      return c.json({ valid: false, error: 8, tts: "Unauthorized" }, 401);
+    }
+
+    const candidates = getCardCandidates(cardNo);
+
+    if (candidates.length === 0) {
+      return c.json({ valid: false, error: 8, tts: "Not registered" });
+    }
+
+    let matchedMember:
+      | {
+          userId: string;
+          memberId: string | null;
+          memberName: string;
+        }
+      | null = null;
+
+    for (const candidate of candidates) {
+      const [row] = await db
+        .select({
+          userId: tenantMemberships.user_id,
+          memberId: tenantMemberships.member_id,
+          memberName: users.name,
+        })
+        .from(tenantMemberships)
+        .innerJoin(users, eq(tenantMemberships.user_id, users.id))
+        .where(
+          and(
+            eq(tenantMemberships.tenant_id, tenantId),
+            ilike(tenantMemberships.member_id, candidate),
+          ),
+        )
+        .limit(1);
+
+      if (row) {
+        matchedMember = row;
+        break;
+      }
+    }
+
+    if (!matchedMember) {
+      return c.json({ valid: false, error: 8, tts: "Not registered" });
+    }
+
+    const [activeSubscription] = await db
+      .select({
+        id: subscriptions.id,
+        planName: memberships.name,
+        currentPeriodEnd: subscriptions.current_period_end,
+      })
+      .from(subscriptions)
+      .leftJoin(memberships, eq(subscriptions.membership_id, memberships.id))
+      .where(
+        and(
+          eq(subscriptions.tenant_id, tenantId),
+          eq(subscriptions.customer_id, matchedMember.userId),
+          eq(subscriptions.status, "active"),
+        ),
+      )
+      .orderBy(desc(subscriptions.current_period_end))
+      .limit(1);
+
+    if (!activeSubscription || activeSubscription.currentPeriodEnd < new Date()) {
+      return c.json({
+        valid: false,
+        error: 8,
+        tts: "Membership expired",
+        expiryDate: activeSubscription?.currentPeriodEnd?.toISOString() ?? null,
+        memberName: matchedMember.memberName,
+      });
+    }
+
+    return c.json({
+      valid: true,
+      error: 0,
+      tts: activeSubscription.planName ?? "Membership active",
+      planName: activeSubscription.planName ?? null,
+      memberName: matchedMember.memberName,
+      expiryDate: activeSubscription.currentPeriodEnd.toISOString(),
+      daysRemaining: daysUntil(activeSubscription.currentPeriodEnd),
+    });
+  } catch (err) {
+    console.error("Gate validate-card error:", err);
+    return c.json({ valid: false, error: 8, tts: "Validation failed" }, 500);
+  }
 });
 
 // ─── POST /verify — Scanner verifies QR (permanent or legacy) ───────────────
