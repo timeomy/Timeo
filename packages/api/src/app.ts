@@ -42,6 +42,7 @@ import { invoicesRouter } from "./routes/invoices.routes.js";
 import { healthRouter } from "./routes/health.js";
 import { feedRouter, broadcastsRouter, catalogRouter } from "./routes/feed.routes.js";
 import { wsFitnessMigrationRouter } from "./routes/admin-migration.routes.js";
+import { uiConfigRouter } from "./routes/ui-config.routes.js";
 
 export function createApp() {
   const app = new Hono();
@@ -90,6 +91,7 @@ export function createApp() {
   app.route("/api/tenants/:tenantId/gym", gymRouter);
   app.route("/api/tenants/:tenantId/mission-control", missionControlRouter);
   app.route("/api/tenants/:tenantId/coaches", coachRouter);
+  app.route("/api/tenants/:tenantId/ui-config", uiConfigRouter);
 
   // Gym device check-in (no auth - uses API key, tenant derived from QR code)
   app.route("/api/gym", gymRouter);
