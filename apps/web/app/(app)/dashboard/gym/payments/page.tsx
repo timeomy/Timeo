@@ -5,6 +5,7 @@ import {
   usePaymentRequests,
   useApprovePaymentRequest,
   useRejectPaymentRequest,
+  useRequestPaymentReceipt,
   type PaymentRequest,
   type PaymentRequestStatus,
 } from "@timeo/api-client";
@@ -31,13 +32,11 @@ import {
   XCircle,
   Clock,
   Eye,
+  Expand,
   Search,
-  Filter,
   AlertCircle,
   Receipt,
-  User,
-  Calendar,
-  DollarSign,
+  Mail,
 } from "lucide-react";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -87,9 +86,11 @@ function ReviewModal({
   const [action, setAction] = useState<"approve" | "reject" | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [receiptPreviewOpen, setReceiptPreviewOpen] = useState(false);
 
   const { mutateAsync: approve } = useApprovePaymentRequest(tenantId);
   const { mutateAsync: reject } = useRejectPaymentRequest(tenantId);
+  const { mutateAsync: requestReceipt } = useRequestPaymentReceipt(tenantId);
 
   if (!request) return null;
 
@@ -122,6 +123,19 @@ function ReviewModal({
       onClose();
     } catch (e: unknown) {
       setError((e as Error).message ?? "Failed to reject");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRequestReceipt() {
+    if (!request) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await requestReceipt({ requestId: request.id });
+    } catch (e: unknown) {
+      setError((e as Error).message ?? "Failed to request receipt");
     } finally {
       setLoading(false);
     }
@@ -198,28 +212,42 @@ function ReviewModal({
           {request.receiptUrl ? (
             <div>
               <p className="mb-2 text-xs text-white/40">Payment Receipt</p>
-              <div className="overflow-hidden rounded-xl border border-white/[0.08]">
+              <button
+                type="button"
+                onClick={() => setReceiptPreviewOpen(true)}
+                className="group relative block w-full overflow-hidden rounded-xl border border-white/[0.08]"
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={request.receiptUrl}
                   alt="Payment receipt"
-                  className="w-full object-contain max-h-64"
+                  className="max-h-64 w-full object-contain"
                 />
-              </div>
-              <a
-                href={request.receiptUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 flex items-center gap-1 text-xs text-blue-400 hover:underline"
-              >
-                <Eye className="h-3 w-3" />
-                View full image
-              </a>
+                <div className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-1 text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100">
+                  <Expand className="mr-1 inline h-3 w-3" />
+                  Full screen
+                </div>
+              </button>
+              <p className="mt-2 text-xs text-white/40">
+                Click receipt image to open full-screen preview.
+              </p>
             </div>
           ) : (
             <div className="rounded-lg border border-dashed border-white/[0.08] p-4 text-center">
               <Receipt className="mx-auto mb-1 h-6 w-6 text-white/20" />
               <p className="text-xs text-white/30">No receipt uploaded yet</p>
+              {!isReadOnly && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-3 h-8 gap-1"
+                  onClick={handleRequestReceipt}
+                  disabled={loading}
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  Request receipt from member
+                </Button>
+              )}
             </div>
           )}
 
@@ -363,6 +391,21 @@ function ReviewModal({
             </>
           )}
         </div>
+
+        <Dialog open={receiptPreviewOpen} onOpenChange={setReceiptPreviewOpen}>
+          <DialogContent className="max-w-5xl border-white/[0.12] bg-black/90 p-2">
+            {request.receiptUrl && (
+              <div className="flex max-h-[85vh] items-center justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={request.receiptUrl}
+                  alt="Receipt full preview"
+                  className="max-h-[82vh] w-auto max-w-full rounded-lg object-contain"
+                />
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {isReadOnly && (
           <DialogFooter>
