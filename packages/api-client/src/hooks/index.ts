@@ -5,7 +5,7 @@ export {
   useSignOut,
 } from "./auth";
 
-export { useUserProfile, useChangePassword } from "./users";
+export { useUserProfile, useChangePassword, useUpdateUserProfile } from "./users";
 
 export {
   useMyTenants,
@@ -103,11 +103,15 @@ export {
 export {
   useMemberships,
   useMembership,
+  useMyMembershipSubscriptions,
+  useMySubscriptions,
+  useTenantSubscriptions,
   useCreateMembership,
   useUpdateMembership,
   useDeleteMembership,
   useSubscribeToMembership,
 } from "./memberships";
+export type { MembershipSubscription } from "./memberships";
 
 export {
   useVouchers,
@@ -286,6 +290,7 @@ export {
 
 export {
   useEInvoiceRequests,
+  useEInvoiceLookup,
   useEInvoiceProfile,
   useSaveEInvoiceProfile,
   useCreateEInvoiceRequest,
@@ -294,6 +299,7 @@ export {
   useMarkEInvoiceRejected,
   useRevertEInvoiceToPending,
 } from "./einvoice";
+export type { EInvoiceRequest, EInvoiceProfile, EInvoiceLookupResponse } from "./einvoice";
 
 export {
   useStaffMembers,
@@ -328,8 +334,25 @@ export {
   usePaymentRequests,
   useApprovePaymentRequest,
   useRejectPaymentRequest,
+  useSendPaymentReminder,
+  useRequestPaymentReceipt,
 } from "./payment-requests";
 export type { PaymentRequest, PaymentRequestStatus, PaymentRequestPlanType } from "./payment-requests";
+
+export {
+  useInvoices,
+  useMyInvoices,
+  useInvoice,
+  useCreateInvoice,
+  useUpdateInvoice,
+  useEmailInvoice,
+} from "./invoices";
+export type {
+  Invoice,
+  InvoiceItem,
+  InvoiceStatus,
+  CreateInvoicePayload,
+} from "./invoices";
 
 export {
   useFeedBroadcasts,

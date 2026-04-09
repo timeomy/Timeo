@@ -72,7 +72,7 @@ export function useTenant(tenantId: string | null | undefined) {
 export function useTenantBySlug(slug: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.tenants.bySlug(slug ?? ""),
-    queryFn: () => api.get<Tenant>(`/api/tenants/slug/${slug}`),
+    queryFn: () => api.get<Tenant>(`/api/tenants/by-slug/${slug}`),
     enabled: !!slug,
   });
 }

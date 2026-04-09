@@ -24,11 +24,75 @@ interface Membership {
   updatedAt?: string;
 }
 
+export interface MembershipSubscription {
+  id: string;
+  customerId?: string;
+  memberName?: string;
+  memberEmail?: string;
+  membershipId?: string;
+  planName?: string;
+  planPrice?: number;
+  status: "active" | "past_due" | "canceled" | "incomplete";
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  cancelAtPeriodEnd?: boolean;
+  updatedAt?: string;
+  subscription?: {
+    id: string;
+    tenantId: string;
+    customerId: string;
+    membershipId: string;
+    status: "active" | "past_due" | "canceled" | "incomplete";
+    currentPeriodStart: string;
+    currentPeriodEnd: string;
+    cancelAtPeriodEnd: boolean;
+  };
+  plan?: {
+    name: string;
+    price: number;
+  };
+}
+
+export interface MyMembershipSubscription {
+  subscription: {
+    id: string;
+    status: string;
+    membershipId?: string | null;
+    membership_id?: string | null;
+    currentPeriodStart?: string;
+    current_period_start?: string;
+    currentPeriodEnd?: string;
+    current_period_end?: string;
+    cancelAtPeriodEnd?: boolean;
+    cancel_at_period_end?: boolean;
+    createdAt?: string;
+    created_at?: string;
+  };
+  plan: {
+    name: string | null;
+    price: number | null;
+  };
+}
+
 export function useMemberships(tenantId: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.memberships.all(tenantId ?? ""),
     queryFn: () =>
       api.get<Membership[]>(`/api/tenants/${tenantId}/memberships`),
+    enabled: !!tenantId,
+    staleTime: 30_000,
+  });
+}
+
+export function useMyMembershipSubscriptions(
+  tenantId: string | null | undefined,
+) {
+  return useQuery({
+    queryKey: queryKeys.memberships.mine(tenantId ?? ""),
+    queryFn: () =>
+      api.get<MyMembershipSubscription[]>(
+        `/api/tenants/${tenantId}/memberships/subscriptions/mine`,
+      ),
     enabled: !!tenantId,
     staleTime: 30_000,
   });
@@ -117,5 +181,29 @@ export function useSubscribeToMembership(tenantId: string) {
       queryClient.invalidateQueries({
         queryKey: queryKeys.memberships.all(tenantId),
       }),
+  });
+}
+
+export function useMySubscriptions(tenantId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.subscriptions.mine(tenantId ?? ""),
+    queryFn: () =>
+      api.get<MembershipSubscription[]>(
+        `/api/tenants/${tenantId}/memberships/subscriptions/mine`,
+      ),
+    enabled: !!tenantId,
+    staleTime: 15_000,
+  });
+}
+
+export function useTenantSubscriptions(tenantId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.subscriptions.all(tenantId ?? ""),
+    queryFn: () =>
+      api.get<MembershipSubscription[]>(
+        `/api/tenants/${tenantId}/memberships/subscriptions`,
+      ),
+    enabled: !!tenantId,
+    staleTime: 15_000,
   });
 }

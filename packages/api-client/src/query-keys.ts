@@ -60,6 +60,8 @@ export const queryKeys = {
   memberships: {
     all: (tenantId: string) => ["memberships", tenantId] as const,
     byId: (tenantId: string, id: string) => ["memberships", tenantId, id] as const,
+    mine: (tenantId: string) =>
+      ["memberships", tenantId, "subscriptions", "mine"] as const,
   },
 
   vouchers: {
@@ -166,6 +168,18 @@ export const queryKeys = {
     mine: (tenantId: string) => ["paymentRequests", tenantId, "mine"] as const,
     byId: (tenantId: string, id: string) =>
       ["paymentRequests", tenantId, id] as const,
+  },
+
+  invoices: {
+    all: (tenantId: string, filters?: Record<string, string>) =>
+      ["invoices", tenantId, filters ?? {}] as const,
+    mine: (tenantId: string) => ["invoices", tenantId, "mine"] as const,
+    byId: (tenantId: string, id: string) => ["invoices", tenantId, id] as const,
+  },
+
+  subscriptions: {
+    mine: (tenantId: string) => ["subscriptions", tenantId, "mine"] as const,
+    all: (tenantId: string) => ["subscriptions", tenantId] as const,
   },
 
   staff: {

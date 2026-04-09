@@ -12,6 +12,8 @@ export type PaymentRequestPlanType = "membership" | "session_package";
 export interface PaymentRequest {
   id: string;
   customerId: string;
+  memberName?: string;
+  memberEmail?: string;
   planId?: string;
   planReferenceType: PaymentRequestPlanType;
   planName: string;
@@ -129,6 +131,15 @@ export function useApprovePaymentRequest(tenantId: string) {
       queryClient.invalidateQueries({
         queryKey: queryKeys.paymentRequests.all(tenantId),
       });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.paymentRequests.mine(tenantId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.subscriptions.mine(tenantId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.subscriptions.all(tenantId),
+      });
       queryClient.invalidateQueries({ queryKey: ["gym", tenantId] });
     },
   });
@@ -152,6 +163,29 @@ export function useRejectPaymentRequest(tenantId: string) {
       queryClient.invalidateQueries({
         queryKey: queryKeys.paymentRequests.all(tenantId),
       });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.paymentRequests.mine(tenantId),
+      });
     },
+  });
+}
+
+export function useSendPaymentReminder(tenantId: string) {
+  return useMutation({
+    mutationFn: ({ requestId, message }: { requestId: string; message?: string }) =>
+      api.post<{ message: string }>(
+        `/api/tenants/${tenantId}/payment-requests/${requestId}/reminder`,
+        { message },
+      ),
+  });
+}
+
+export function useRequestPaymentReceipt(tenantId: string) {
+  return useMutation({
+    mutationFn: ({ requestId, message }: { requestId: string; message?: string }) =>
+      api.post<{ message: string }>(
+        `/api/tenants/${tenantId}/payment-requests/${requestId}/request-receipt`,
+        { message },
+      ),
   });
 }
