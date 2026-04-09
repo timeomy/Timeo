@@ -1206,7 +1206,7 @@ Time: 6.146s
 
 ---
 
-## Session: 2026-04-10 03:00 GMT+8 — Quality Gates Re-verification
+## Session: 2026-04-10 03:00 GMT+8 — Quality Gates Re-verification & CI/CD Improvements
 
 **Status Check:**
 - ✅ API Tests: 128 passing + 12 todo (0 failing) across 13 test files
@@ -1230,6 +1230,11 @@ Time: 6.146s
 - 5 test files (auth, bookings, gym, onboarding, platform)
 - 53 test cases registered and ready to execute
 - Coverage: Auth flows, Onboarding, Bookings, Gym member management, Platform admin
+
+**Proactive CI/CD Improvements (Apr 10):**
+- ✅ **Found & Fixed:** E2E workflow was missing gym.spec.ts tests
+- Impact: E2E workflow now runs all 53 tests (was only running 4 of 5 files)
+- Commit: 5e82035 — fix(ci): add missing gym.spec.ts to E2E workflow test suite
 
 **Next Steps if Assigned Work:**
 1. **Deployment Verification** → Run E2E tests against staging/production when infrastructure is ready
