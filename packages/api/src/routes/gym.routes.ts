@@ -8,6 +8,8 @@ import {
   users,
   tenantMemberships,
   subscriptions,
+  memberships,
+  paymentRequests,
   tenants,
   faceRegistrations,
   sessionPackages,
@@ -461,16 +463,16 @@ app.get(
   },
 );
 
-// ─── GET /members/:id — Member detail ───────────────────────────────────────
+// ─── GET /members/:memberId — Member detail ─────────────────────────────────
 
 app.get(
-  "/members/:id",
+  "/members/:memberId",
   authMiddleware,
   tenantMiddleware,
   requireRole("admin", "staff"),
   async (c) => {
     const tenantId = c.get("tenantId");
-    const memberId = c.req.param("id");
+    const memberId = c.req.param("memberId");
 
     try {
       // Get user + membership
@@ -480,6 +482,7 @@ app.get(
             id: users.id,
             name: users.name,
             email: users.email,
+            phone: users.phone,
             avatarUrl: users.avatar_url,
             createdAt: users.created_at,
           },
@@ -489,6 +492,7 @@ app.get(
             status: tenantMemberships.status,
             notes: tenantMemberships.notes,
             tags: tenantMemberships.tags,
+            memberId: tenantMemberships.member_id,
             joinedAt: tenantMemberships.joined_at,
             coachId: tenantMemberships.coach_id,
           },
@@ -507,26 +511,40 @@ app.get(
         return c.json(error("NOT_FOUND", "Member not found"), 404);
       }
 
-      // Get subscription status
       const now = new Date();
-      const [activeSub] = await db
+
+      // Current/latest subscription
+      const [latestSubscription] = await db
         .select({
           id: subscriptions.id,
           status: subscriptions.status,
+          membershipId: subscriptions.membership_id,
+          planName: memberships.name,
           currentPeriodStart: subscriptions.current_period_start,
           currentPeriodEnd: subscriptions.current_period_end,
           cancelAtPeriodEnd: subscriptions.cancel_at_period_end,
         })
         .from(subscriptions)
+        .leftJoin(memberships, eq(subscriptions.membership_id, memberships.id))
         .where(
           and(
             eq(subscriptions.tenant_id, tenantId),
             eq(subscriptions.customer_id, memberId),
-            eq(subscriptions.status, "active"),
-            gt(subscriptions.current_period_end, now),
           ),
         )
+        .orderBy(desc(subscriptions.current_period_end))
         .limit(1);
+
+      const subscriptionIsActive =
+        latestSubscription?.status === "active" &&
+        latestSubscription.currentPeriodEnd > now;
+
+      const membershipStatus =
+        memberRow.membership.status === "suspended"
+          ? "suspended"
+          : subscriptionIsActive
+            ? "active"
+            : "expired";
 
       // Get face registration status
       const faceRegs = await db
@@ -549,11 +567,15 @@ app.get(
         (reg) => reg.status === "synced" || reg.status === "pending",
       );
 
-      // Get recent check-ins (last 10)
-      const recentCheckIns = await db
+      // Check-in history
+      const checkInHistory = await db
         .select({
           id: checkIns.id,
           method: checkIns.method,
+          gate: checkIns.gate,
+          device: checkIns.device,
+          entryType: checkIns.entry_type,
+          notes: checkIns.notes,
           timestamp: checkIns.timestamp,
         })
         .from(checkIns)
@@ -564,18 +586,179 @@ app.get(
           ),
         )
         .orderBy(desc(checkIns.timestamp))
-        .limit(10);
+        ;
+
+      // Payment request history
+      const paymentHistory = await db
+        .select({
+          id: paymentRequests.id,
+          planName: paymentRequests.plan_name,
+          amount: paymentRequests.amount,
+          currency: paymentRequests.currency,
+          status: paymentRequests.status,
+          receiptUrl: paymentRequests.receipt_url,
+          memberNote: paymentRequests.member_note,
+          adminNote: paymentRequests.admin_note,
+          approvedAt: paymentRequests.approved_at,
+          rejectedAt: paymentRequests.rejected_at,
+          createdAt: paymentRequests.created_at,
+          updatedAt: paymentRequests.updated_at,
+        })
+        .from(paymentRequests)
+        .where(
+          and(
+            eq(paymentRequests.tenant_id, tenantId),
+            eq(paymentRequests.customer_id, memberId),
+          ),
+        )
+        .orderBy(desc(paymentRequests.created_at));
+
+      // Session credits
+      const credits = await db
+        .select({
+          id: sessionCredits.id,
+          packageId: sessionCredits.package_id,
+          packageName: sessionPackages.name,
+          totalSessions: sessionCredits.total_sessions,
+          usedSessions: sessionCredits.used_sessions,
+          expiresAt: sessionCredits.expires_at,
+          purchasedAt: sessionCredits.purchased_at,
+        })
+        .from(sessionCredits)
+        .leftJoin(sessionPackages, eq(sessionCredits.package_id, sessionPackages.id))
+        .where(
+          and(
+            eq(sessionCredits.tenant_id, tenantId),
+            eq(sessionCredits.user_id, memberId),
+          ),
+        )
+        .orderBy(desc(sessionCredits.purchased_at));
+
+      // Class enrollments (legacy WS Fitness tables)
+      let classEnrollments: Array<{
+        id: string;
+        classId: string;
+        className: string | null;
+        status: string;
+        waitlistPosition: number | null;
+        startTime: Date | null;
+        location: string | null;
+        enrolledAt: Date;
+        attendedAt: Date | null;
+      }> = [];
+
+      try {
+        const enrollmentRows = await db.execute(sql`
+          SELECT
+            ce.id,
+            ce.class_id AS "classId",
+            ce.status,
+            ce.waitlist_position AS "waitlistPosition",
+            ce.created_at AS "enrolledAt",
+            ce.attended_at AS "attendedAt",
+            gc.name AS "className",
+            gc.start_time AS "startTime",
+            gc.location
+          FROM class_enrollments ce
+          LEFT JOIN group_classes gc ON gc.id = ce.class_id
+          WHERE ce.tenant_id = ${tenantId}
+            AND ce.user_id = ${memberId}
+          ORDER BY COALESCE(gc.start_time, ce.created_at) DESC, ce.created_at DESC
+        `);
+
+        const enrollmentRecords = enrollmentRows as unknown as Array<
+          Record<string, unknown>
+        >;
+
+        classEnrollments = enrollmentRecords.map((row) => {
+          const waitlistValue = row.waitlistPosition;
+          return {
+            id: String(row.id ?? ""),
+            classId: String(row.classId ?? ""),
+            className: row.className ? String(row.className) : null,
+            status: String(row.status ?? "enrolled"),
+            waitlistPosition:
+              waitlistValue === null || waitlistValue === undefined
+                ? null
+                : Number.isFinite(Number(waitlistValue))
+                  ? Number(waitlistValue)
+                  : null,
+            startTime:
+              row.startTime instanceof Date
+                ? row.startTime
+                : row.startTime
+                  ? new Date(String(row.startTime))
+                  : null,
+            location: row.location ? String(row.location) : null,
+            enrolledAt:
+              row.enrolledAt instanceof Date
+                ? row.enrolledAt
+                : new Date(String(row.enrolledAt ?? new Date().toISOString())),
+            attendedAt:
+              row.attendedAt instanceof Date
+                ? row.attendedAt
+                : row.attendedAt
+                  ? new Date(String(row.attendedAt))
+                  : null,
+          };
+        });
+      } catch (queryErr) {
+        const code = (queryErr as { code?: string })?.code;
+        if (code !== "42P01") {
+          throw queryErr;
+        }
+      }
+
+      const tags = Array.isArray(memberRow.membership.tags)
+        ? memberRow.membership.tags
+            .map((tag) => (typeof tag === "string" ? tag.trim() : ""))
+            .filter(Boolean)
+        : [];
 
       return c.json(
         success({
-          user: memberRow.user,
-          membership: memberRow.membership,
-          subscription: activeSub ?? null,
+          user: {
+            ...memberRow.user,
+            memberId: memberRow.membership.memberId,
+          },
+          membership: {
+            ...memberRow.membership,
+            tags,
+          },
+          membershipStatus,
+          subscription: latestSubscription
+            ? {
+                id: latestSubscription.id,
+                status: latestSubscription.status,
+                membershipId: latestSubscription.membershipId,
+                planName: latestSubscription.planName,
+                currentPeriodStart: latestSubscription.currentPeriodStart,
+                currentPeriodEnd: latestSubscription.currentPeriodEnd,
+                startDate: latestSubscription.currentPeriodStart,
+                endDate: latestSubscription.currentPeriodEnd,
+                cancelAtPeriodEnd: latestSubscription.cancelAtPeriodEnd,
+                daysRemaining: Math.ceil(
+                  (latestSubscription.currentPeriodEnd.getTime() - now.getTime()) /
+                    86400000,
+                ),
+                isActive: subscriptionIsActive,
+              }
+            : null,
+          payments: paymentHistory,
+          checkIns: checkInHistory,
+          recentCheckIns: checkInHistory.slice(0, 10),
+          classEnrollments,
+          sessionCredits: credits.map((credit) => ({
+            ...credit,
+            remainingSessions: Math.max(
+              0,
+              (credit.totalSessions ?? 0) - (credit.usedSessions ?? 0),
+            ),
+          })),
           faceRegistration: {
             registered: hasFaceRegistered,
             registrations: faceRegs,
           },
-          recentCheckIns,
         }),
       );
     } catch (err) {

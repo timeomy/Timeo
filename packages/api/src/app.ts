@@ -89,6 +89,7 @@ export function createApp() {
   app.route("/api/tenants/:tenantId/staff", staffRouter);
   app.route("/api/tenants/:tenantId/turnstile", turnstileRouter);
   app.route("/api/tenants/:tenantId/gym", gymRouter);
+  app.route("/api/tenants/:tenantId", gymRouter);
   app.route("/api/tenants/:tenantId/mission-control", missionControlRouter);
   app.route("/api/tenants/:tenantId/coaches", coachRouter);
   app.route("/api/tenants/:tenantId/ui-config", uiConfigRouter);
