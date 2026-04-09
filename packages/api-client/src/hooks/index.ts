@@ -345,9 +345,10 @@ export type { Broadcast, ServiceCatalogItem, DiscoverFeed } from "./feed";
 
 export {
   useGymMembers,
+  useMemberDetail,
   useCoaches,
 } from "./gym";
-export type { GymMember, CoachOption } from "./gym";
+export type { GymMember, CoachOption, MemberDetail } from "./gym";
 
 export {
   useMissionControl,

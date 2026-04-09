@@ -46,6 +46,95 @@ type CoachApiResponse = {
   role: string;
 };
 
+export interface MemberDetail {
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+    avatarUrl: string | null;
+    memberId: string | null;
+    createdAt: string;
+  };
+  membership: {
+    id: string;
+    role: string;
+    status: string;
+    notes: string | null;
+    tags: string[];
+    memberId: string | null;
+    joinedAt: string;
+    coachId: string | null;
+  };
+  membershipStatus: "active" | "suspended" | "expired";
+  subscription: {
+    id: string;
+    status: string;
+    membershipId: string;
+    planName: string | null;
+    currentPeriodStart: string;
+    currentPeriodEnd: string;
+    startDate: string;
+    endDate: string;
+    cancelAtPeriodEnd: boolean;
+    daysRemaining: number;
+    isActive: boolean;
+  } | null;
+  payments: Array<{
+    id: string;
+    planName: string;
+    amount: number;
+    currency: string;
+    status: string;
+    receiptUrl: string | null;
+    memberNote: string | null;
+    adminNote: string | null;
+    approvedAt: string | null;
+    rejectedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  checkIns: Array<{
+    id: string;
+    method: string;
+    gate: string | null;
+    device: string | null;
+    entryType: string | null;
+    notes: string | null;
+    timestamp: string;
+  }>;
+  classEnrollments: Array<{
+    id: string;
+    classId: string;
+    className: string | null;
+    status: string;
+    waitlistPosition: number | null;
+    startTime: string | null;
+    location: string | null;
+    enrolledAt: string;
+    attendedAt: string | null;
+  }>;
+  sessionCredits: Array<{
+    id: string;
+    packageId: string;
+    packageName: string | null;
+    totalSessions: number;
+    usedSessions: number;
+    remainingSessions: number;
+    expiresAt: string | null;
+    purchasedAt: string;
+  }>;
+  faceRegistration?: {
+    registered: boolean;
+    registrations: Array<{ id: string; status: string }>;
+  };
+  recentCheckIns?: Array<{
+    id: string;
+    method: string;
+    timestamp: string;
+  }>;
+}
+
 export function useGymMembers(tenantId: string | null | undefined) {
   return useQuery({
     queryKey: ["gym", tenantId, "members"],
@@ -79,6 +168,21 @@ export function useGymMembers(tenantId: string | null | undefined) {
 
       return allMembers;
     },
+  });
+}
+
+export function useMemberDetail(
+  tenantId: string | null | undefined,
+  memberId: string | null | undefined,
+) {
+  return useQuery({
+    queryKey: ["gym", tenantId, "member-detail", memberId],
+    enabled: !!tenantId && !!memberId,
+    staleTime: 10_000,
+    queryFn: () =>
+      api.get<MemberDetail>(
+        `/api/tenants/${tenantId}/members/${encodeURIComponent(memberId ?? "")}`,
+      ),
   });
 }
 
