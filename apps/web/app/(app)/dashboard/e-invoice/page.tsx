@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   useEInvoiceProfile,
   useSaveEInvoiceProfile,
@@ -136,7 +137,14 @@ export default function EInvoiceSettingsPage() {
             Manage your LHDN MyInvois taxpayer profile and e-invoice requests.
           </p>
         </div>
-        <div className="flex rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5">
+        <div className="flex items-center gap-2">
+          <Link href="/dashboard/invoices">
+            <Button variant="outline" size="sm" className="h-8">
+              Invoice Center
+            </Button>
+          </Link>
+
+          <div className="flex rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5">
           <button
             onClick={() => setTab("profile")}
             className={cn(
@@ -159,6 +167,7 @@ export default function EInvoiceSettingsPage() {
           >
             Requests
           </button>
+          </div>
         </div>
       </div>
 

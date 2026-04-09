@@ -163,6 +163,8 @@ const sidebarSections: SidebarSection[] = [
       { href: "/dashboard/gym/members", label: "Members", icon: UserCheck },
       { href: "/dashboard/team", label: "Team", icon: Users },
       { href: "/dashboard/gym/payments", label: "Payments", icon: CreditCard },
+      { href: "/dashboard/billing", label: "Billing", icon: FileText },
+      { href: "/dashboard/invoices", label: "Invoices", icon: FileText },
       { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
     ],
   },
