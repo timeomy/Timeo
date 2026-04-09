@@ -9,13 +9,16 @@ import {
   subscriptions,
   sessionCredits,
   memberQrCodes,
+  users,
 } from "@timeo/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { generateId } from "@timeo/db";
+import { sendMail } from "@timeo/auth/email";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
 import { requireRole } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
+import { createNotification } from "../services/notification.service.js";
 
 const app = new Hono();
 
@@ -40,6 +43,16 @@ const RejectRequestSchema = z.object({
   adminNote: z.string().min(1).max(500),
 });
 
+const ReminderSchema = z.object({
+  message: z.string().max(500).optional(),
+});
+
+function addMonths(base: Date, months: number): Date {
+  const next = new Date(base);
+  next.setMonth(next.getMonth() + months);
+  return next;
+}
+
 // ─── GET /tenants/:tenantId/payment-requests — admin: list all ──────────────
 app.get(
   "/",
@@ -54,6 +67,8 @@ app.get(
       .select({
         id: paymentRequests.id,
         customerId: paymentRequests.customer_id,
+        memberName: users.name,
+        memberEmail: users.email,
         planId: paymentRequests.plan_id,
         planReferenceType: paymentRequests.plan_reference_type,
         planName: paymentRequests.plan_name,
@@ -74,6 +89,7 @@ app.get(
         updatedAt: paymentRequests.updated_at,
       })
       .from(paymentRequests)
+      .leftJoin(users, eq(paymentRequests.customer_id, users.id))
       .where(
         status
           ? and(
@@ -275,21 +291,51 @@ app.post(
     let sessionCreditId: string | null = null;
 
     if (req.plan_reference_type === "membership") {
-      // Create subscription
+      // Extend existing subscription if present; otherwise create a new one.
       const durationMonths = req.plan_duration_months ?? 1;
-      const periodEnd = new Date(now);
-      periodEnd.setMonth(periodEnd.getMonth() + durationMonths);
+      const [existingSub] = await db
+        .select()
+        .from(subscriptions)
+        .where(
+          and(
+            eq(subscriptions.tenant_id, tenantId),
+            eq(subscriptions.customer_id, req.customer_id),
+          ),
+        )
+        .orderBy(desc(subscriptions.current_period_end))
+        .limit(1);
 
-      subscriptionId = generateId();
-      await db.insert(subscriptions).values({
-        id: subscriptionId,
-        tenant_id: tenantId,
-        customer_id: req.customer_id,
-        membership_id: req.plan_id!,
-        status: "active",
-        current_period_start: now,
-        current_period_end: periodEnd,
-      });
+      const extensionBase =
+        existingSub && existingSub.current_period_end > now
+          ? existingSub.current_period_end
+          : now;
+      const periodEnd = addMonths(extensionBase, durationMonths);
+
+      if (existingSub) {
+        subscriptionId = existingSub.id;
+        await db
+          .update(subscriptions)
+          .set({
+            membership_id: req.plan_id!,
+            status: "active",
+            current_period_start: now,
+            current_period_end: periodEnd,
+            cancel_at_period_end: false,
+            updated_at: now,
+          })
+          .where(eq(subscriptions.id, existingSub.id));
+      } else {
+        subscriptionId = generateId();
+        await db.insert(subscriptions).values({
+          id: subscriptionId,
+          tenant_id: tenantId,
+          customer_id: req.customer_id,
+          membership_id: req.plan_id!,
+          status: "active",
+          current_period_start: now,
+          current_period_end: periodEnd,
+        });
+      }
 
       // Ensure member has an active QR code
       const existingQr = await db
@@ -314,16 +360,15 @@ app.post(
           user_id: req.customer_id,
           code,
           is_active: true,
-          expires_at: new Date(Date.now() + durationMonths * 30 * 24 * 60 * 60 * 1000),
+          expires_at: periodEnd,
         });
       } else {
         // Update expiry of existing QR
-        const durationMonths2 = req.plan_duration_months ?? 1;
         await db
           .update(memberQrCodes)
           .set({
             is_active: true,
-            expires_at: new Date(Date.now() + durationMonths2 * 30 * 24 * 60 * 60 * 1000),
+            expires_at: periodEnd,
           })
           .where(eq(memberQrCodes.id, existingQr[0].id));
       }
@@ -357,6 +402,47 @@ app.post(
         updated_at: now,
       })
       .where(eq(paymentRequests.id, requestId));
+
+    await createNotification({
+      userId: req.customer_id,
+      tenantId,
+      type: "payment_received",
+      title: "Payment approved",
+      body:
+        req.plan_reference_type === "membership"
+          ? `Your ${req.plan_name} subscription has been activated.`
+          : `Your ${req.plan_name} top-up has been added to your account.`,
+      data: {
+        paymentRequestId: requestId,
+        subscriptionId,
+        sessionCreditId,
+      },
+    });
+
+    try {
+      const [member] = await db
+        .select({ email: users.email, name: users.name })
+        .from(users)
+        .where(eq(users.id, req.customer_id))
+        .limit(1);
+
+      if (member?.email) {
+        await sendMail({
+          to: member.email,
+          subject: `Payment Approved — ${req.plan_name}`,
+          html: `
+            <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;">
+              <h2 style="margin:0 0 12px;">Payment Approved</h2>
+              <p style="margin:0 0 8px;">Hi ${member.name ?? "there"},</p>
+              <p style="margin:0 0 8px;">Your payment for <strong>${req.plan_name}</strong> has been approved.</p>
+              <p style="margin:0;">Your membership/credits are now active.</p>
+            </div>
+          `,
+        });
+      }
+    } catch (mailError) {
+      console.error("Failed to send approval email:", mailError);
+    }
 
     return c.json(
       success({
@@ -411,7 +497,182 @@ app.post(
       })
       .where(eq(paymentRequests.id, requestId));
 
+    await createNotification({
+      userId: req.customer_id,
+      tenantId,
+      type: "system",
+      title: "Payment request rejected",
+      body: `Your payment request for ${req.plan_name} was rejected. Reason: ${body.adminNote}`,
+      data: {
+        paymentRequestId: requestId,
+      },
+    });
+
+    try {
+      const [member] = await db
+        .select({ email: users.email, name: users.name })
+        .from(users)
+        .where(eq(users.id, req.customer_id))
+        .limit(1);
+
+      if (member?.email) {
+        await sendMail({
+          to: member.email,
+          subject: `Payment Rejected — ${req.plan_name}`,
+          html: `
+            <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;">
+              <h2 style="margin:0 0 12px;">Payment Request Rejected</h2>
+              <p style="margin:0 0 8px;">Hi ${member.name ?? "there"},</p>
+              <p style="margin:0 0 8px;">Your payment request for <strong>${req.plan_name}</strong> was rejected.</p>
+              <p style="margin:0;"><strong>Reason:</strong> ${body.adminNote}</p>
+            </div>
+          `,
+        });
+      }
+    } catch (mailError) {
+      console.error("Failed to send rejection email:", mailError);
+    }
+
     return c.json(success({ message: "Payment request rejected." }));
+  },
+);
+
+// ─── POST /tenants/:tenantId/payment-requests/:id/reminder — admin reminder ─
+app.post(
+  "/:id/reminder",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  zValidator("json", ReminderSchema),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+    const requestId = c.req.param("id");
+    const body = c.req.valid("json");
+
+    const rows = await db
+      .select({ request: paymentRequests, memberName: users.name, memberEmail: users.email })
+      .from(paymentRequests)
+      .leftJoin(users, eq(paymentRequests.customer_id, users.id))
+      .where(
+        and(
+          eq(paymentRequests.id, requestId),
+          eq(paymentRequests.tenant_id, tenantId),
+        ),
+      )
+      .limit(1);
+
+    const row = rows[0];
+    if (!row) {
+      return c.json(error("NOT_FOUND", "Payment request not found"), 404);
+    }
+
+    if (row.request.status !== "pending_verification") {
+      return c.json(
+        error("INVALID_STATE", "Reminder can only be sent for pending requests"),
+        422,
+      );
+    }
+
+    const message =
+      body.message ??
+      `Reminder: Please complete your payment receipt submission for ${row.request.plan_name}.`;
+
+    await createNotification({
+      userId: row.request.customer_id,
+      tenantId,
+      type: "system",
+      title: "Payment reminder",
+      body: message,
+      data: { paymentRequestId: requestId },
+    });
+
+    if (row.memberEmail) {
+      try {
+        await sendMail({
+          to: row.memberEmail,
+          subject: `Payment Reminder — ${row.request.plan_name}`,
+          html: `
+            <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;">
+              <h2 style="margin:0 0 12px;">Payment Reminder</h2>
+              <p style="margin:0 0 8px;">Hi ${row.memberName ?? "there"},</p>
+              <p style="margin:0;">${message}</p>
+            </div>
+          `,
+        });
+      } catch (mailError) {
+        console.error("Failed to send reminder email:", mailError);
+      }
+    }
+
+    return c.json(success({ message: "Payment reminder sent." }));
+  },
+);
+
+// ─── POST /tenants/:tenantId/payment-requests/:id/request-receipt ───────────
+app.post(
+  "/:id/request-receipt",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  zValidator("json", ReminderSchema),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+    const requestId = c.req.param("id");
+    const body = c.req.valid("json");
+
+    const rows = await db
+      .select({ request: paymentRequests, memberName: users.name, memberEmail: users.email })
+      .from(paymentRequests)
+      .leftJoin(users, eq(paymentRequests.customer_id, users.id))
+      .where(
+        and(
+          eq(paymentRequests.id, requestId),
+          eq(paymentRequests.tenant_id, tenantId),
+        ),
+      )
+      .limit(1);
+
+    const row = rows[0];
+    if (!row) {
+      return c.json(error("NOT_FOUND", "Payment request not found"), 404);
+    }
+
+    if (row.request.receipt_url) {
+      return c.json(error("INVALID_STATE", "Receipt already uploaded"), 422);
+    }
+
+    const message =
+      body.message ??
+      `Please upload your payment receipt for ${row.request.plan_name} so we can verify and activate your package.`;
+
+    await createNotification({
+      userId: row.request.customer_id,
+      tenantId,
+      type: "receipt",
+      title: "Receipt required",
+      body: message,
+      data: { paymentRequestId: requestId },
+    });
+
+    if (row.memberEmail) {
+      try {
+        await sendMail({
+          to: row.memberEmail,
+          subject: `Receipt Needed — ${row.request.plan_name}`,
+          html: `
+            <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;">
+              <h2 style="margin:0 0 12px;">Receipt Required</h2>
+              <p style="margin:0 0 8px;">Hi ${row.memberName ?? "there"},</p>
+              <p style="margin:0;">${message}</p>
+            </div>
+          `,
+        });
+      } catch (mailError) {
+        console.error("Failed to send receipt request email:", mailError);
+      }
+    }
+
+    return c.json(success({ message: "Receipt request sent." }));
   },
 );
 

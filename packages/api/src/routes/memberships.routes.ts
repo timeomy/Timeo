@@ -86,6 +86,40 @@ app.get("/subscriptions/mine", authMiddleware, tenantMiddleware, async (c) => {
   return c.json(success(rows));
 });
 
+// GET /tenants/:tenantId/memberships/subscriptions - admin list all
+app.get(
+  "/subscriptions",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+
+    const rows = await db
+      .select({
+        id: subscriptions.id,
+        customerId: subscriptions.customer_id,
+        memberName: users.name,
+        memberEmail: users.email,
+        membershipId: subscriptions.membership_id,
+        planName: memberships.name,
+        planPrice: memberships.price,
+        status: subscriptions.status,
+        currentPeriodStart: subscriptions.current_period_start,
+        currentPeriodEnd: subscriptions.current_period_end,
+        cancelAtPeriodEnd: subscriptions.cancel_at_period_end,
+        updatedAt: subscriptions.updated_at,
+      })
+      .from(subscriptions)
+      .leftJoin(users, eq(subscriptions.customer_id, users.id))
+      .leftJoin(memberships, eq(subscriptions.membership_id, memberships.id))
+      .where(eq(subscriptions.tenant_id, tenantId))
+      .orderBy(desc(subscriptions.current_period_end));
+
+    return c.json(success(rows));
+  },
+);
+
 // POST /tenants/:tenantId/memberships/:planId/subscribe
 app.post(
   "/:planId/subscribe",

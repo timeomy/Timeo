@@ -44,6 +44,12 @@ export const invoices = pgTable(
   (t) => [
     index("invoices_tenant_id_idx").on(t.tenant_id),
     index("invoices_user_id_idx").on(t.user_id),
+    index("invoices_tenant_status_idx").on(t.tenant_id, t.status),
+    index("invoices_tenant_issue_date_idx").on(t.tenant_id, t.issue_date),
+    uniqueIndex("invoices_tenant_invoice_number_idx").on(
+      t.tenant_id,
+      t.invoice_number,
+    ),
     uniqueIndex("invoices_tenant_external_id_idx").on(t.tenant_id, t.external_id),
   ],
 );
@@ -79,4 +85,3 @@ export const invoiceItems = pgTable(
     ),
   ],
 );
-
