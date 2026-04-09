@@ -31,9 +31,10 @@ const templateWriteAllowlist = new Set([
   "tenant_ui_overrides",
 ]);
 
-const migrationWriteAllowlistSet = new Set<string>(
-  TEMPLATE_MIGRATION_WRITE_ALLOWLIST,
-);
+// Lazy-load to support mocking in tests
+function getMigrationWriteAllowlistSet() {
+  return new Set<string>(TEMPLATE_MIGRATION_WRITE_ALLOWLIST ?? []);
+}
 
 function assertTemplateWriteAllowed(tableName: string) {
   if (!templateWriteAllowlist.has(tableName)) {
@@ -48,15 +49,16 @@ function assertMigrationAllowlist(confirmWriteTables?: string[]) {
     return;
   }
 
+  const allowlist = getMigrationWriteAllowlistSet();
   const requestedSet = new Set(confirmWriteTables);
-  if (requestedSet.size !== migrationWriteAllowlistSet.size) {
+  if (requestedSet.size !== allowlist.size) {
     throw new Error(
       `Invalid write allowlist. Expected exactly: ${TEMPLATE_MIGRATION_WRITE_ALLOWLIST.join(", ")}`,
     );
   }
 
   for (const tableName of requestedSet) {
-    if (!migrationWriteAllowlistSet.has(tableName)) {
+    if (!allowlist.has(tableName)) {
       throw new Error(`Invalid write allowlist table: ${tableName}`);
     }
   }

@@ -92,7 +92,7 @@ export default function EInvoicePage() {
           lookupData.transaction?.receiptNumber ?? lookupData.receiptNumber,
         status: lookupData.transaction?.status,
         date: lookupData.transaction?.date,
-        items: lookupData.transaction?.items ?? [],
+        items: (lookupData.transaction?.items ?? []) as Array<{ name: string; quantity: number; price: number }>,
         total: lookupData.transaction?.total ?? 0,
         currency: lookupData.transaction?.currency ?? "MYR",
       }

@@ -14,5 +14,6 @@ export default defineConfig({
     include: ["src/__tests__/**/*.test.ts"],
     setupFiles: ["src/__tests__/setup.ts"],
     testTimeout: 10_000,
+    unstubGlobals: true,
   },
 });

@@ -19,6 +19,10 @@ vi.mock("@timeo/auth/server", () => ({
 
 // Mock @timeo/db
 vi.mock("@timeo/db", () => ({
+  TEMPLATE_MIGRATION_WRITE_ALLOWLIST: [
+    "tenant_template_assignments",
+    "tenant_ui_overrides",
+  ],
   db: {
     select: vi.fn(),
     insert: vi.fn(),
@@ -27,6 +31,8 @@ vi.mock("@timeo/db", () => ({
     execute: vi.fn(),
   },
   generateId: vi.fn(() => "gym_test_id_12345678"),
+  runTenantTemplateMigration: vi.fn(),
+  normalizeIndustry: vi.fn((industry: string) => industry),
 }));
 
 // Mock @timeo/db/schema
@@ -34,7 +40,7 @@ vi.mock("@timeo/db/schema", () => ({
   users: { id: "id", auth_id: "auth_id", email: "email", name: "name", avatar_url: "avatar_url", nfc_card_id: "nfc_card_id", created_at: "created_at", updated_at: "updated_at", role: "role", force_password_reset: "force_password_reset" },
   tenants: { id: "id", slug: "slug" },
   tenantMemberships: { id: "id", user_id: "user_id", tenant_id: "tenant_id", role: "role", status: "status", notes: "notes", tags: "tags", joined_at: "joined_at" },
-  checkIns: { id: "id", tenant_id: "tenant_id", user_id: "user_id", method: "method", timestamp: "timestamp" },
+  checkIns: { id: "id", tenant_id: "tenant_id", user_id: "user_id", method: "method", timestamp: "timestamp", gate: "gate", device: "device", entry_type: "entry_type", notes: "notes" },
   subscriptions: { id: "id", tenant_id: "tenant_id", customer_id: "customer_id", membership_id: "membership_id", status: "status", current_period_start: "current_period_start", current_period_end: "current_period_end", cancel_at_period_end: "cancel_at_period_end" },
   faceRegistrations: { id: "id", tenant_id: "tenant_id", user_id: "user_id", device_sn: "device_sn", device_person_id: "device_person_id", status: "status", registered_at: "registered_at", synced_at: "synced_at" },
   accessLogs: { id: "id", tenant_id: "tenant_id", device_sn: "device_sn", user_id: "user_id", match_result: "match_result" },
@@ -44,11 +50,12 @@ vi.mock("@timeo/db/schema", () => ({
   products: {},
   orders: {},
   orderItems: {},
-  memberships: {},
+  memberships: { id: "id", name: "name" },
+  paymentRequests: { id: "id", tenant_id: "tenant_id", customer_id: "customer_id", plan_name: "plan_name", amount: "amount", currency: "currency", status: "status", receipt_url: "receipt_url", member_note: "member_note", admin_note: "admin_note", approved_at: "approved_at", rejected_at: "rejected_at", created_at: "created_at", updated_at: "updated_at" },
   payments: {},
   posTransactions: {},
-  sessionPackages: {},
-  sessionCredits: {},
+  sessionPackages: { id: "id", name: "name" },
+  sessionCredits: { id: "id", tenant_id: "tenant_id", user_id: "user_id", package_id: "package_id", total_sessions: "total_sessions", used_sessions: "used_sessions", expires_at: "expires_at", purchased_at: "purchased_at" },
   sessionLogs: {},
   vouchers: {},
   voucherRedemptions: {},
@@ -542,12 +549,14 @@ describe("GET /api/tenants/:tenantId/gym/members/:id", () => {
     };
 
     // Queries made:
-    // 1. Auth middleware: user lookup .where().limit(1) → [TEST_ADMIN]
-    // 2. Tenant middleware: membership check .where().limit(1) → [TEST_MEMBERSHIP_ADMIN]
-    // 3. Member detail: .innerJoin().where().limit(1) → [mockMember]
-    // 4. Subscription: .where().limit(1) → [mockActiveSub]
-    // 5. Face registrations: .where() (no limit) → []
-    // 6. Recent check-ins: .where().orderBy().limit(10) → []
+    // 1. Auth middleware: user lookup
+    // 2. Tenant middleware: membership check
+    // 3. Member detail: .innerJoin().where().limit(1)
+    // 4. Subscription: .leftJoin().where().orderBy().limit(1)
+    // 5. Face registrations: .where()
+    // 6. Check-ins: .where().orderBy().limit()
+    // 7. Payment history: .where().orderBy()
+    // 8. Session credits: .leftJoin().where().orderBy()
     let selectCallCount = 0;
     mockDb.select.mockImplementation(() => {
       selectCallCount++;
@@ -557,7 +566,7 @@ describe("GET /api/tenants/:tenantId/gym/members/:id", () => {
         return { from: vi.fn().mockReturnValue(ce) };
       }
       if (selectCallCount === 2) {
-        // Tenant middleware membership check
+        // Tenant middleware: membership check
         const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([TEST_MEMBERSHIP_ADMIN]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
@@ -567,17 +576,32 @@ describe("GET /api/tenants/:tenantId/gym/members/:id", () => {
         return { from: vi.fn().mockReturnValue(ce) };
       }
       if (selectCallCount === 4) {
-        // Subscription: .where().limit()
-        const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([mockActiveSub]) };
+        // Subscription: .leftJoin().where().orderBy().limit()
+        const ce = { leftJoin: vi.fn().mockReturnThis(), where: vi.fn().mockReturnThis(), orderBy: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([mockActiveSub]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
       if (selectCallCount === 5) {
-        // Face registrations: .where() (no limit!)
+        // Face registrations: .where()
         const ce = { where: vi.fn().mockResolvedValue([]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
-      // Recent check-ins: .where().orderBy().limit()
-      const ce = { where: vi.fn().mockReturnThis(), orderBy: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([]) };
+      if (selectCallCount === 6) {
+        // Check-ins: .where().orderBy() [no limit]
+        const ce = { where: vi.fn().mockReturnThis(), orderBy: vi.fn().mockResolvedValue([]) };
+        return { from: vi.fn().mockReturnValue(ce) };
+      }
+      if (selectCallCount === 7) {
+        // Payment history: .where().orderBy()
+        const ce = { where: vi.fn().mockReturnThis(), orderBy: vi.fn().mockResolvedValue([]) };
+        return { from: vi.fn().mockReturnValue(ce) };
+      }
+      if (selectCallCount === 8) {
+        // Session credits: .leftJoin().where().orderBy()
+        const ce = { leftJoin: vi.fn().mockReturnThis(), where: vi.fn().mockReturnThis(), orderBy: vi.fn().mockResolvedValue([]) };
+        return { from: vi.fn().mockReturnValue(ce) };
+      }
+      // Fallback for any additional queries
+      const ce = { where: vi.fn().mockReturnThis(), orderBy: vi.fn().mockReturnThis(), leftJoin: vi.fn().mockReturnThis(), innerJoin: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([]) };
       return { from: vi.fn().mockReturnValue(ce) };
     });
 

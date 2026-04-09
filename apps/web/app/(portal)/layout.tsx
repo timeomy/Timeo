@@ -1,52 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
+import { useEffect } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { usePathname, useRouter } from "next/navigation";
 import { resolveHomePath, useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
-import { getInitials } from "@timeo/shared";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
 import { useEnsureMembership } from "@/hooks/use-ensure-membership";
 import { useTenantId } from "@/hooks/use-tenant-id";
-import { useTenant } from "@timeo/api-client";
-import {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-  Separator,
-  cn,
-} from "@timeo/ui/web";
 import { TimeoLogo } from "@/timeo-logo";
-import { NotificationsBell } from "@/notifications-bell";
-import { ViewModeSwitcher } from "@/view-mode-switcher";
-import {
-  Home,
-  Calendar,
-  Package,
-  Ticket,
-  QrCode,
-  Receipt,
-  Menu,
-  X,
-  LogOut,
-  User,
-  ChevronDown,
-  Search,
-} from "lucide-react";
-
-type NavLink = {
-  href: string;
-  label: string;
-  icon: React.ElementType;
-};
-
-const navLinks: NavLink[] = [
-  { href: "/portal", label: "Home", icon: Home },
-  { href: "/portal/directory", label: "Browse", icon: Search },
-  { href: "/portal/bookings", label: "Bookings", icon: Calendar },
-  { href: "/portal/packages", label: "Packages", icon: Package },
-];
+import { BottomTabs } from "@/member/bottom-tabs";
 
 export default function PortalLayout({
   children,
@@ -58,8 +20,6 @@ export default function PortalLayout({
   const {
     isLoaded,
     isSignedIn,
-    user,
-    signOut,
     isPlatformAdmin,
     viewMode,
     activeTenantId,
@@ -69,10 +29,6 @@ export default function PortalLayout({
   useEnsureUser(!!isSignedIn);
   const { tenantId } = useTenantId();
   useEnsureMembership(tenantId);
-  const { data: tenantData } = useTenant(tenantId);
-  const tenantLogoUrl = tenantData?.branding?.logoUrl ?? "/tenants/ws-fitness-logo.png";
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const homePath = resolveHomePath({
     platformRole: isPlatformAdmin ? "platform_admin" : "user",
@@ -81,8 +37,6 @@ export default function PortalLayout({
     activeTenantId,
     viewAsRole,
   });
-
-  const displayName = user?.name || user?.email || "User";
 
   // Redirect logic in useEffect to avoid infinite re-render loops
   useEffect(() => {
@@ -118,204 +72,24 @@ export default function PortalLayout({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      {/* Top Navigation Bar */}
-      <header className="glass-nav sticky top-0 z-50 border-b border-white/[0.06]">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          {/* Left: Logo */}
-          <div className="flex items-center gap-6">
-            <Link href="/portal" className="flex items-center gap-2">
-              {/* Tenant branding: dynamic logo from tenant settings, fallback to WS Fitness logo */}
-              <img
-                src={tenantLogoUrl}
-                alt="Gym Logo"
-                className="h-8 w-auto"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.display = "none";
-                }}
-              />
-            </Link>
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.16),transparent_46%)]" />
 
-            {/* Desktop Nav Links */}
-            <nav className="hidden items-center gap-1 md:flex">
-              {navLinks.map((link) => {
-                const isActive =
-                  pathname === link.href ||
-                  (link.href !== "/portal" &&
-                    pathname.startsWith(link.href + "/"));
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={cn(
-                      "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all",
-                      isActive
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
-                    )}
-                  >
-                    <link.icon className="h-4 w-4" />
-                    {link.label}
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-
-          {/* Right: Notifications + User Avatar Dropdown + Mobile Hamburger */}
-          <div className="flex items-center gap-2">
-            <ViewModeSwitcher />
-            <NotificationsBell />
-            {/* User Dropdown (Desktop) */}
-            <div className="relative hidden md:block">
-              <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/[0.06]"
-              >
-                <Avatar className="h-7 w-7">
-                  {user?.imageUrl && <AvatarImage src={user.imageUrl} alt={displayName} />}
-                  <AvatarFallback className="text-xs">
-                    {getInitials(displayName)}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="max-w-[120px] truncate text-sm font-medium">
-                  {displayName}
-                </span>
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-              </button>
-
-              {userMenuOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setUserMenuOpen(false)}
-                  />
-                  <div className="absolute right-0 top-full z-50 mt-1.5 w-48 rounded-xl border border-white/[0.08] bg-[#1a1a2e] p-1.5 shadow-xl">
-                    <Link
-                      href="/portal/profile"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
-                    >
-                      <User className="h-4 w-4" />
-                      Profile
-                    </Link>
-                    <Separator className="my-1.5 bg-white/[0.06]" />
-                    <button
-                      onClick={() => {
-                        setUserMenuOpen(false);
-                        signOut();
-                      }}
-                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Sign Out
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Mobile Hamburger */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-white/[0.06] md:hidden"
-            >
-              {mobileMenuOpen ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="border-t border-white/[0.06] md:hidden">
-            <div className="mx-auto max-w-7xl space-y-1 px-4 py-3">
-              {navLinks.map((link) => {
-                const isActive =
-                  pathname === link.href ||
-                  (link.href !== "/portal" &&
-                    pathname.startsWith(link.href + "/"));
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
-                      isActive
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
-                    )}
-                  >
-                    <link.icon className="h-4 w-4" />
-                    {link.label}
-                  </Link>
-                );
-              })}
-
-              <Separator className="my-2 bg-white/[0.06]" />
-
-              {/* Mobile User Section */}
-              <div className="flex items-center gap-3 px-3 py-2">
-                <Avatar className="h-8 w-8">
-                  {user?.imageUrl && <AvatarImage src={user.imageUrl} alt={displayName} />}
-                  <AvatarFallback className="text-xs">
-                    {getInitials(displayName)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{displayName}</p>
-                  {user?.email && (
-                    <p className="truncate text-xs text-muted-foreground">
-                      {user.email}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <Link
-                href="/portal/profile"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-all hover:bg-white/[0.06] hover:text-foreground"
-              >
-                <User className="h-4 w-4" />
-                Profile
-              </Link>
-
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  signOut();
-                }}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-all hover:bg-white/[0.06] hover:text-foreground"
-              >
-                <LogOut className="h-4 w-4" />
-                Sign Out
-              </button>
-            </div>
-          </div>
-        )}
-      </header>
-
-      {/* Page Content */}
-      <main className="flex-1">
+      <main className="relative mx-auto min-h-screen w-full max-w-md px-4 pb-28 pt-4">
         <AnimatePresence mode="wait">
           <motion.div
             key={pathname}
-            initial={{ opacity: 0, y: 8 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
           >
-            <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-              {children}
-            </div>
+            {children}
           </motion.div>
         </AnimatePresence>
       </main>
+
+      <BottomTabs />
     </div>
   );
 }

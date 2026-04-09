@@ -6,6 +6,7 @@ interface UserProfile {
   email: string;
   name: string;
   role: string;
+  phone?: string | null;
   avatar_url: string | null;
   force_password_reset: boolean;
   created_at: string;
@@ -31,6 +32,21 @@ export function useChangePassword() {
   return useMutation({
     mutationFn: (data: { currentPassword: string; newPassword: string }) =>
       api.post<{ message: string }>("/api/users/me/change-password", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.me() });
+    },
+  });
+}
+
+/** Update the current user's profile fields. */
+export function useUpdateUserProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      name?: string;
+      phone?: string | null;
+      avatar_url?: string | null;
+    }) => api.patch<UserProfile>("/api/users/me", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userKeys.me() });
     },
