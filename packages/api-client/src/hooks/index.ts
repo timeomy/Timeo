@@ -245,6 +245,39 @@ export {
   usePlatformLogs,
 } from "./platform";
 
+export type {
+  FeatureFlagSource,
+  UiConfigScope,
+  PlatformTemplateSummary,
+  PlatformTemplateVersion,
+  PlatformTemplateDetail,
+  TenantTemplateAssignment,
+  PlatformTenantTemplateResponse,
+  TenantUiConfigResponse,
+  TenantUiResetResponse,
+  EffectiveFeatureFlag,
+  EffectiveFeatureFlagsResponse,
+  TemplateMigrationReport,
+} from "./templates";
+
+export {
+  usePlatformTemplates,
+  useCreatePlatformTemplate,
+  usePlatformTemplate,
+  useTemplateVersions,
+  useCreateTemplateVersion,
+  usePublishTemplateVersion,
+  usePlatformTenantTemplate,
+  useAssignTemplate,
+  useTemplateMigrationPreview,
+  useTemplateMigrationExecute,
+  useTenantUiConfig,
+  useUpdateTenantUiConfig,
+  useResetTenantUiConfig,
+  useEffectiveFeatureFlags,
+  useUpdateTenantFeatureFlagOverride,
+} from "./templates";
+
 export {
   useFiles,
   useUploadFile,

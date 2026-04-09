@@ -130,8 +130,40 @@ export function useUpdateTenantBranding(tenantId: string) {
 export function useTenantFeatureFlags(tenantId: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.tenants.featureFlags(tenantId ?? ""),
-    queryFn: () =>
-      api.get<Record<string, boolean>>(`/api/tenants/${tenantId}/feature-flags`),
+    queryFn: async () => {
+      const response = await api.get<
+        | Record<string, boolean>
+        | {
+            flags?: Record<string, boolean>;
+            details?: Array<{ key: string; enabled: boolean }>;
+          }
+      >(`/api/tenants/${tenantId}/feature-flags`);
+
+      if (
+        response &&
+        typeof response === "object" &&
+        !Array.isArray(response) &&
+        "flags" in response &&
+        response.flags &&
+        typeof response.flags === "object"
+      ) {
+        return response.flags;
+      }
+
+      if (
+        response &&
+        typeof response === "object" &&
+        !Array.isArray(response) &&
+        "details" in response &&
+        Array.isArray(response.details)
+      ) {
+        return Object.fromEntries(
+          response.details.map((item) => [item.key, item.enabled]),
+        );
+      }
+
+      return response as Record<string, boolean>;
+    },
     enabled: !!tenantId,
     staleTime: 60_000,
   });

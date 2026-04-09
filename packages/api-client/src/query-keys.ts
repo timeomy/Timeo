@@ -7,6 +7,10 @@ export const queryKeys = {
     byId: (id: string) => ["tenants", id] as const,
     bySlug: (slug: string) => ["tenants", "slug", slug] as const,
     featureFlags: (id: string) => ["tenants", id, "feature-flags"] as const,
+    effectiveFeatureFlags: (id: string) =>
+      ["tenants", id, "feature-flags", "effective"] as const,
+    uiConfig: (id: string, scope: "member" | "admin") =>
+      ["tenants", id, "ui-config", scope] as const,
   },
 
   bookings: {
@@ -130,6 +134,14 @@ export const queryKeys = {
     analyticsOverview: () => ["platform", "analytics", "overview"] as const,
     analyticsTenants: (days?: number) =>
       ["platform", "analytics", "tenants", days ?? 30] as const,
+    templates: () => ["platform", "templates"] as const,
+    template: (id: string) => ["platform", "templates", id] as const,
+    templateVersions: (id: string) =>
+      ["platform", "templates", id, "versions"] as const,
+    tenantTemplate: (tenantId: string) =>
+      ["platform", "tenants", tenantId, "template"] as const,
+    templateMigration: (mode: "preview" | "execute") =>
+      ["platform", "template-migrations", mode] as const,
   },
 
   files: {
