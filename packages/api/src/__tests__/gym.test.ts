@@ -385,28 +385,25 @@ describe("GET /api/tenants/:tenantId/gym/members", () => {
       user: { id: "usr_1", name: "Alice", email: "alice@example.com", avatarUrl: null },
     };
 
-    // Auth queries (calls 1–3) use .limit() as terminal.
-    // Count query (call 4) uses .innerJoin().where() as terminal → needs .where() to return Promise.
-    // Members query (call 5) uses .orderBy().limit().offset() as terminal → .offset() returns Promise.
+    // Query sequence:
+    // 1. Auth middleware: user lookup .where().limit()
+    // 2. Tenant middleware: membership check .where().limit()
+    // 3. Count query: .innerJoin().where() as terminal
+    // 4. Members query: .innerJoin().where().orderBy().limit().offset() as terminal
     let selectCallCount = 0;
     mockDb.select.mockImplementation(() => {
       selectCallCount++;
       if (selectCallCount === 1) {
-        // User lookup
+        // Auth middleware: user lookup
         const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([TEST_ADMIN]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
       if (selectCallCount === 2) {
-        // Membership lookup
+        // Tenant middleware: membership check
         const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([TEST_MEMBERSHIP_ADMIN]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
       if (selectCallCount === 3) {
-        // RBAC check
-        const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([TEST_MEMBERSHIP_ADMIN]) };
-        return { from: vi.fn().mockReturnValue(ce) };
-      }
-      if (selectCallCount === 4) {
         // Count query: .from().innerJoin().where() as terminal
         const ce = { innerJoin: vi.fn().mockReturnThis(), where: vi.fn().mockResolvedValue([{ count: 1 }]) };
         return { from: vi.fn().mockReturnValue(ce) };
@@ -421,6 +418,8 @@ describe("GET /api/tenants/:tenantId/gym/members", () => {
       };
       return { from: vi.fn().mockReturnValue(ce) };
     });
+
+    mockDb.execute.mockResolvedValue([]);
 
     const res = await app.request(`${GYM_URL}/members`, {
       headers: { Origin: "http://localhost:3000" },
@@ -445,22 +444,21 @@ describe("GET /api/tenants/:tenantId/gym/members", () => {
     mockDb.select.mockImplementation(() => {
       selectCallCount++;
       if (selectCallCount === 1) {
+        // Auth middleware: user lookup
         const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([TEST_ADMIN]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
       if (selectCallCount === 2) {
+        // Tenant middleware: membership check
         const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([TEST_MEMBERSHIP_ADMIN]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
       if (selectCallCount === 3) {
-        const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([TEST_MEMBERSHIP_ADMIN]) };
-        return { from: vi.fn().mockReturnValue(ce) };
-      }
-      if (selectCallCount === 4) {
         // Count query returns 0 results matching "Alice"
         const ce = { innerJoin: vi.fn().mockReturnThis(), where: vi.fn().mockResolvedValue([{ count: 0 }]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
+      // Members list query with search
       const ce = {
         innerJoin: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
@@ -470,6 +468,8 @@ describe("GET /api/tenants/:tenantId/gym/members", () => {
       };
       return { from: vi.fn().mockReturnValue(ce) };
     });
+
+    mockDb.execute.mockResolvedValue([]);
 
     const res = await app.request(`${GYM_URL}/members?search=Alice`, {
       headers: { Origin: "http://localhost:3000" },
@@ -494,23 +494,24 @@ describe("GET /api/tenants/:tenantId/gym/members/:id", () => {
       session: { id: "sess_test" },
     });
 
-    let callCount = 0;
-    const chainEnd = {
-      where: vi.fn().mockReturnThis(),
-      innerJoin: vi.fn().mockReturnThis(),
-      leftJoin: vi.fn().mockReturnThis(),
-      orderBy: vi.fn().mockReturnThis(),
-      offset: vi.fn().mockReturnThis(),
-      limit: vi.fn(() => {
-        callCount++;
-        if (callCount === 1) return Promise.resolve([TEST_ADMIN]);
-        if (callCount === 2) return Promise.resolve([TEST_MEMBERSHIP_ADMIN]);
-        if (callCount === 3) return Promise.resolve([TEST_MEMBERSHIP_ADMIN]);
-        // Member detail lookup — not found
-        return Promise.resolve([]);
-      }),
-    };
-    mockDb.select.mockReturnValue({ from: vi.fn().mockReturnValue(chainEnd) });
+    let selectCallCount = 0;
+    mockDb.select.mockImplementation(() => {
+      selectCallCount++;
+      if (selectCallCount === 1) {
+        // Auth middleware: user lookup
+        const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([TEST_ADMIN]) };
+        return { from: vi.fn().mockReturnValue(ce) };
+      }
+      if (selectCallCount === 2) {
+        // Tenant middleware: membership check
+        const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([TEST_MEMBERSHIP_ADMIN]) };
+        return { from: vi.fn().mockReturnValue(ce) };
+      }
+      // Member detail lookup — not found
+      const ce = { innerJoin: vi.fn().mockReturnThis(), where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([]) };
+      return { from: vi.fn().mockReturnValue(ce) };
+    });
+    mockDb.execute.mockResolvedValue([]);
 
     const res = await app.request(`${GYM_URL}/members/usr_nonexistent12345`, {
       headers: { Origin: "http://localhost:3000" },
@@ -529,7 +530,7 @@ describe("GET /api/tenants/:tenantId/gym/members/:id", () => {
 
     const mockMember = {
       user: { id: "usr_member123456789", name: "Alice", email: "alice@example.com", avatarUrl: null, createdAt: new Date() },
-      membership: { id: "mem_1", role: "customer", status: "active", notes: null, tags: [], joinedAt: new Date() },
+      membership: { id: "mem_1", role: "customer", status: "active", notes: null, tags: [], joinedAt: new Date(), coachId: null },
     };
 
     const mockActiveSub = {
@@ -540,41 +541,38 @@ describe("GET /api/tenants/:tenantId/gym/members/:id", () => {
       cancelAtPeriodEnd: false,
     };
 
-    // Member detail queries:
-    // 1. User lookup: .where().limit(1) → [TEST_ADMIN]
-    // 2. Membership lookup: .where().limit(1) → [TEST_MEMBERSHIP_ADMIN]
-    // 3. RBAC check: .where().limit(1) → [TEST_MEMBERSHIP_ADMIN]
-    // 4. Member detail: .innerJoin().where().limit(1) → [mockMember]
-    // 5. Subscription: .where().limit(1) → [mockActiveSub]
-    // 6. Face registrations: .where() as terminal → [] (no limit!)
-    // 7. Recent check-ins: .where().orderBy().limit(10) → []
+    // Queries made:
+    // 1. Auth middleware: user lookup .where().limit(1) → [TEST_ADMIN]
+    // 2. Tenant middleware: membership check .where().limit(1) → [TEST_MEMBERSHIP_ADMIN]
+    // 3. Member detail: .innerJoin().where().limit(1) → [mockMember]
+    // 4. Subscription: .where().limit(1) → [mockActiveSub]
+    // 5. Face registrations: .where() (no limit) → []
+    // 6. Recent check-ins: .where().orderBy().limit(10) → []
     let selectCallCount = 0;
     mockDb.select.mockImplementation(() => {
       selectCallCount++;
       if (selectCallCount === 1) {
+        // Auth middleware: user lookup
         const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([TEST_ADMIN]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
       if (selectCallCount === 2) {
+        // Tenant middleware membership check
         const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([TEST_MEMBERSHIP_ADMIN]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
       if (selectCallCount === 3) {
-        const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([TEST_MEMBERSHIP_ADMIN]) };
-        return { from: vi.fn().mockReturnValue(ce) };
-      }
-      if (selectCallCount === 4) {
         // Member detail: .innerJoin().where().limit()
         const ce = { innerJoin: vi.fn().mockReturnThis(), where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([mockMember]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
-      if (selectCallCount === 5) {
+      if (selectCallCount === 4) {
         // Subscription: .where().limit()
         const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([mockActiveSub]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
-      if (selectCallCount === 6) {
-        // Face registrations: .where() as terminal (no limit!)
+      if (selectCallCount === 5) {
+        // Face registrations: .where() (no limit!)
         const ce = { where: vi.fn().mockResolvedValue([]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
@@ -582,6 +580,8 @@ describe("GET /api/tenants/:tenantId/gym/members/:id", () => {
       const ce = { where: vi.fn().mockReturnThis(), orderBy: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([]) };
       return { from: vi.fn().mockReturnValue(ce) };
     });
+
+    mockDb.execute.mockResolvedValue([]);
 
     const res = await app.request(`${GYM_URL}/members/usr_member123456789`, {
       headers: { Origin: "http://localhost:3000" },
@@ -623,21 +623,22 @@ describe("POST /api/tenants/:tenantId/gym/members/:id/photo", () => {
       session: { id: "sess_test" },
     });
 
+    // Mock all database queries:
+    // 1. Auth middleware: user lookup → TEST_ADMIN
+    // 2. Tenant middleware: membership check → TEST_MEMBERSHIP_ADMIN
+    // 3. Photo endpoint: member check → empty (member not in this tenant)
     let callCount = 0;
     const chainEnd = {
       where: vi.fn().mockReturnThis(),
-      innerJoin: vi.fn().mockReturnThis(),
-      leftJoin: vi.fn().mockReturnThis(),
-      orderBy: vi.fn().mockReturnThis(),
       limit: vi.fn(() => {
         callCount++;
-        if (callCount === 1) return Promise.resolve([TEST_ADMIN]);
-        if (callCount === 2) return Promise.resolve([TEST_MEMBERSHIP_ADMIN]);
-        if (callCount === 3) return Promise.resolve([TEST_MEMBERSHIP_ADMIN]);
-        return Promise.resolve([]); // no membership found
+        if (callCount === 1) return Promise.resolve([TEST_ADMIN]);        // Auth middleware
+        if (callCount === 2) return Promise.resolve([TEST_MEMBERSHIP_ADMIN]); // Tenant middleware
+        return Promise.resolve([]);                                         // Photo endpoint: no membership
       }),
     };
     mockDb.select.mockReturnValue({ from: vi.fn().mockReturnValue(chainEnd) });
+    mockDb.execute.mockResolvedValue([]);
 
     const res = await app.request(`${GYM_URL}/members/usr_other_tenant/photo`, {
       method: "POST",

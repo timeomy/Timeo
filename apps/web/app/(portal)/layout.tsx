@@ -19,7 +19,6 @@ import {
 } from "@timeo/ui/web";
 import { TimeoLogo } from "@/timeo-logo";
 import { NotificationsBell } from "@/notifications-bell";
-import { LanguageSwitcher } from "@/language-switcher";
 import { ViewModeSwitcher } from "@/view-mode-switcher";
 import {
   Home,
@@ -166,7 +165,6 @@ export default function PortalLayout({
           {/* Right: Notifications + User Avatar Dropdown + Mobile Hamburger */}
           <div className="flex items-center gap-2">
             <ViewModeSwitcher />
-            <LanguageSwitcher />
             <NotificationsBell />
             {/* User Dropdown (Desktop) */}
             <div className="relative hidden md:block">

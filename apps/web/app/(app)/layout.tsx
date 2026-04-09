@@ -6,7 +6,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { resolveHomePath, useTimeoWebAuthContext, useTimeoWebTenantContext, isRoleAtLeast } from "@timeo/auth/web";
 import { useTenant } from "@timeo/api-client";
-import { LanguageSwitcher } from "@/language-switcher";
 import type { TimeoRole } from "@timeo/auth/web";
 import { getInitials } from "@timeo/shared";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
@@ -598,7 +597,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
               <div className="flex items-center gap-2">
                 <ViewModeSwitcher />
-                <LanguageSwitcher />
                 <NotificationsBell />
               </div>
             </header>
@@ -607,7 +605,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <header className="hidden h-12 items-center justify-end border-b border-white/[0.06] px-6 lg:flex">
               <div className="flex items-center gap-2">
                 <ViewModeSwitcher />
-                <LanguageSwitcher />
                 <NotificationsBell />
               </div>
             </header>

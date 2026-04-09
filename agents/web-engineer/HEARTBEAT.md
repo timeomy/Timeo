@@ -51,3 +51,6 @@ pnpm typecheck                  # Full monorepo typecheck
 
 ## Heartbeat Log
 - 2026-04-07 16:28 GMT+8: No assignments. Idle.
+- 2026-04-09 06:49 GMT+8: No assignments. Board clean (0 open, 30 done). Idle.
+- 2026-04-09 07:50 GMT+8: No assignments. Board still clean (0 open, 30 done). Current branch: feat/phase1-self-serve-onboarding (no corresponding Paperclip issue). Idle.
+- 2026-04-09 08:53 GMT+8: No assignments. Board clean (0 open, 0 in_progress, 30 done). Idle.

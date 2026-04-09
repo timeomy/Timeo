@@ -139,43 +139,40 @@ describe("GET /api/tenants/:tenantId/check-ins/stats", () => {
       session: { id: "sess_test" },
     });
 
-    // Stats endpoint query sequence:
-    // 1. User lookup: .where().limit()
-    // 2. Membership lookup: .where().limit()
-    // 3. RBAC check: .where().limit()
-    // 4–7. Count queries (today/week/month/unique): .where() as terminal
-    // 8. Method breakdown: .where().groupBy() as terminal
+    // Query sequence:
+    // 1. Auth middleware: user lookup .where().limit()
+    // 2. Tenant middleware: membership check .where().limit()
+    // 3–6. Count queries (today/week/month/unique): .where() as terminal (no limit)
+    // 7. Method breakdown: .where().groupBy() as terminal
     let selectCallCount = 0;
     mockDb.select.mockImplementation(() => {
       selectCallCount++;
       if (selectCallCount === 1) {
+        // Auth middleware: user lookup
         const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([TEST_ADMIN]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
       if (selectCallCount === 2) {
+        // Tenant middleware: membership check
         const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([TEST_MEMBERSHIP_ADMIN]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
       if (selectCallCount === 3) {
-        const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([TEST_MEMBERSHIP_ADMIN]) };
-        return { from: vi.fn().mockReturnValue(ce) };
-      }
-      if (selectCallCount === 4) {
-        // Today count — .where() as terminal
+        // Today count — .where() as terminal (no limit)
         const ce = { where: vi.fn().mockResolvedValue([{ count: 10 }]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
-      if (selectCallCount === 5) {
+      if (selectCallCount === 4) {
         // Week count
         const ce = { where: vi.fn().mockResolvedValue([{ count: 50 }]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
-      if (selectCallCount === 6) {
+      if (selectCallCount === 5) {
         // Month count
         const ce = { where: vi.fn().mockResolvedValue([{ count: 200 }]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
-      if (selectCallCount === 7) {
+      if (selectCallCount === 6) {
         // Unique today count
         const ce = { where: vi.fn().mockResolvedValue([{ count: 8 }]) };
         return { from: vi.fn().mockReturnValue(ce) };
@@ -190,6 +187,8 @@ describe("GET /api/tenants/:tenantId/check-ins/stats", () => {
       };
       return { from: vi.fn().mockReturnValue(ce) };
     });
+
+    mockDb.execute.mockResolvedValue([]);
 
     const res = await app.request(`${CHECK_INS_URL}/stats`, {
       headers: { Origin: "http://localhost:3000" },
@@ -218,19 +217,17 @@ describe("GET /api/tenants/:tenantId/check-ins/stats", () => {
     mockDb.select.mockImplementation(() => {
       selectCallCount++;
       if (selectCallCount === 1) {
+        // Auth middleware: user lookup
         const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([TEST_ADMIN]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
       if (selectCallCount === 2) {
+        // Tenant middleware: membership check
         const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([TEST_MEMBERSHIP_ADMIN]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
-      if (selectCallCount === 3) {
-        const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([TEST_MEMBERSHIP_ADMIN]) };
-        return { from: vi.fn().mockReturnValue(ce) };
-      }
-      if (selectCallCount <= 7) {
-        // Count queries (today, week, month, unique)
+      if (selectCallCount <= 6) {
+        // Count queries (today, week, month, unique) — selectCallCount 3, 4, 5, 6
         const ce = { where: vi.fn().mockResolvedValue([{ count: 0 }]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
@@ -241,6 +238,8 @@ describe("GET /api/tenants/:tenantId/check-ins/stats", () => {
       };
       return { from: vi.fn().mockReturnValue(ce) };
     });
+
+    mockDb.execute.mockResolvedValue([]);
 
     const res = await app.request(`${CHECK_INS_URL}/stats`, {
       headers: { Origin: "http://localhost:3000" },

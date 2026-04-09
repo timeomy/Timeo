@@ -64,3 +64,27 @@ vi.mock("../realtime/socket.js", () => ({
   emitToTenant: vi.fn(),
   emitToUser: vi.fn(),
 }));
+
+// Mock @timeo/db — database module
+vi.mock("@timeo/db", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    TEMPLATE_MIGRATION_WRITE_ALLOWLIST: [
+      "tenant_template_assignments",
+      "tenant_ui_overrides",
+    ],
+    db: {
+      query: {
+        tenantTemplates: {
+          findMany: vi.fn().mockResolvedValue([]),
+          findOne: vi.fn().mockResolvedValue(null),
+        },
+      },
+      select: vi.fn(),
+      insert: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+  };
+});

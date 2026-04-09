@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { TimeoLogo } from "@/timeo-logo";
-import { LanguageSwitcher } from "@/language-switcher";
 
 export default function AuthLayout({
   children,
@@ -15,7 +14,6 @@ export default function AuthLayout({
           <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <TimeoLogo size="sm" />
           </Link>
-          <LanguageSwitcher />
         </div>
       </header>
 

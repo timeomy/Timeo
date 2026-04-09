@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { authClient, TimeoWebAuthProvider } from "@timeo/auth/web";
 import { TimeoWebAnalyticsProvider } from "@timeo/analytics/web";
 import { useMyTenants } from "@timeo/api-client";
-import { LanguageProvider } from "@/language-context";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,9 +38,7 @@ export function Providers({ children }: { children: ReactNode }) {
       host={process.env.NEXT_PUBLIC_POSTHOG_HOST}
     >
       <QueryClientProvider client={queryClient}>
-        <LanguageProvider>
-          <TenantsLoader>{children}</TenantsLoader>
-        </LanguageProvider>
+        <TenantsLoader>{children}</TenantsLoader>
       </QueryClientProvider>
     </TimeoWebAnalyticsProvider>
   );
