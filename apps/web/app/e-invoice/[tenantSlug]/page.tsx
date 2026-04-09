@@ -2,7 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { useTenantBySlug, useCreateEInvoiceRequest } from "@timeo/api-client";
+import {
+  useTenantBySlug,
+  useCreateEInvoiceRequest,
+  useEInvoiceLookup,
+} from "@timeo/api-client";
 import { formatPrice } from "@timeo/shared";
 import {
   Card,
@@ -74,19 +78,25 @@ export default function EInvoicePage() {
 
   const createEInvoice = useCreateEInvoiceRequest(tenantData?.id ?? "");
 
-  // Simulate receipt lookup state (to be replaced by a real lookup hook when available)
-  const [receiptData, setReceiptData] = useState<{
-    found: boolean;
-    alreadySubmitted?: boolean;
-    existingStatus?: string;
-    receiptNumber?: string;
-    status?: string;
-    date?: number;
-    items?: Array<{ name: string; quantity: number; price: number }>;
-    total?: number;
-    currency?: string;
-  } | null>(null);
-  const [lookupLoading, setLookupLoading] = useState(false);
+  const { data: lookupData, isLoading: lookupLoading } = useEInvoiceLookup(
+    tenantData?.id,
+    lookupRef || null,
+  );
+
+  const receiptData = lookupData
+    ? {
+        found: lookupData.found,
+        alreadySubmitted: lookupData.alreadySubmitted,
+        existingStatus: lookupData.existingStatus,
+        receiptNumber:
+          lookupData.transaction?.receiptNumber ?? lookupData.receiptNumber,
+        status: lookupData.transaction?.status,
+        date: lookupData.transaction?.date,
+        items: lookupData.transaction?.items ?? [],
+        total: lookupData.transaction?.total ?? 0,
+        currency: lookupData.transaction?.currency ?? "MYR",
+      }
+    : null;
 
   // Auto-advance to form when receipt found
   useEffect(() => {
@@ -105,12 +115,7 @@ export default function EInvoicePage() {
   function handleLookup() {
     if (!receiptInput.trim()) return;
     setLookupRef(receiptInput.trim().toUpperCase());
-    // Receipt lookup will be wired to a real endpoint once available
-    setLookupLoading(true);
-    setTimeout(() => {
-      setReceiptData(null);
-      setLookupLoading(false);
-    }, 500);
+    setStep("lookup");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -122,15 +127,21 @@ export default function EInvoicePage() {
 
     try {
       await createEInvoice.mutateAsync({
+        receiptNumber: lookupRef,
         buyerTin: buyerTin.trim(),
+        buyerIdType: buyerIdType,
+        buyerIdValue: buyerIdValue.trim(),
         buyerName: buyerName.trim(),
-        items: [
-          {
-            description: lookupRef,
-            quantity: 1,
-            unitPrice: receiptData.total ?? 0,
-          },
-        ],
+        buyerEmail: buyerEmail.trim(),
+        buyerPhone: buyerPhone ? buyerPhone.trim() : undefined,
+        buyerAddress: {
+          line1: addressLine1.trim(),
+          line2: addressLine2 ? addressLine2.trim() : undefined,
+          city: city.trim(),
+          state: state.trim(),
+          postcode: postcode.trim(),
+        },
+        buyerSstRegNo: sstRegNo ? sstRegNo.trim() : undefined,
       });
       setStep("success");
     } catch (err: any) {
@@ -140,7 +151,7 @@ export default function EInvoicePage() {
     }
   }
 
-  function formatDate(timestamp: number) {
+  function formatDate(timestamp: string | number) {
     return new Date(timestamp).toLocaleDateString("en-MY", {
       day: "numeric",
       month: "long",
@@ -210,7 +221,6 @@ export default function EInvoicePage() {
                       setReceiptInput(e.target.value.toUpperCase());
                       if (lookupRef) setLookupRef("");
                       setStep("lookup");
-                      setReceiptData(null);
                     }}
                     onKeyDown={(e) => e.key === "Enter" && handleLookup()}
                     className="font-mono"
@@ -231,7 +241,7 @@ export default function EInvoicePage() {
                     Looking up receipt...
                   </p>
                 )}
-                {lookupRef && !lookupLoading && receiptData === null && (
+                {lookupRef && !lookupLoading && receiptData && !receiptData.found && (
                   <div className="mt-3 flex items-center gap-2 text-sm text-red-400">
                     <AlertCircle className="h-4 w-4" />
                     Receipt not found. Please check the number and try again.
