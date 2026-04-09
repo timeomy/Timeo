@@ -91,7 +91,7 @@ jobs:
         working-directory: apps/web
 
       - name: Run Playwright E2E tests
-        run: npx playwright test e2e/auth.spec.ts e2e/onboarding.spec.ts e2e/bookings.spec.ts e2e/platform.spec.ts --reporter=list
+        run: npx playwright test e2e/auth.spec.ts e2e/onboarding.spec.ts e2e/bookings.spec.ts e2e/gym.spec.ts e2e/platform.spec.ts --reporter=list
         working-directory: apps/web
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
