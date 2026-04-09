@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { db } from "@timeo/db";
+import { z } from "zod";
+import { db, generateId } from "@timeo/db";
 import {
   tenants,
   tenantMemberships,
@@ -19,6 +20,7 @@ import {
   AddTenantMemberSchema,
 } from "../lib/validation.js";
 import * as TenantService from "../services/tenant.service.js";
+import { getEffectiveFeatureFlags } from "../services/template-resolver.js";
 
 const app = new Hono();
 
@@ -390,23 +392,103 @@ app.get(
   async (c) => {
     const tenantId = c.req.param("tenantId");
 
-    const [allFlags, overrides] = await Promise.all([
-      db.select().from(featureFlags),
-      db
-        .select()
-        .from(featureFlagOverrides)
-        .where(eq(featureFlagOverrides.tenant_id, tenantId)),
-    ]);
+    const effectiveFlags = await getEffectiveFeatureFlags(tenantId);
 
-    const overrideMap = new Map(
-      overrides.map((o) => [o.feature_flag_id, o.enabled]),
+    const flags = Object.fromEntries(
+      effectiveFlags.map((flag) => [flag.key, flag.enabled]),
+    );
+    const sources = Object.fromEntries(
+      effectiveFlags.map((flag) => [flag.key, flag.source]),
     );
 
-    const result = Object.fromEntries(
-      allFlags.map((f) => [f.key, overrideMap.get(f.id) ?? f.default_enabled]),
+    return c.json(
+      success({
+        flags,
+        sources,
+        details: effectiveFlags,
+      }),
+    );
+  },
+);
+
+// PATCH /tenants/:tenantId/feature-flags — set or clear tenant override
+app.patch(
+  "/:tenantId/feature-flags",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  zValidator(
+    "json",
+    z.object({
+      key: z.string().min(1),
+      enabled: z.boolean().optional(),
+      clearOverride: z.boolean().optional(),
+    }),
+  ),
+  async (c) => {
+    const tenantId = c.req.param("tenantId");
+    const body = c.req.valid("json");
+
+    const [flag] = await db
+      .select({ id: featureFlags.id, key: featureFlags.key })
+      .from(featureFlags)
+      .where(eq(featureFlags.key, body.key))
+      .limit(1);
+
+    if (!flag) {
+      return c.json(error("NOT_FOUND", "Feature flag not found"), 404);
+    }
+
+    const [existingOverride] = await db
+      .select({ id: featureFlagOverrides.id })
+      .from(featureFlagOverrides)
+      .where(
+        and(
+          eq(featureFlagOverrides.tenant_id, tenantId),
+          eq(featureFlagOverrides.feature_flag_id, flag.id),
+        ),
+      )
+      .limit(1);
+
+    if (body.clearOverride) {
+      if (existingOverride) {
+        await db
+          .delete(featureFlagOverrides)
+          .where(eq(featureFlagOverrides.id, existingOverride.id));
+      }
+    } else {
+      const nextValue = body.enabled ?? false;
+
+      if (existingOverride) {
+        await db
+          .update(featureFlagOverrides)
+          .set({ enabled: nextValue })
+          .where(eq(featureFlagOverrides.id, existingOverride.id));
+      } else {
+        await db.insert(featureFlagOverrides).values({
+          id: generateId(),
+          feature_flag_id: flag.id,
+          tenant_id: tenantId,
+          enabled: nextValue,
+        });
+      }
+    }
+
+    const effectiveFlags = await getEffectiveFeatureFlags(tenantId);
+    const flags = Object.fromEntries(
+      effectiveFlags.map((item) => [item.key, item.enabled]),
+    );
+    const sources = Object.fromEntries(
+      effectiveFlags.map((item) => [item.key, item.source]),
     );
 
-    return c.json(success(result));
+    return c.json(
+      success({
+        flags,
+        sources,
+        details: effectiveFlags,
+      }),
+    );
   },
 );
 
