@@ -87,6 +87,18 @@ const coachSidebarSections: SidebarSection[] = [
       { href: "/dashboard/settings", label: "Settings", icon: Settings },
     ],
   },
+  {
+    label: "CONFIGURATION",
+    minRole: "admin",
+    links: [
+      { href: "/dashboard/settings/customize", label: "Customize UI", icon: Monitor },
+      {
+        href: "/dashboard/settings/features",
+        label: "Feature Flags",
+        icon: MonitorOff,
+      },
+    ],
+  },
 ];
 
 
