@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useMemo, useState, useRef } from "react";
 import {
   useSessionCredits,
   useMemberships,
+  useMySubscriptions,
   useMyPaymentRequests,
   useCreatePaymentRequest,
   useUploadFile,
@@ -63,10 +64,30 @@ function formatRM(cents: number) {
   return `RM ${(cents / 100).toFixed(0)}`;
 }
 
-function getPlanBadgeColor(planType: string) {
-  if (planType === "all_access") return "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
-  if (planType === "studio_class") return "bg-purple-500/20 text-purple-400 border-purple-500/30";
-  return "bg-blue-500/20 text-blue-400 border-blue-500/30";
+function getSubscriptionEndDate(subscription: any): string | null {
+  return (
+    subscription?.currentPeriodEnd ??
+    subscription?.current_period_end ??
+    subscription?.subscription?.currentPeriodEnd ??
+    subscription?.subscription?.current_period_end ??
+    null
+  );
+}
+
+function getSubscriptionPlanName(subscription: any): string {
+  return (
+    subscription?.planName ??
+    subscription?.plan?.name ??
+    "No active membership"
+  );
+}
+
+function getSubscriptionStatus(subscription: any): string {
+  return (
+    subscription?.status ??
+    subscription?.subscription?.status ??
+    "inactive"
+  );
 }
 
 function getStatusIcon(status: string) {
@@ -111,24 +132,43 @@ function PlanSelectionModal({
   onClose,
   plans,
   isLoading,
+  currentPlanId,
+  intent,
   onSelect,
 }: {
   open: boolean;
   onClose: () => void;
   plans: MembershipPlan[];
   isLoading: boolean;
+  currentPlanId?: string | null;
+  intent: "renew" | "upgrade" | "buy";
   onSelect: (plan: MembershipPlan) => void;
 }) {
-  const gymPlans = plans.filter((p) => p.planType === "all_access");
+  const modalTitle =
+    intent === "renew"
+      ? "Renew Membership"
+      : intent === "upgrade"
+        ? "Upgrade Membership"
+        : "Choose a Membership Plan";
+
+  const modalDescription =
+    intent === "renew"
+      ? "Select your renewal plan and continue payment with DuitNow."
+      : intent === "upgrade"
+        ? "Choose a different plan to upgrade your current membership."
+        : "Select the plan that suits you best. Payment via DuitNow.";
+
+  const availablePlans =
+    intent === "upgrade" && currentPlanId
+      ? plans.filter((plan) => plan.id !== currentPlanId)
+      : plans;
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Choose a Membership Plan</DialogTitle>
-          <DialogDescription>
-            Select the plan that suits you best. Payment via DuitNow.
-          </DialogDescription>
+          <DialogTitle>{modalTitle}</DialogTitle>
+          <DialogDescription>{modalDescription}</DialogDescription>
         </DialogHeader>
 
         {isLoading ? (
@@ -139,12 +179,14 @@ function PlanSelectionModal({
           </div>
         ) : (
           <div className="space-y-3 py-2">
-            {gymPlans.length === 0 && (
+            {availablePlans.length === 0 && (
               <p className="py-8 text-center text-sm text-white/40">
-                No membership plans available at this time.
+                {intent === "upgrade"
+                  ? "No alternative plans available to upgrade right now."
+                  : "No membership plans available at this time."}
               </p>
             )}
-            {gymPlans.map((plan) => (
+            {availablePlans.map((plan) => (
               <button
                 key={plan.id}
                 onClick={() => onSelect(plan)}
@@ -152,7 +194,14 @@ function PlanSelectionModal({
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-white">{plan.name}</p>
+                    <p className="font-medium text-white">
+                      {plan.name}
+                      {currentPlanId && plan.id === currentPlanId && (
+                        <span className="ml-2 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-300">
+                          Current
+                        </span>
+                      )}
+                    </p>
                     <p className="mt-0.5 text-xs text-white/40">
                       {plan.durationMonths
                         ? plan.durationMonths >= 12
@@ -532,33 +581,67 @@ export default function MyPackagesPage() {
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<MembershipPlan | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [planIntent, setPlanIntent] = useState<"renew" | "upgrade" | "buy">("buy");
 
   const { data: credits, isLoading: creditsLoading } = useSessionCredits(tenantId);
   const { data: membershipsData, isLoading: plansLoading } = useMemberships(tenantId);
+  const { data: subscriptions, refetch: refetchSubscriptions } = useMySubscriptions(tenantId);
   const { data: paymentRequests, isLoading: requestsLoading, refetch: refetchRequests } = useMyPaymentRequests(tenantId);
 
   const isLoading = creditsLoading || requestsLoading;
 
   // Normalize plan data from API (API returns snake_case DB rows)
-  const plans: MembershipPlan[] = (membershipsData ?? []).map((m) => ({
-    id: m.id,
-    name: m.name,
-    price: m.price,
-    currency: m.currency ?? "MYR",
-    durationMonths: m.duration_months ?? m.durationMonths,
-    planType: m.plan_type ?? m.planType ?? "all_access",
-    features: m.features ?? m.benefits ?? [],
-    description: m.description,
-    interval: m.interval ?? m.billingInterval ?? "monthly",
-  }));
+  const plans: MembershipPlan[] = (membershipsData ?? [])
+    .filter((membership) => (membership.is_active ?? membership.isActive ?? true))
+    .map((membership) => ({
+      id: membership.id,
+      name: membership.name,
+      price: membership.price,
+      currency: membership.currency ?? "MYR",
+      durationMonths: membership.duration_months ?? membership.durationMonths,
+      planType: membership.plan_type ?? membership.planType ?? "all_access",
+      features: membership.features ?? membership.benefits ?? [],
+      description: membership.description,
+      interval: membership.interval ?? membership.billingInterval ?? "monthly",
+    }));
+
+  const latestSubscription = useMemo(() => {
+    return [...(subscriptions ?? [])].sort((left, right) => {
+      const leftTime = new Date(getSubscriptionEndDate(left) ?? 0).getTime();
+      const rightTime = new Date(getSubscriptionEndDate(right) ?? 0).getTime();
+      return rightTime - leftTime;
+    })[0];
+  }, [subscriptions]);
+
+  const currentMembershipId =
+    latestSubscription?.membershipId ??
+    latestSubscription?.subscription?.membershipId ??
+    null;
+  const currentPlanName = getSubscriptionPlanName(latestSubscription);
+  const subscriptionStatus = getSubscriptionStatus(latestSubscription);
+  const subscriptionEndDate = getSubscriptionEndDate(latestSubscription);
+  const daysUntilExpiry = subscriptionEndDate
+    ? Math.ceil((new Date(subscriptionEndDate).getTime() - Date.now()) / 86_400_000)
+    : null;
+  const isExpired = daysUntilExpiry !== null && daysUntilExpiry <= 0;
+  const isExpiringSoon =
+    daysUntilExpiry !== null && daysUntilExpiry > 0 && daysUntilExpiry < 30;
+  const shouldShowRenew = !latestSubscription || isExpired || isExpiringSoon;
 
   // Check for active/pending membership
   const pendingRequest = paymentRequests?.find(
     (r) => r.status === "pending_verification",
   );
-  const approvedRequest = paymentRequests?.find(
-    (r) => r.status === "approved",
+  const pendingMembershipRequest = paymentRequests?.find(
+    (request) =>
+      request.status === "pending_verification" &&
+      request.planReferenceType === "membership",
   );
+
+  function openPlanModal(intent: "renew" | "upgrade" | "buy") {
+    setPlanIntent(intent);
+    setPlanModalOpen(true);
+  }
 
   function handleSelectPlan(plan: MembershipPlan) {
     setSelectedPlan(plan);
@@ -570,6 +653,7 @@ export default function MyPackagesPage() {
     setPaymentModalOpen(false);
     setSelectedPlan(null);
     refetchRequests();
+    refetchSubscriptions();
   }
 
   return (
@@ -584,17 +668,96 @@ export default function MyPackagesPage() {
             Membership plans and session credits
           </p>
         </div>
-        {!pendingRequest && (
+        {!pendingMembershipRequest && (
           <Button
-            onClick={() => setPlanModalOpen(true)}
+            onClick={() => openPlanModal(shouldShowRenew ? "renew" : "upgrade")}
             className="shrink-0 bg-emerald-600 hover:bg-emerald-700"
             size="sm"
           >
             <Plus className="mr-1.5 h-4 w-4" />
-            {approvedRequest ? "Renew" : "Buy Membership"}
+            {shouldShowRenew ? "Renew" : "Upgrade"}
           </Button>
         )}
       </div>
+
+      {/* Current subscription status */}
+      <Card className="glass border-white/[0.08]">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm uppercase tracking-wider text-white/60">
+            Current Subscription
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 pt-0">
+          <div className="flex items-start justify-between gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
+            <div>
+              <p className="text-base font-semibold text-white">{currentPlanName}</p>
+              <p className="mt-1 text-xs text-white/45">
+                Expiry: {subscriptionEndDate
+                  ? new Date(subscriptionEndDate).toLocaleDateString("en-MY", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : "No expiry date"}
+              </p>
+              {daysUntilExpiry !== null && (
+                <p
+                  className={cn(
+                    "mt-1 text-xs",
+                    isExpired
+                      ? "text-red-400"
+                      : isExpiringSoon
+                        ? "text-yellow-400"
+                        : "text-emerald-400",
+                  )}
+                >
+                  {isExpired
+                    ? "Expired"
+                    : `${daysUntilExpiry} day${daysUntilExpiry === 1 ? "" : "s"} remaining`}
+                </p>
+              )}
+            </div>
+            <Badge
+              className={cn(
+                "rounded-full border px-2 py-0 text-[11px]",
+                subscriptionStatus === "active" &&
+                  "border-emerald-500/30 bg-emerald-500/15 text-emerald-300",
+                subscriptionStatus === "past_due" &&
+                  "border-yellow-500/30 bg-yellow-500/15 text-yellow-300",
+                subscriptionStatus === "canceled" &&
+                  "border-red-500/30 bg-red-500/15 text-red-300",
+                subscriptionStatus === "inactive" &&
+                  "border-white/[0.12] bg-white/[0.06] text-white/60",
+              )}
+            >
+              {subscriptionStatus}
+            </Badge>
+          </div>
+
+          {!pendingMembershipRequest && (
+            <div className="flex flex-wrap gap-2">
+              {shouldShowRenew && (
+                <Button
+                  size="sm"
+                  onClick={() => openPlanModal("renew")}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <RefreshCw className="mr-1.5 h-4 w-4" />
+                  Renew
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => openPlanModal("upgrade")}
+              >
+                <Plus className="mr-1.5 h-4 w-4" />
+                Upgrade
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Pending payment notice */}
       {pendingRequest && (
@@ -724,7 +887,7 @@ export default function MyPackagesPage() {
       {!isLoading &&
         (!credits || credits.length === 0) &&
         (!paymentRequests || paymentRequests.length === 0) && (
-          <EmptyState onBuyClick={() => setPlanModalOpen(true)} />
+          <EmptyState onBuyClick={() => openPlanModal("buy")} />
         )}
 
       {/* Modals */}
@@ -733,6 +896,8 @@ export default function MyPackagesPage() {
         onClose={() => setPlanModalOpen(false)}
         plans={plans}
         isLoading={plansLoading}
+        currentPlanId={currentMembershipId}
+        intent={planIntent}
         onSelect={handleSelectPlan}
       />
 
