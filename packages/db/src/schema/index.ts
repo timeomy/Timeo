@@ -20,3 +20,4 @@ export * from "./invoices";
 export * from "./einvoice";
 export * from "./loyalty";
 export * from "./access-control";
+export * from "./tenant-templates";

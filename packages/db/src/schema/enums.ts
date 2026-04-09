@@ -14,6 +14,12 @@ export const tenantStatusEnum = pgEnum("tenant_status", [
   "trial",
 ]);
 
+export const tenantTemplateStatusEnum = pgEnum("tenant_template_status", [
+  "draft",
+  "published",
+  "archived",
+]);
+
 export const tenantIdTypeEnum = pgEnum("tenant_id_type", [
   "brn",
   "nric",
