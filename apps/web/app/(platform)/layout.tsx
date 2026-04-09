@@ -18,6 +18,7 @@ import { ViewModeSwitcher } from "@/view-mode-switcher";
 import {
   LayoutDashboard,
   Building2,
+  LayoutTemplate,
   Users,
   CreditCard,
   ToggleRight,
@@ -42,6 +43,7 @@ type SidebarLink = {
 const sidebarLinks: SidebarLink[] = [
   { href: "/admin", label: "Command", icon: LayoutDashboard },
   { href: "/admin/tenants", label: "Tenants", icon: Building2 },
+  { href: "/admin/templates", label: "Templates", icon: LayoutTemplate },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/billing", label: "Billing", icon: CreditCard },
   { href: "/admin/features", label: "Feature Flags", icon: ToggleRight },

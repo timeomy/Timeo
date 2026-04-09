@@ -322,6 +322,14 @@ export default function TenantDetailPage() {
             </div>
           </div>
           <div className="flex gap-2">
+            {!loading && (
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/admin/tenants/${tenantId}/template`)}
+              >
+                Template
+              </Button>
+            )}
             {hasChanges && (
               <Button onClick={handleSave} disabled={saving} className="gap-2">
                 <Save className="h-4 w-4" />
