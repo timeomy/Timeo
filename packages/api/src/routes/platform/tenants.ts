@@ -1,8 +1,18 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { db, generateId } from "@timeo/db";
-import { tenants, tenantMemberships, users, user as authUser, account as authAccount } from "@timeo/db/schema";
+import { db, generateId, normalizeIndustry } from "@timeo/db";
+import {
+  tenants,
+  tenantMemberships,
+  users,
+  user as authUser,
+  account as authAccount,
+  tenantTemplateAssignments,
+  tenantTemplateVersions,
+  tenantTemplates,
+  tenantUiOverrides,
+} from "@timeo/db/schema";
 import { eq, desc, sql, count, and } from "drizzle-orm";
 import { authMiddleware } from "../../middleware/auth.js";
 import { requirePlatformAdmin } from "../../middleware/rbac.js";
@@ -11,6 +21,7 @@ import { redis } from "../../lib/redis.js";
 import { insertAudit, getClientIp } from "./helpers.js";
 import { sendMail } from "@timeo/auth/email";
 import { tenantInviteEmail } from "@timeo/auth/email-templates";
+import { TEMPLATE_INDUSTRIES } from "@timeo/shared";
 
 const SITE_URL = process.env.SITE_URL ?? "http://localhost:3000";
 
@@ -60,6 +71,101 @@ async function createUserWithCredentials(email: string, name: string): Promise<{
   });
 
   return { timeoUserId: timeoId, tempPassword };
+}
+
+const templateBootstrapWriteAllowlist = new Set([
+  "tenant_template_assignments",
+  "tenant_ui_overrides",
+]);
+
+function assertTemplateBootstrapWriteAllowed(tableName: string) {
+  if (!templateBootstrapWriteAllowlist.has(tableName)) {
+    throw new Error(
+      `Blocked write: table \"${tableName}\" is not allowed during tenant template bootstrap`,
+    );
+  }
+}
+
+function readIndustry(settings: unknown): string | null {
+  if (!settings || typeof settings !== "object") {
+    return null;
+  }
+
+  const rawIndustry = (settings as Record<string, unknown>).industry;
+  return typeof rawIndustry === "string" ? rawIndustry : null;
+}
+
+async function autoAssignTemplateToTenant(
+  tenantId: string,
+  settings: Record<string, unknown>,
+  actorId: string,
+) {
+  const normalizedIndustry = normalizeIndustry(readIndustry(settings));
+  if (!normalizedIndustry) {
+    return null;
+  }
+
+  const [publishedTemplate] = await db
+    .select({
+      templateId: tenantTemplates.id,
+      templateVersionId: tenantTemplateVersions.id,
+      version: tenantTemplateVersions.version,
+      key: tenantTemplates.key,
+      industry: tenantTemplates.industry,
+      name: tenantTemplates.name,
+    })
+    .from(tenantTemplates)
+    .innerJoin(
+      tenantTemplateVersions,
+      and(
+        eq(tenantTemplateVersions.template_id, tenantTemplates.id),
+        eq(tenantTemplateVersions.version, tenantTemplates.current_version),
+      ),
+    )
+    .where(
+      and(
+        eq(tenantTemplateVersions.is_published, true),
+        eq(tenantTemplates.industry, normalizedIndustry),
+      ),
+    )
+    .limit(1);
+
+  if (!publishedTemplate) {
+    return null;
+  }
+
+  assertTemplateBootstrapWriteAllowed("tenant_template_assignments");
+  assertTemplateBootstrapWriteAllowed("tenant_ui_overrides");
+
+  await db.insert(tenantTemplateAssignments).values({
+    id: generateId(),
+    tenant_id: tenantId,
+    template_id: publishedTemplate.templateId,
+    template_version_id: publishedTemplate.templateVersionId,
+    industry_snapshot: normalizedIndustry,
+    source: "tenant_create_auto_assignment",
+    is_pinned: false,
+    applied_by: actorId,
+    applied_at: new Date(),
+  });
+
+  await db.insert(tenantUiOverrides).values({
+    id: generateId(),
+    tenant_id: tenantId,
+    member_portal_override: {},
+    admin_panel_override: {},
+    updated_by: actorId,
+    revision: 0,
+  });
+
+  return {
+    industry: normalizedIndustry,
+    templateId: publishedTemplate.templateId,
+    templateVersionId: publishedTemplate.templateVersionId,
+    templateVersion: publishedTemplate.version,
+    templateKey: publishedTemplate.key,
+    templateName: publishedTemplate.name,
+  };
 }
 
 const app = new Hono();
@@ -115,6 +221,7 @@ app.post(
       slug: z.string().min(2).max(50).regex(/^[a-z0-9-]+$/),
       ownerEmail: z.string().email(),
       plan: z.enum(["free", "starter", "pro", "enterprise"]).default("free"),
+      industry: z.enum(TEMPLATE_INDUSTRIES).optional(),
     }),
   ),
   async (c) => {
@@ -163,6 +270,12 @@ app.post(
     }
 
     const tenantId = generateId();
+    const initialSettings: Record<string, unknown> = {};
+
+    if (body.industry) {
+      initialSettings.industry = body.industry;
+    }
+
     await db.insert(tenants).values({
       id: tenantId,
       name: body.name,
@@ -170,6 +283,7 @@ app.post(
       owner_id: ownerId,
       plan: body.plan,
       status: "active",
+      settings: initialSettings,
     });
 
     // Add owner as admin member
@@ -181,13 +295,44 @@ app.post(
       status: memberStatus,
     });
 
+    try {
+      const assignment = await autoAssignTemplateToTenant(
+        tenantId,
+        initialSettings,
+        user.id,
+      );
+
+      if (assignment) {
+        await insertAudit(
+          user.id,
+          "platform_admin",
+          "tenant_template.auto_assigned",
+          "tenant_template_assignment",
+          tenantId,
+          assignment,
+          ip,
+          tenantId,
+        );
+      }
+    } catch (autoAssignError) {
+      console.error(
+        `Tenant ${tenantId} created but template auto-assignment failed:`,
+        autoAssignError,
+      );
+    }
+
     await insertAudit(
       user.id,
       "platform_admin",
       "tenant.created",
       "tenant",
       tenantId,
-      { name: body.name, slug: body.slug, plan: body.plan },
+      {
+        name: body.name,
+        slug: body.slug,
+        plan: body.plan,
+        industry: body.industry ?? null,
+      },
       ip,
     );
 
