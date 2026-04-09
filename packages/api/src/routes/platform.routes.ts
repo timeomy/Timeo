@@ -12,6 +12,7 @@ import { healthRouter } from "./platform/health.js";
 import { analyticsRouter } from "./platform/analytics.js";
 import { dataRouter } from "./platform/data.js";
 import { viewAsRouter } from "./platform/view-as.js";
+import { platformTemplatesRouter } from "./platform/templates.js";
 
 const app = new Hono();
 
@@ -53,5 +54,8 @@ app.route("/data", dataRouter);
 
 // Module 13 — View As audit
 app.route("/view-as", viewAsRouter);
+
+// Module 14 — Tenant Templates
+app.route("/", platformTemplatesRouter);
 
 export { app as platformRouter };
