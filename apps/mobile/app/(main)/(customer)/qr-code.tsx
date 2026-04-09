@@ -44,6 +44,7 @@ export default function QrCodeScreen() {
   }, [tenantId, generateQrCode]);
 
   const displayName = user?.name || "Member";
+  const memberId = user?.id?.slice(0, 12).toUpperCase() ?? "MEMBER";
 
   if (!tenantId) {
     return (
@@ -89,6 +90,12 @@ export default function QrCodeScreen() {
         >
           Scan to check in
         </Text>
+        <Text
+          className="mt-1 text-xs"
+          style={{ color: theme.colors.textSecondary }}
+        >
+          Member ID: {memberId}
+        </Text>
       </View>
 
       <Spacer size={32} />
@@ -99,12 +106,12 @@ export default function QrCodeScreen() {
             <View
               className="items-center justify-center rounded-2xl"
               style={{
-                width: 240,
-                height: 240,
+                width: 292,
+                height: 292,
                 backgroundColor: "#FFFFFF",
               }}
             >
-              <QRCode value={qrCode.code} size={200} />
+              <QRCode value={qrCode.code} size={252} />
             </View>
 
             <Spacer size={16} />

@@ -1,30 +1,41 @@
-import { useState, useMemo } from "react";
-import { View, Text, FlatList, TouchableOpacity, RefreshControl } from "react-native";
+import { useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  RefreshControl,
+  TextInput,
+  TouchableOpacity,
+} from "react-native";
 import { useRouter } from "expo-router";
-import { Dumbbell, User, Calendar, Plus } from "lucide-react-native";
+import { CalendarDays, Clock3, Dumbbell, Filter, Plus } from "lucide-react-native";
 import { useTimeoAuth } from "@timeo/auth";
-import { useSessionLogs } from "@timeo/api-client";
+import { useCoachClients, useSessionLogs } from "@timeo/api-client";
 import {
   Screen,
   Header,
   Card,
-  Badge,
+  Select,
   SearchInput,
-  LoadingScreen,
   EmptyState,
+  LoadingScreen,
   useTheme,
 } from "@timeo/ui";
 
-function formatSessionDate(isoDate: string): string {
-  return new Date(isoDate).toLocaleDateString("en-MY", {
-    weekday: "short",
+function formatDateTime(value: string): string {
+  const parsed = new Date(value);
+  return parsed.toLocaleString("en-MY", {
     day: "numeric",
     month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
-function formatSessionType(type: string): string {
-  return type.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+function formatSessionType(type?: string): string {
+  if (!type) return "Session";
+  return type.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 export default function SessionLogsScreen() {
@@ -32,119 +43,206 @@ export default function SessionLogsScreen() {
   const router = useRouter();
   const { activeTenantId } = useTimeoAuth();
   const tenantId = activeTenantId as string;
-  const [searchQuery, setSearchQuery] = useState("");
 
-  const { data: sessionLogs, isLoading, refetch, isRefetching } = useSessionLogs(tenantId);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  const { data: clients } = useCoachClients(tenantId);
+  const {
+    data: logs,
+    isLoading,
+    refetch,
+    isRefetching,
+  } = useSessionLogs(tenantId, {
+    scope: "coach",
+    clientId: selectedClientId || undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+  });
+
+  const clientOptions = useMemo(
+    () => [
+      { label: "All clients", value: "" },
+      ...(clients ?? []).map((client) => ({
+        label: client.name,
+        value: client.id,
+      })),
+    ],
+    [clients],
+  );
 
   const filteredLogs = useMemo(() => {
-    if (!sessionLogs) return [];
-    if (!searchQuery.trim()) return sessionLogs;
-    const q = searchQuery.toLowerCase();
-    return sessionLogs.filter(
+    const list = logs ?? [];
+    if (!searchQuery.trim()) return list;
+
+    const query = searchQuery.toLowerCase();
+    return list.filter(
       (log) =>
-        log.clientName?.toLowerCase().includes(q) ||
-        log.coachName?.toLowerCase().includes(q)
+        log.clientName?.toLowerCase().includes(query) ||
+        log.notes?.toLowerCase().includes(query),
     );
-  }, [sessionLogs, searchQuery]);
+  }, [logs, searchQuery]);
 
   if (!tenantId) {
     return (
       <Screen>
-        <Header title="Session Logs" onBack={() => router.back()} />
-        <View className="flex-1 items-center justify-center">
-          <Text style={{ color: theme.colors.textSecondary }}>No organization selected.</Text>
-        </View>
+        <Header title="Session History" onBack={() => router.back()} />
+        <EmptyState
+          title="No organization selected"
+          description="Please select an organization first."
+        />
       </Screen>
     );
   }
 
   if (isLoading) {
-    return <LoadingScreen message="Loading session logs..." />;
+    return <LoadingScreen message="Loading sessions..." />;
   }
 
   return (
     <Screen padded={false}>
-      <Header title="Session Logs" onBack={() => router.back()} />
+      <Header title="Session History" onBack={() => router.back()} />
 
-      <View className="px-4 pb-2">
-        <SearchInput value={searchQuery} onChangeText={setSearchQuery} placeholder="Search by client or coach..." />
-      </View>
+      <View className="px-4 pb-3" style={{ gap: 10 }}>
+        <SearchInput
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search notes or client"
+        />
 
-      <View className="flex-row items-center justify-between px-4 pb-2">
-        <Text className="text-sm font-semibold uppercase tracking-wide" style={{ color: theme.colors.textSecondary }}>
-          {filteredLogs.length} session{filteredLogs.length !== 1 ? "s" : ""}
-        </Text>
+        <View>
+          <Text className="mb-1 text-xs font-semibold uppercase tracking-wide" style={{ color: theme.colors.textSecondary }}>
+            Client
+          </Text>
+          <Select
+            options={clientOptions}
+            value={selectedClientId}
+            onChange={setSelectedClientId}
+            placeholder="Filter by client"
+          />
+        </View>
+
+        <View className="flex-row" style={{ gap: 8 }}>
+          <View className="flex-1">
+            <Text className="mb-1 text-xs font-semibold uppercase tracking-wide" style={{ color: theme.colors.textSecondary }}>
+              Date From
+            </Text>
+            <TextInput
+              className="rounded-xl px-3 py-2 text-sm"
+              style={{
+                backgroundColor: theme.colors.surface,
+                color: theme.colors.text,
+                borderColor: theme.colors.border,
+                borderWidth: 1,
+              }}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={theme.colors.textSecondary}
+              value={dateFrom}
+              onChangeText={setDateFrom}
+              autoCapitalize="none"
+            />
+          </View>
+          <View className="flex-1">
+            <Text className="mb-1 text-xs font-semibold uppercase tracking-wide" style={{ color: theme.colors.textSecondary }}>
+              Date To
+            </Text>
+            <TextInput
+              className="rounded-xl px-3 py-2 text-sm"
+              style={{
+                backgroundColor: theme.colors.surface,
+                color: theme.colors.text,
+                borderColor: theme.colors.border,
+                borderWidth: 1,
+              }}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={theme.colors.textSecondary}
+              value={dateTo}
+              onChangeText={setDateTo}
+              autoCapitalize="none"
+            />
+          </View>
+        </View>
+
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center" style={{ gap: 6 }}>
+            <Filter size={13} color={theme.colors.textSecondary} />
+            <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>
+              {filteredLogs.length} session{filteredLogs.length === 1 ? "" : "s"}
+            </Text>
+          </View>
+
+          <TouchableOpacity onPress={() => router.push("/session-logs/create" as never)}>
+            <View className="flex-row items-center" style={{ gap: 4 }}>
+              <Plus size={14} color={theme.colors.primary} />
+              <Text className="text-xs font-semibold" style={{ color: theme.colors.primary }}>
+                New
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
         data={filteredLogs}
         keyExtractor={(item) => item.id}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100, paddingTop: 8, gap: 10 }}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />
+        }
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120, gap: 10 }}
         ListEmptyComponent={
           <EmptyState
-            title="No session logs"
-            description="Session logs will appear here when you create them."
+            title="No sessions found"
+            description="Try adjusting filters or log a new session."
             icon={<Dumbbell size={32} color={theme.colors.textSecondary} />}
           />
         }
         renderItem={({ item }) => (
           <Card>
-            <View className="flex-row items-start">
-              <View
-                className="mr-3 h-10 w-10 items-center justify-center rounded-full"
-                style={{ backgroundColor: theme.colors.primary + "15" }}
-              >
-                <Text className="text-sm font-bold" style={{ color: theme.colors.primary }}>
-                  {(item.clientName ?? "?").charAt(0).toUpperCase()}
-                </Text>
-              </View>
-              <View className="flex-1">
-                <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
-                  {item.clientName}
-                </Text>
-                {item.sessionType && (
-                  <View className="mt-1 flex-row items-center" style={{ gap: 8 }}>
-                    <Badge label={formatSessionType(item.sessionType)} />
-                  </View>
-                )}
-                <View className="mt-2 flex-row items-center" style={{ gap: 12 }}>
-                  {item.coachName && (
-                    <View className="flex-row items-center">
-                      <User size={12} color={theme.colors.textSecondary} />
-                      <Text className="ml-1 text-xs" style={{ color: theme.colors.textSecondary }}>
-                        {item.coachName}
-                      </Text>
-                    </View>
-                  )}
-                  <View className="flex-row items-center">
-                    <Calendar size={12} color={theme.colors.textSecondary} />
-                    <Text className="ml-1 text-xs" style={{ color: theme.colors.textSecondary }}>
-                      {formatSessionDate(item.createdAt)}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              {item.exercises && item.exercises.length > 0 && (
-                <View className="rounded-full px-2 py-1" style={{ backgroundColor: theme.colors.surface }}>
-                  <Text className="text-xs font-medium" style={{ color: theme.colors.textSecondary }}>
-                    {item.exercises.length}
-                  </Text>
-                </View>
-              )}
+            <View className="flex-row items-center justify-between">
+              <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
+                {item.clientName ?? "Client"}
+              </Text>
+              <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>
+                {item.duration ? `${item.duration} min` : "-"}
+              </Text>
             </View>
+
+            <View className="mt-2 flex-row items-center" style={{ gap: 8 }}>
+              <View
+                className="rounded-full px-2 py-1"
+                style={{ backgroundColor: theme.colors.surface }}
+              >
+                <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>
+                  {formatSessionType(item.sessionType)}
+                </Text>
+              </View>
+            </View>
+
+            <View className="mt-2" style={{ gap: 6 }}>
+              <View className="flex-row items-center" style={{ gap: 6 }}>
+                <CalendarDays size={13} color={theme.colors.textSecondary} />
+                <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>
+                  {formatDateTime(item.createdAt)}
+                </Text>
+              </View>
+              <View className="flex-row items-center" style={{ gap: 6 }}>
+                <Clock3 size={13} color={theme.colors.textSecondary} />
+                <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>
+                  Coach log entry
+                </Text>
+              </View>
+            </View>
+
+            {item.notes ? (
+              <Text className="mt-2 text-sm" style={{ color: theme.colors.textSecondary }}>
+                {item.notes}
+              </Text>
+            ) : null}
           </Card>
         )}
       />
-
-      <TouchableOpacity
-        onPress={() => router.push("/session-logs/create" as any)}
-        className="absolute bottom-6 right-6 h-14 w-14 items-center justify-center rounded-full shadow-lg"
-        style={{ backgroundColor: theme.colors.primary }}
-        activeOpacity={0.8}
-      >
-        <Plus size={24} color={theme.dark ? "#0B0B0F" : "#FFFFFF"} />
-      </TouchableOpacity>
     </Screen>
   );
 }

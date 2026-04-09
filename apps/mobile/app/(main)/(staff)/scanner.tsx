@@ -18,11 +18,12 @@ import { Screen, Header, Button, Spacer, useTheme } from "@timeo/ui";
 
 type ScanResult = {
   success: boolean;
+  validationMessage?: string;
   member?: {
     name: string;
-    email?: string;
-    membershipName?: string;
-    photoUrl?: string;
+    email?: string | null;
+    membershipName?: string | null;
+    photoUrl?: string | null;
   };
   error?: string;
 };
@@ -62,6 +63,7 @@ export default function StaffScannerScreen() {
         const response = await checkInByQr.mutateAsync(data);
         setResult({
           success: true,
+          validationMessage: response.validation?.message,
           member: response.member,
         });
       } catch (err) {
@@ -160,6 +162,9 @@ export default function StaffScannerScreen() {
                   <CheckCircle2 size={72} color="#FFFFFF" />
                   <Spacer size={20} />
                   <Text style={styles.resultTitle}>Check-in Granted</Text>
+                  {result.validationMessage ? (
+                    <Text style={styles.resultError}>{result.validationMessage}</Text>
+                  ) : null}
 
                   {result.member ? (
                     <View style={styles.memberCard}>

@@ -1,364 +1,424 @@
-import { useState, useCallback, useEffect } from "react";
-import { View, Text, Alert } from "react-native";
+import { useMemo } from "react";
 import { useRouter } from "expo-router";
+import { View, Text, TouchableOpacity } from "react-native";
 import {
-  QrCode,
-  RefreshCw,
-  User,
-  Camera,
-  History,
-  ChevronRight,
+  Calendar,
+  Clock3,
   CreditCard,
-  CalendarClock,
+  History,
+  Package,
+  WalletCards,
 } from "lucide-react-native";
-import QRCode from "react-native-qrcode-svg";
-import * as Brightness from "expo-brightness";
-import { useTimeoAuth } from "@timeo/auth";
 import {
-  useMemberQrCode,
-  useGenerateQrCode,
   useMemberships,
-  useFaceEnrollmentStatus,
+  useMyMembershipSubscriptions,
+  useMyPaymentRequests,
+  useSessionCredits,
 } from "@timeo/api-client";
-import {
-  Screen,
-  Header,
-  Card,
-  Button,
-  LoadingScreen,
-  Separator,
-  Spacer,
-  useTheme,
-} from "@timeo/ui";
+import { useTimeoAuth } from "@timeo/auth";
+import { Card, Header, Screen, Spacer, useTheme } from "@timeo/ui";
 
-export default function MembershipCardScreen() {
-  const theme = useTheme();
+type SubscriptionRow = {
+  subscription?: {
+    status?: string;
+    currentPeriodStart?: string;
+    current_period_start?: string;
+    currentPeriodEnd?: string;
+    current_period_end?: string;
+  };
+  plan?: {
+    name?: string | null;
+    price?: number | null;
+  };
+};
+
+function getSubscriptionStartDate(row: SubscriptionRow | null) {
+  return row?.subscription?.currentPeriodStart ?? row?.subscription?.current_period_start ?? null;
+}
+
+function getSubscriptionEndDate(row: SubscriptionRow | null) {
+  return row?.subscription?.currentPeriodEnd ?? row?.subscription?.current_period_end ?? null;
+}
+
+function formatDate(value?: string | null) {
+  if (!value) {
+    return "—";
+  }
+
+  return new Date(value).toLocaleDateString("en-MY", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatMoney(amount: number, currency = "MYR") {
+  return new Intl.NumberFormat("en-MY", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 0,
+  }).format(amount / 100);
+}
+
+function getStatusTone(status?: string) {
+  if (!status) {
+    return { label: "pending", color: "#88878F" };
+  }
+
+  if (status === "active") {
+    return { label: "active", color: "#10B981" };
+  }
+
+  if (status === "past_due" || status === "incomplete") {
+    return { label: status.replace("_", " "), color: "#F59E0B" };
+  }
+
+  if (status === "canceled") {
+    return { label: "canceled", color: "#EF4444" };
+  }
+
+  return { label: status.replace("_", " "), color: "#88878F" };
+}
+
+function getPaymentStatusTone(status: string) {
+  if (status === "approved") {
+    return "#10B981";
+  }
+
+  if (status === "pending_verification") {
+    return "#F59E0B";
+  }
+
+  if (status === "rejected") {
+    return "#EF4444";
+  }
+
+  return "#88878F";
+}
+
+export default function MembershipScreen() {
   const router = useRouter();
-  const { activeTenantId, user } = useTimeoAuth();
-  const tenantId = activeTenantId as string;
+  const theme = useTheme();
+  const { activeTenantId } = useTimeoAuth();
 
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [originalBrightness, setOriginalBrightness] = useState<number | null>(
-    null,
+  const { data: subscriptions = [], isLoading: subscriptionsLoading } =
+    useMyMembershipSubscriptions(activeTenantId);
+  const { data: sessionCredits = [], isLoading: creditsLoading } =
+    useSessionCredits(activeTenantId);
+  const { data: paymentRequests = [], isLoading: paymentsLoading } =
+    useMyPaymentRequests(activeTenantId);
+  const { data: plans = [], isLoading: plansLoading } = useMemberships(activeTenantId);
+
+  const sortedSubscriptions = useMemo(
+    () =>
+      [...(subscriptions as SubscriptionRow[])].sort((left, right) => {
+        const leftDate = new Date(getSubscriptionEndDate(left) ?? 0).getTime();
+        const rightDate = new Date(getSubscriptionEndDate(right) ?? 0).getTime();
+        return rightDate - leftDate;
+      }),
+    [subscriptions],
   );
 
-  const { data: qrCode, isLoading: qrLoading } = useMemberQrCode(tenantId);
-  const { data: memberships } = useMemberships(tenantId);
-  const { data: faceStatus } = useFaceEnrollmentStatus(tenantId);
-  const generateQrCode = useGenerateQrCode(tenantId ?? "");
+  const latestSubscription = sortedSubscriptions[0] ?? null;
+  const periodStart = getSubscriptionStartDate(latestSubscription);
+  const periodEnd = getSubscriptionEndDate(latestSubscription);
+  const planName = latestSubscription?.plan?.name ?? "No active plan";
+  const planStatus = latestSubscription?.subscription?.status;
 
-  // Auto-brighten screen when QR is displayed
-  useEffect(() => {
-    if (!qrCode) return;
+  const daysRemaining = useMemo(() => {
+    if (!periodEnd) return null;
+    const dayMs = 86_400_000;
+    return Math.ceil((new Date(periodEnd).getTime() - Date.now()) / dayMs);
+  }, [periodEnd]);
 
-    let mounted = true;
+  const totalSessions = sessionCredits.reduce(
+    (total, credit) => total + Math.max(0, credit.totalSessions ?? 0),
+    0,
+  );
+  const usedSessions = sessionCredits.reduce(
+    (total, credit) => total + Math.max(0, credit.usedSessions ?? 0),
+    0,
+  );
+  const remainingSessions = sessionCredits.reduce(
+    (total, credit) => total + Math.max(0, credit.remaining ?? 0),
+    0,
+  );
 
-    const brighten = async () => {
-      try {
-        const { status } = await Brightness.requestPermissionsAsync();
-        if (status !== "granted" || !mounted) return;
-
-        const current = await Brightness.getBrightnessAsync();
-        if (mounted) {
-          setOriginalBrightness(current);
-          await Brightness.setBrightnessAsync(1);
-        }
-      } catch {
-        // Brightness API may not be available on all devices
-      }
-    };
-
-    brighten();
-
-    return () => {
-      mounted = false;
-      if (originalBrightness !== null) {
-        Brightness.setBrightnessAsync(originalBrightness).catch(() => {});
-      }
-    };
-  }, [qrCode?.code]);
-
-  const handleGenerate = useCallback(async () => {
-    if (!tenantId) return;
-    setIsGenerating(true);
-    try {
-      await generateQrCode.mutateAsync({});
-    } catch (err) {
-      Alert.alert(
-        "Error",
-        err instanceof Error ? err.message : "Failed to generate QR code",
-      );
-    } finally {
-      setIsGenerating(false);
+  const activePlans = plans.filter((plan) => {
+    if (plan.isActive !== undefined) {
+      return plan.isActive;
     }
-  }, [tenantId, generateQrCode]);
 
-  const displayName = user?.name || "Member";
-  const activeMembership = memberships?.find((m) => m.isActive);
+    if (plan.is_active !== undefined) {
+      return plan.is_active;
+    }
 
-  if (!tenantId) {
-    return (
-      <Screen>
-        <Header title="Membership" />
-        <View className="flex-1 items-center justify-center">
-          <Text style={{ color: theme.colors.textSecondary }}>
-            No organization selected.
-          </Text>
-        </View>
-      </Screen>
-    );
-  }
+    return true;
+  });
 
-  if (qrLoading) {
-    return <LoadingScreen message="Loading membership card..." />;
-  }
+  const statusTone = getStatusTone(planStatus);
 
   return (
     <Screen scroll>
-      <Header title="Membership Card" />
+      <Header title="My Plan" />
 
       <Spacer size={16} />
 
-      {/* Member Info Card */}
       <Card>
-        <View className="items-center">
-          <View
-            className="h-20 w-20 items-center justify-center rounded-full"
-            style={{ backgroundColor: theme.colors.primary + "15" }}
-          >
-            {user?.imageUrl ? (
-              <View className="h-20 w-20 overflow-hidden rounded-full">
-                <Text
-                  className="text-center text-3xl font-bold"
-                  style={{ color: theme.colors.primary, lineHeight: 80 }}
-                >
-                  {displayName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-            ) : (
-              <User size={40} color={theme.colors.primary} />
-            )}
-          </View>
-
-          <Spacer size={12} />
-
-          <Text
-            className="text-xl font-bold"
-            style={{ color: theme.colors.text }}
-          >
-            {displayName}
+        <View className="flex-row items-center justify-between">
+          <Text className="text-base font-semibold" style={{ color: theme.colors.text }}>
+            Current Plan
           </Text>
-
-          {activeMembership ? (
-            <View className="mt-2 flex-row items-center">
-              <CreditCard size={14} color={theme.colors.primary} />
-              <Text
-                className="ml-1.5 text-sm font-semibold"
-                style={{ color: theme.colors.primary }}
-              >
-                {activeMembership.name}
-              </Text>
-            </View>
-          ) : null}
-
-          {user?.email ? (
-            <Text
-              className="mt-1 text-sm"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              {user.email}
-            </Text>
-          ) : null}
-        </View>
-      </Card>
-
-      <Spacer size={16} />
-
-      {/* QR Code Display */}
-      {qrCode ? (
-        <Card>
-          <View className="items-center py-4">
-            <View
-              className="items-center justify-center rounded-2xl p-4"
-              style={{ backgroundColor: "#FFFFFF" }}
-            >
-              <QRCode value={qrCode.code} size={220} />
-            </View>
-
-            <Spacer size={12} />
-
-            <View
-              className="rounded-full px-4 py-1.5"
-              style={{ backgroundColor: theme.colors.success + "15" }}
-            >
-              <Text
-                className="text-sm font-semibold"
-                style={{ color: theme.colors.success }}
-              >
-                Active
-              </Text>
-            </View>
-
-            <Spacer size={8} />
-
-            <Text
-              className="text-center text-xs"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              Show this code at the front desk to check in
-            </Text>
-
-            {qrCode.expiresAt ? (
-              <View className="mt-2 flex-row items-center">
-                <CalendarClock size={12} color={theme.colors.warning} />
-                <Text
-                  className="ml-1 text-xs"
-                  style={{ color: theme.colors.warning }}
-                >
-                  Expires{" "}
-                  {new Date(qrCode.expiresAt).toLocaleDateString("en-MY", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        </Card>
-      ) : (
-        <Card>
-          <View className="items-center py-8">
-            <QrCode size={64} color={theme.colors.textSecondary + "50"} />
-            <Spacer size={16} />
-            <Text
-              className="text-base font-semibold"
-              style={{ color: theme.colors.text }}
-            >
-              No Membership Card
-            </Text>
-            <Text
-              className="mt-1 text-center text-sm"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              Generate your QR code to check in at the gym
-            </Text>
-            <Spacer size={20} />
-            <Button onPress={handleGenerate} loading={isGenerating}>
-              <View className="flex-row items-center">
-                <QrCode
-                  size={16}
-                  color={theme.dark ? "#0B0B0F" : "#FFFFFF"}
-                />
-                <Text
-                  className="ml-2 font-semibold"
-                  style={{ color: theme.dark ? "#0B0B0F" : "#FFFFFF" }}
-                >
-                  Generate QR Code
-                </Text>
-              </View>
-            </Button>
-          </View>
-        </Card>
-      )}
-
-      {qrCode ? (
-        <>
-          <Spacer size={12} />
-          <Button
-            variant="outline"
-            onPress={handleGenerate}
-            loading={isGenerating}
+          <View
+            className="rounded-full px-2.5 py-1"
+            style={{ backgroundColor: statusTone.color + "20" }}
           >
-            <View className="flex-row items-center">
-              <RefreshCw size={16} color={theme.colors.primary} />
-              <Text
-                className="ml-2 font-semibold"
-                style={{ color: theme.colors.primary }}
-              >
-                Regenerate Code
-              </Text>
-            </View>
-          </Button>
-        </>
-      ) : null}
+            <Text className="text-xs font-semibold capitalize" style={{ color: statusTone.color }}>
+              {statusTone.label}
+            </Text>
+          </View>
+        </View>
 
-      <Spacer size={24} />
-
-      {/* Quick Navigation */}
-      <Card>
-        <Text
-          className="mb-3 text-sm font-semibold uppercase tracking-wide"
-          style={{ color: theme.colors.textSecondary }}
-        >
-          Membership
+        <Text className="mt-2 text-xl font-bold" style={{ color: theme.colors.text }}>
+          {subscriptionsLoading ? "Loading..." : planName}
         </Text>
 
-        <Separator />
+        <View className="mt-3 flex-row">
+          <View className="mr-2 flex-1 rounded-xl border px-3 py-2" style={{ borderColor: theme.colors.border }}>
+            <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>
+              Start
+            </Text>
+            <Text className="mt-1 text-sm font-semibold" style={{ color: theme.colors.text }}>
+              {formatDate(periodStart)}
+            </Text>
+          </View>
 
-        <View
-          style={{ opacity: 1 }}
-          className="flex-row items-center py-3"
-          onTouchEnd={() =>
-            router.push("/(main)/(customer)/face-enrollment" as never)
-          }
-        >
-          <View
-            className="mr-3 rounded-lg p-2"
-            style={{ backgroundColor: theme.colors.info + "15" }}
-          >
-            <Camera size={18} color={theme.colors.info} />
-          </View>
-          <View className="flex-1">
-            <Text
-              className="text-base"
-              style={{ color: theme.colors.text }}
-            >
-              Face Enrollment
+          <View className="flex-1 rounded-xl border px-3 py-2" style={{ borderColor: theme.colors.border }}>
+            <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>
+              End
             </Text>
-            <Text
-              className="text-xs"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              {faceStatus?.enrolled ? "Enrolled" : "Not enrolled"}
+            <Text className="mt-1 text-sm font-semibold" style={{ color: theme.colors.text }}>
+              {formatDate(periodEnd)}
             </Text>
           </View>
-          <ChevronRight size={18} color={theme.colors.textSecondary} />
         </View>
 
-        <Separator />
-
         <View
-          className="flex-row items-center py-3"
-          onTouchEnd={() =>
-            router.push("/(main)/(customer)/checkin-history" as never)
-          }
+          className="mt-3 rounded-xl px-3 py-2"
+          style={{ backgroundColor: theme.colors.background + "80" }}
         >
-          <View
-            className="mr-3 rounded-lg p-2"
-            style={{ backgroundColor: theme.colors.warning + "15" }}
-          >
-            <History size={18} color={theme.colors.warning} />
-          </View>
-          <View className="flex-1">
-            <Text
-              className="text-base"
-              style={{ color: theme.colors.text }}
-            >
-              Check-in History
-            </Text>
-            <Text
-              className="text-xs"
-              style={{ color: theme.colors.textSecondary }}
-            >
-              View your past visits
-            </Text>
-          </View>
-          <ChevronRight size={18} color={theme.colors.textSecondary} />
+          <Text className="text-sm" style={{ color: theme.colors.text }}>
+            {daysRemaining === null
+              ? "Your plan status appears here once subscribed."
+              : `${Math.max(daysRemaining, 0)} day${daysRemaining === 1 ? "" : "s"} remaining`}
+          </Text>
         </View>
+
+        <TouchableOpacity
+          onPress={() => router.push("/(main)/(customer)/memberships" as never)}
+          className="mt-4 rounded-xl px-4 py-3"
+          style={{ backgroundColor: theme.colors.primary }}
+        >
+          <Text className="text-center text-sm font-semibold" style={{ color: "#0B0B0F" }}>
+            Renew / Top-up
+          </Text>
+        </TouchableOpacity>
       </Card>
 
-      <Spacer size={40} />
+      <Spacer size={12} />
+
+      <Card>
+        <View className="mb-3 flex-row items-center">
+          <CreditCard size={16} color={theme.colors.textSecondary} />
+          <Text className="ml-2 text-base font-semibold" style={{ color: theme.colors.text }}>
+            Session Credits
+          </Text>
+        </View>
+
+        {creditsLoading ? (
+          <Text className="text-sm" style={{ color: theme.colors.textSecondary }}>
+            Loading credits...
+          </Text>
+        ) : totalSessions === 0 ? (
+          <Text className="text-sm" style={{ color: theme.colors.textSecondary }}>
+            No session package yet. Top up credits to book more classes.
+          </Text>
+        ) : (
+          <>
+            <View
+              className="rounded-2xl px-4 py-4"
+              style={{ backgroundColor: theme.colors.background + "80" }}
+            >
+              <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>
+                Remaining Credits
+              </Text>
+              <Text className="mt-1 text-3xl font-bold" style={{ color: theme.colors.text }}>
+                {remainingSessions}
+              </Text>
+              <Text className="mt-1 text-xs" style={{ color: theme.colors.textSecondary }}>
+                {usedSessions} used out of {totalSessions}
+              </Text>
+            </View>
+
+            {sessionCredits.map((credit, index) => (
+              <View
+                key={credit.id}
+                className={`mt-3 flex-row items-center justify-between rounded-xl px-3 py-2 ${
+                  index < sessionCredits.length - 1 ? "" : ""
+                }`}
+                style={{ backgroundColor: theme.colors.background + "60" }}
+              >
+                <View className="flex-1 pr-3">
+                  <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
+                    {credit.packageName ?? "Session package"}
+                  </Text>
+                  <Text className="text-xs" style={{ color: theme.colors.textSecondary }}>
+                    Expires {formatDate(credit.expiresAt)}
+                  </Text>
+                </View>
+                <Text className="text-sm font-bold" style={{ color: theme.colors.primary }}>
+                  {credit.remaining}/{credit.totalSessions}
+                </Text>
+              </View>
+            ))}
+          </>
+        )}
+      </Card>
+
+      <Spacer size={12} />
+
+      <Card>
+        <View className="mb-3 flex-row items-center justify-between">
+          <View className="flex-row items-center">
+            <History size={16} color={theme.colors.textSecondary} />
+            <Text className="ml-2 text-base font-semibold" style={{ color: theme.colors.text }}>
+              Payment History
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => router.push("/(main)/(customer)/memberships" as never)}
+          >
+            <Text className="text-xs font-semibold" style={{ color: theme.colors.primary }}>
+              Full history
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {paymentsLoading ? (
+          <Text className="text-sm" style={{ color: theme.colors.textSecondary }}>
+            Loading payments...
+          </Text>
+        ) : paymentRequests.length === 0 ? (
+          <Text className="text-sm" style={{ color: theme.colors.textSecondary }}>
+            No payments yet.
+          </Text>
+        ) : (
+          paymentRequests.slice(0, 6).map((payment, index) => {
+            const tone = getPaymentStatusTone(payment.status);
+
+            return (
+              <View
+                key={payment.id}
+                className={`rounded-xl px-3 py-3 ${index > 0 ? "mt-2" : ""}`}
+                style={{ backgroundColor: theme.colors.background + "60" }}
+              >
+                <View className="flex-row items-start justify-between">
+                  <View className="flex-1 pr-2">
+                    <Text className="text-sm font-semibold" style={{ color: theme.colors.text }}>
+                      {payment.planName}
+                    </Text>
+                    <Text className="mt-0.5 text-xs" style={{ color: theme.colors.textSecondary }}>
+                      {new Date(payment.createdAt).toLocaleDateString("en-MY")}
+                    </Text>
+                  </View>
+
+                  <View
+                    className="rounded-full px-2 py-0.5"
+                    style={{ backgroundColor: tone + "20" }}
+                  >
+                    <Text className="text-[11px] font-semibold" style={{ color: tone }}>
+                      {payment.status.replace("_", " ")}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text className="mt-2 text-sm font-bold" style={{ color: theme.colors.primary }}>
+                  {formatMoney(payment.amount, payment.currency)}
+                </Text>
+              </View>
+            );
+          })
+        )}
+      </Card>
+
+      <Spacer size={12} />
+
+      <Card>
+        <View className="mb-3 flex-row items-center">
+          <WalletCards size={16} color={theme.colors.textSecondary} />
+          <Text className="ml-2 text-base font-semibold" style={{ color: theme.colors.text }}>
+            Available Plans
+          </Text>
+        </View>
+
+        {plansLoading ? (
+          <Text className="text-sm" style={{ color: theme.colors.textSecondary }}>
+            Loading plans...
+          </Text>
+        ) : activePlans.length === 0 ? (
+          <Text className="text-sm" style={{ color: theme.colors.textSecondary }}>
+            No plans published yet.
+          </Text>
+        ) : (
+          activePlans.slice(0, 4).map((plan, index) => (
+            <TouchableOpacity
+              key={plan.id}
+              onPress={() => router.push("/(main)/(customer)/memberships" as never)}
+              className={`rounded-xl px-3 py-3 ${index > 0 ? "mt-2" : ""}`}
+              style={{ backgroundColor: theme.colors.background + "60" }}
+            >
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1 pr-3">
+                  <View className="flex-row items-center">
+                    <Package size={14} color={theme.colors.textSecondary} />
+                    <Text className="ml-1.5 text-sm font-semibold" style={{ color: theme.colors.text }}>
+                      {plan.name}
+                    </Text>
+                  </View>
+                  <Text className="mt-0.5 text-xs" style={{ color: theme.colors.textSecondary }}>
+                    {plan.description ?? "Membership package"}
+                  </Text>
+                </View>
+
+                <View className="items-end">
+                  <Text className="text-sm font-bold" style={{ color: theme.colors.primary }}>
+                    {formatMoney(plan.price, plan.currency)}
+                  </Text>
+                  <View className="mt-1 flex-row items-center">
+                    <Calendar size={11} color={theme.colors.textSecondary} />
+                    <Text className="ml-1 text-[11px]" style={{ color: theme.colors.textSecondary }}>
+                      {plan.billingInterval === "yearly" ? "Yearly" : "Monthly"}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
+      </Card>
+
+      <Spacer size={16} />
+
+      <TouchableOpacity
+        onPress={() => router.push("/(main)/(customer)/checkin-history" as never)}
+        className="flex-row items-center justify-center rounded-xl border px-4 py-3"
+        style={{ borderColor: theme.colors.border }}
+      >
+        <Clock3 size={16} color={theme.colors.primary} />
+        <Text className="ml-2 text-sm font-semibold" style={{ color: theme.colors.primary }}>
+          View Check-in History
+        </Text>
+      </TouchableOpacity>
     </Screen>
   );
 }

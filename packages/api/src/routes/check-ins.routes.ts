@@ -1,7 +1,15 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import { db, generateId } from "@timeo/db";
-import { checkIns, users, memberQrCodes, tenantMemberships } from "@timeo/db/schema";
+import {
+  checkIns,
+  users,
+  memberQrCodes,
+  tenantMemberships,
+  subscriptions,
+  memberships,
+} from "@timeo/db/schema";
 import { eq, desc, and, gte, sql, count } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
@@ -9,8 +17,43 @@ import { requireRole } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
 import { CreateCheckInSchema } from "../lib/validation.js";
 import * as CheckInService from "../services/check-in.service.js";
+import { buildPermanentQr, signPermanentCode } from "./gate.routes.js";
 
 const app = new Hono();
+
+const ScanCheckInSchema = z.object({
+  qrCode: z.string().min(1),
+});
+
+function resolveUserIdFromQr(
+  qrCode: string,
+  tenantId: string,
+): { ok: true; memberId: string } | { ok: false; message: string } {
+  if (!qrCode.startsWith("TM:")) {
+    return {
+      ok: false,
+      message: "Unsupported QR format. Please refresh your member QR code.",
+    };
+  }
+
+  const parts = qrCode.split(":");
+  if (parts.length < 3 || parts[0] !== "TM") {
+    return { ok: false, message: "Invalid QR format" };
+  }
+
+  const signature = parts[parts.length - 1];
+  const memberId = parts.slice(1, -1).join(":").trim();
+  if (!memberId) {
+    return { ok: false, message: "Invalid member identifier in QR code" };
+  }
+
+  const expectedSignature = signPermanentCode(memberId, tenantId);
+  if (signature !== expectedSignature) {
+    return { ok: false, message: "QR signature is invalid" };
+  }
+
+  return { ok: true, memberId };
+}
 
 // GET /tenants/:tenantId/check-ins/stats
 app.get(
@@ -154,6 +197,99 @@ app.post(
   },
 );
 
+// POST /tenants/:tenantId/check-ins/scan
+app.post(
+  "/scan",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin", "staff", "coach"),
+  zValidator("json", ScanCheckInSchema),
+  async (c) => {
+    const user = c.get("user");
+    const tenantId = c.get("tenantId");
+    const body = c.req.valid("json");
+
+    try {
+      const resolved = resolveUserIdFromQr(body.qrCode, tenantId);
+      if (!resolved.ok) {
+        return c.json(
+          error("CHECKIN_QR_INVALID", resolved.message),
+          422,
+        );
+      }
+
+      const [membership] = await db
+        .select({ userId: tenantMemberships.user_id })
+        .from(tenantMemberships)
+        .where(
+          and(
+            eq(tenantMemberships.tenant_id, tenantId),
+            eq(tenantMemberships.member_id, resolved.memberId),
+            eq(tenantMemberships.status, "active"),
+          ),
+        )
+        .limit(1);
+
+      if (!membership) {
+        return c.json(
+          error("CHECKIN_MEMBER_NOT_FOUND", "Member not found for this QR code"),
+          404,
+        );
+      }
+
+      const checkInId = await CheckInService.createCheckIn({
+        tenantId,
+        userId: membership.userId,
+        method: "qr",
+        checkedInBy: user.id,
+      });
+
+      const [member] = await db
+        .select({
+          name: users.name,
+          email: users.email,
+          photoUrl: users.avatar_url,
+        })
+        .from(users)
+        .where(eq(users.id, membership.userId))
+        .limit(1);
+
+      const [activeSubscription] = await db
+        .select({ membershipName: memberships.name })
+        .from(subscriptions)
+        .leftJoin(memberships, eq(subscriptions.membership_id, memberships.id))
+        .where(
+          and(
+            eq(subscriptions.tenant_id, tenantId),
+            eq(subscriptions.customer_id, membership.userId),
+            eq(subscriptions.status, "active"),
+          ),
+        )
+        .limit(1);
+
+      return c.json(
+        success({
+          checkInId,
+          validation: {
+            valid: true,
+            code: "granted",
+            message: "Check-in granted",
+          },
+          member: {
+            name: member?.name ?? "Member",
+            email: member?.email ?? null,
+            membershipName: activeSubscription?.membershipName ?? null,
+            photoUrl: member?.photoUrl ?? null,
+          },
+        }),
+        201,
+      );
+    } catch (err) {
+      return c.json(error("CHECKIN_SCAN_ERROR", (err as Error).message), 500);
+    }
+  },
+);
+
 
 // GET /tenants/:tenantId/check-ins/my-history - customer check-in history
 app.get(
@@ -288,8 +424,6 @@ app.get(
     }
   },
 );
-
-import { buildPermanentQr } from "./gate.routes.js";
 
 // ─── GET /check-ins/qr-code ─────────────────────────────────────────────────
 // Returns the member's permanent QR code. Creates it on first call.

@@ -37,6 +37,8 @@ import { doorWebhookRouter } from "./routes/webhooks/door.js";
 import { gateRouter } from "./routes/gate.routes.js";
 import { walletRouter } from "./routes/wallet.routes.js";
 import { coachRouter } from "./routes/coach.routes.js";
+import { coachWorkflowRouter } from "./routes/coach-workflow.routes.js";
+import { sessionLogsRouter } from "./routes/session-logs.routes.js";
 import { notificationTemplatesRouter, notificationSettingsRouter } from "./routes/notification-templates.routes.js";
 import { invoicesRouter } from "./routes/invoices.routes.js";
 import { healthRouter } from "./routes/health.js";
@@ -92,6 +94,8 @@ export function createApp() {
   app.route("/api/tenants/:tenantId", gymRouter);
   app.route("/api/tenants/:tenantId/mission-control", missionControlRouter);
   app.route("/api/tenants/:tenantId/coaches", coachRouter);
+  app.route("/api/tenants/:tenantId/coach", coachWorkflowRouter);
+  app.route("/api/tenants/:tenantId/session-logs", sessionLogsRouter);
   app.route("/api/tenants/:tenantId/ui-config", uiConfigRouter);
 
   // Gym device check-in (no auth - uses API key, tenant derived from QR code)

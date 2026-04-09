@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Home, Briefcase, CalendarCheck, CreditCard, User } from "lucide-react-native";
+import { Home, CalendarCheck, CreditCard, User } from "lucide-react-native";
 
 export default function CustomerTabsLayout() {
   return (
@@ -22,24 +22,23 @@ export default function CustomerTabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="services"
+        name="membership"
         options={{
-          title: "Services",
-          tabBarIcon: ({ color, size }) => <Briefcase size={size} color={color} />,
+          title: "My Plan",
+          tabBarIcon: ({ color, size }) => <CreditCard size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="bookings"
         options={{
-          title: "Bookings",
+          title: "Activity",
           tabBarIcon: ({ color, size }) => <CalendarCheck size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="membership"
+        name="services"
         options={{
-          title: "Membership",
-          tabBarIcon: ({ color, size }) => <CreditCard size={size} color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen

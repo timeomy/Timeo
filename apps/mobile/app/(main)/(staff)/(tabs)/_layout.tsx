@@ -4,6 +4,9 @@ import {
   CalendarDays,
   Package,
   ClipboardList,
+  Users,
+  History,
+  PlusCircle,
 } from "lucide-react-native";
 import { AuthGuard, RoleGuard, useTimeoAuth, useTenantSwitcher } from "@timeo/auth";
 import { LoadingScreen, useTheme } from "@timeo/ui";
@@ -27,7 +30,7 @@ function AccessDenied() {
         className="mt-2 text-center text-sm"
         style={{ color: theme.colors.textSecondary }}
       >
-        You need at least staff-level access to use this app.
+        You need at least coach-level access to use this app.
       </Text>
     </View>
   );
@@ -78,7 +81,7 @@ function TenantAndRoleGate({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <RoleGuard minimumRole="staff" fallback={<AccessDenied />}>
+    <RoleGuard minimumRole="coach" fallback={<AccessDenied />}>
       {children}
     </RoleGuard>
   );
@@ -86,6 +89,8 @@ function TenantAndRoleGate({ children }: { children: React.ReactNode }) {
 
 export default function TabLayout() {
   const theme = useTheme();
+  const { activeRole } = useTimeoAuth();
+  const isCoach = activeRole === "coach";
 
   return (
     <AuthGuard
@@ -111,16 +116,16 @@ export default function TabLayout() {
           <Tabs.Screen
             name="index"
             options={{
-              title: "Dashboard",
+              title: isCoach ? "My Clients" : "Dashboard",
               tabBarIcon: ({ color, size }) => (
-                <LayoutDashboard size={size} color={color} />
+                isCoach ? <Users size={size} color={color} /> : <LayoutDashboard size={size} color={color} />
               ),
             }}
           />
           <Tabs.Screen
             name="bookings"
             options={{
-              title: "Bookings",
+              title: isCoach ? "Schedule" : "Bookings",
               tabBarIcon: ({ color, size }) => (
                 <CalendarDays size={size} color={color} />
               ),
@@ -129,18 +134,20 @@ export default function TabLayout() {
           <Tabs.Screen
             name="products"
             options={{
-              title: "Products",
+              title: isCoach ? "Sessions" : "Products",
+              href: isCoach ? "/session-logs" : undefined,
               tabBarIcon: ({ color, size }) => (
-                <Package size={size} color={color} />
+                isCoach ? <History size={size} color={color} /> : <Package size={size} color={color} />
               ),
             }}
           />
           <Tabs.Screen
             name="orders"
             options={{
-              title: "Orders",
+              title: isCoach ? "Log Session" : "Orders",
+              href: isCoach ? "/session-logs/create" : undefined,
               tabBarIcon: ({ color, size }) => (
-                <ClipboardList size={size} color={color} />
+                isCoach ? <PlusCircle size={size} color={color} /> : <ClipboardList size={size} color={color} />
               ),
             }}
           />

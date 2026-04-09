@@ -26,7 +26,7 @@ interface Tenant {
   updatedAt: string;
 }
 
-type TimeoRole = "platform_admin" | "admin" | "staff" | "customer";
+type TimeoRole = "platform_admin" | "admin" | "staff" | "coach" | "customer";
 
 interface TenantWithRole extends Tenant {
   role: TimeoRole;

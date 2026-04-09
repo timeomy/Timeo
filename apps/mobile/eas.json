@@ -21,7 +21,14 @@
     },
     "production": {
       "autoIncrement": true,
+      "distribution": "store",
       "node": "22.22.1",
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "simulator": false
+      },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.timeo.my",
         "EXPO_PUBLIC_APP_SCHEME": "timeo"

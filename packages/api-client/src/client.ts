@@ -5,13 +5,19 @@ type ApiResponse<T> =
   | { success: true; data: T }
   | { success: false; error: { code: string; message: string } };
 
+type RuntimeGlobals = {
+  EXPO_PUBLIC_API_URL?: string;
+  __timeoGetAuthCookie?: () => string | null;
+  localStorage?: { getItem: (key: string) => string | null };
+};
+
 function getBaseUrl(): string {
+  const runtimeGlobal = globalThis as RuntimeGlobals;
+
   if (typeof window !== "undefined") {
     // Mobile (Expo) — use the explicit API URL so requests go directly
     // to the Hono server (no browser-cookie concerns on native).
-    const expoUrl =
-      (globalThis as Record<string, unknown>).EXPO_PUBLIC_API_URL as string ??
-      process.env.EXPO_PUBLIC_API_URL;
+    const expoUrl = runtimeGlobal.EXPO_PUBLIC_API_URL ?? process.env.EXPO_PUBLIC_API_URL;
     if (expoUrl) return expoUrl;
 
     // Web (Next.js) — use same origin so session cookies are sent.
@@ -39,13 +45,12 @@ export class ApiError extends Error {
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}${path}`;
+  const runtimeGlobal = globalThis as RuntimeGlobals;
 
   const contextHeaders: Record<string, string> = {};
   if (typeof window !== "undefined") {
     try {
-      const localStorageLike = (
-        globalThis as { localStorage?: { getItem: (key: string) => string | null } }
-      ).localStorage;
+      const localStorageLike = runtimeGlobal.localStorage;
 
       const activeTenantId = localStorageLike?.getItem("timeo.activeTenantId");
       const viewMode = localStorageLike?.getItem("timeo.viewMode");
@@ -57,6 +62,15 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
     } catch {
       // localStorage may be unavailable in private mode; ignore safely.
     }
+  }
+
+  try {
+    const authCookie = runtimeGlobal.__timeoGetAuthCookie?.();
+    if (authCookie) {
+      contextHeaders.Cookie = authCookie;
+    }
+  } catch {
+    // Cookie bridge may not exist in non-mobile runtimes.
   }
 
   const response = await fetch(url, {

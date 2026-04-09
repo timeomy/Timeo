@@ -101,6 +101,13 @@ export {
 } from "./sessions";
 
 export {
+  useCoachClients,
+  useCoachSchedule,
+  useClassAttendance,
+  useMarkAttendance,
+} from "./coach";
+
+export {
   useMemberships,
   useMembership,
   useMyMembershipSubscriptions,

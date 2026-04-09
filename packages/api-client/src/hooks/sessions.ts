@@ -40,22 +40,57 @@ interface ExerciseEntry {
 
 interface SessionLog {
   id: string;
-  tenantId: string;
-  userId: string;
+  tenantId?: string;
+  userId?: string;
+  clientId?: string;
+  coachId?: string;
   creditId?: string;
   serviceId?: string;
-  usedAt: string;
+  usedAt?: string;
   createdAt: string;
+  updatedAt?: string;
   userName?: string;
   serviceName?: string;
   /** Session type e.g. personal_training, group_class */
   sessionType?: string;
+  duration?: number | null;
   clientName?: string;
+  clientAvatar?: string | null;
   clientEmail?: string;
   coachName?: string;
+  coachEmail?: string;
   notes?: string;
   exercises: ExerciseEntry[];
   metrics?: Record<string, unknown>;
+}
+
+type SessionLogScope = "tenant" | "coach";
+
+interface SessionLogOptions {
+  scope?: SessionLogScope;
+  clientId?: string;
+  coachId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+interface CreateSessionLogOptions {
+  scope?: SessionLogScope;
+}
+
+interface CreateSessionLogInput {
+  creditId?: string;
+  userId?: string;
+  clientId?: string;
+  coachId?: string;
+  serviceId?: string;
+  clientEmail?: string;
+  sessionType?: string;
+  notes?: string;
+  exercises?: ExerciseEntry[];
+  metrics?: Record<string, unknown>;
+  duration?: number;
+  date?: string;
 }
 
 export function useSessionPackages(tenantId: string | null | undefined) {
@@ -87,11 +122,42 @@ export function useSessionCredits(
   });
 }
 
-export function useSessionLogs(tenantId: string | null | undefined) {
+export function useSessionLogs(
+  tenantId: string | null | undefined,
+  options?: SessionLogOptions,
+) {
+  const scope = options?.scope ?? "tenant";
+
   return useQuery({
-    queryKey: queryKeys.sessions.logs(tenantId ?? ""),
-    queryFn: () =>
-      api.get<SessionLog[]>(`/api/tenants/${tenantId}/sessions/logs`),
+    queryKey:
+      scope === "coach"
+        ? [
+            ...queryKeys.sessions.logs(tenantId ?? ""),
+            "coach",
+            options?.clientId ?? "",
+            options?.coachId ?? "",
+            options?.dateFrom ?? "",
+            options?.dateTo ?? "",
+          ]
+        : queryKeys.sessions.logs(tenantId ?? ""),
+    queryFn: () => {
+      if (scope === "coach") {
+        const params = new URLSearchParams();
+        if (options?.clientId) params.set("clientId", options.clientId);
+        if (options?.coachId) params.set("coachId", options.coachId);
+        if (options?.dateFrom) params.set("dateFrom", options.dateFrom);
+        if (options?.dateTo) params.set("dateTo", options.dateTo);
+
+        const queryString = params.toString();
+        return api.get<SessionLog[]>(
+          `/api/tenants/${tenantId}/session-logs${
+            queryString ? `?${queryString}` : ""
+          }`,
+        );
+      }
+
+      return api.get<SessionLog[]>(`/api/tenants/${tenantId}/sessions/logs`);
+    },
     enabled: !!tenantId,
     staleTime: 30_000,
   });
@@ -216,26 +282,64 @@ export function useAdjustSessionCredits(tenantId: string) {
   });
 }
 
-export function useCreateSessionLog(tenantId: string) {
+export function useCreateSessionLog(
+  tenantId: string,
+  options?: CreateSessionLogOptions,
+) {
   const queryClient = useQueryClient();
+  const scope = options?.scope ?? "tenant";
+
   return useMutation({
-    mutationFn: (data: {
-      creditId?: string;
-      userId?: string;
-      serviceId?: string;
-      clientEmail?: string;
-      sessionType?: string;
-      notes?: string;
-      exercises?: ExerciseEntry[];
-      metrics?: Record<string, unknown>;
-    }) =>
-      api.post<{ logId: string }>(
-        `/api/tenants/${tenantId}/sessions/logs`,
-        data,
-      ),
+    mutationFn: (data: CreateSessionLogInput) => {
+      if (scope === "coach") {
+        const clientId = data.clientId ?? data.userId;
+        if (!clientId) {
+          throw new Error("clientId is required for coach session logs");
+        }
+
+        const fallbackDuration = (() => {
+          if (typeof data.duration === "number") return data.duration;
+
+          const metricDuration = data.metrics?.durationMinutes;
+          if (typeof metricDuration === "number") {
+            return Math.max(1, Math.round(metricDuration));
+          }
+
+          return 60;
+        })();
+
+        return api.post<{ id: string }>(`/api/tenants/${tenantId}/session-logs`, {
+          clientId,
+          coachId: data.coachId,
+          sessionType: data.sessionType ?? "personal_training",
+          duration: fallbackDuration,
+          notes: data.notes,
+          date: data.date,
+        });
+      }
+
+      return api
+        .post<{ logId: string }>(`/api/tenants/${tenantId}/sessions/logs`, {
+          clientId: data.clientId ?? data.userId,
+          clientEmail: data.clientEmail,
+          bookingId: undefined,
+          creditId: data.creditId,
+          sessionType: data.sessionType,
+          notes: data.notes,
+          exercises: data.exercises,
+          metrics: data.metrics,
+        })
+        .then((result) => ({ id: result.logId }));
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.sessions.logs(tenantId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: [
+          ...queryKeys.sessions.logs(tenantId),
+          "coach",
+        ],
       });
       queryClient.invalidateQueries({
         queryKey: queryKeys.sessions.credits(tenantId),

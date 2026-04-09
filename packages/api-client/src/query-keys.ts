@@ -57,6 +57,14 @@ export const queryKeys = {
     logs: (tenantId: string) => ["sessions", tenantId, "logs"] as const,
   },
 
+  coach: {
+    clients: (tenantId: string) => ["coach", tenantId, "clients"] as const,
+    schedule: (tenantId: string, coachId?: string) =>
+      ["coach", tenantId, "schedule", coachId ?? "me"] as const,
+    attendance: (tenantId: string, classId: string) =>
+      ["coach", tenantId, "attendance", classId] as const,
+  },
+
   memberships: {
     all: (tenantId: string) => ["memberships", tenantId] as const,
     byId: (tenantId: string, id: string) => ["memberships", tenantId, id] as const,

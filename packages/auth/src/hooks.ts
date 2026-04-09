@@ -41,10 +41,12 @@ export function useTenantSwitcher(): TenantSwitcherContext {
 export function useRole(): RoleContext {
   const { activeRole } = useTimeoAuthContext();
 
+  const isCoach = activeRole === "coach";
+
   return {
     role: activeRole,
     isCustomer: activeRole === "customer",
-    isStaff: isRoleAtLeast(activeRole, "staff"),
+    isStaff: isCoach || isRoleAtLeast(activeRole, "staff"),
     isAdmin: isRoleAtLeast(activeRole, "admin"),
     isPlatformAdmin: activeRole === "platform_admin",
   };

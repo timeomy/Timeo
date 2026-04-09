@@ -3,7 +3,7 @@ import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { useRole, useTimeoAuth } from "@timeo/auth";
 
 export default function RoleRouter() {
-  const { isLoaded, isSignedIn } = useTimeoAuth();
+  const { isLoaded, isSignedIn, activeRole } = useTimeoAuth();
   const { isPlatformAdmin, isAdmin, isStaff } = useRole();
 
   if (!isLoaded) {
@@ -26,7 +26,7 @@ export default function RoleRouter() {
     return <Redirect href="/(main)/(admin)/(tabs)" />;
   }
 
-  if (isStaff) {
+  if (isStaff || activeRole === "coach") {
     return <Redirect href="/(main)/(staff)/(tabs)" />;
   }
 

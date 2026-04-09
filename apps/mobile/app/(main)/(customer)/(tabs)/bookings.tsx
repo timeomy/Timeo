@@ -58,7 +58,7 @@ export default function BookingsScreen() {
 
   return (
     <Screen padded={false}>
-      <Header title="My Bookings" />
+      <Header title="Activity & Bookings" />
 
       {/* Tab Selector */}
       <View className="mx-4 mb-3 flex-row rounded-xl p-1"

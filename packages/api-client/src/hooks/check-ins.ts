@@ -16,6 +16,20 @@ interface CheckIn {
   status?: "granted" | "denied";
 }
 
+interface CheckInListApiRow {
+  checkIn: {
+    id: string;
+    tenant_id: string;
+    user_id: string;
+    method: "qr" | "face" | "nfc" | "manual";
+    timestamp: string;
+  };
+  user: {
+    name?: string;
+    email?: string;
+  } | null;
+}
+
 interface CheckInStats {
   today: number;
   thisWeek: number;
@@ -35,9 +49,21 @@ export function useCheckIns(
   const date = options?.date;
   return useQuery({
     queryKey: [...queryKeys.checkIns.all(tenantId ?? ""), date],
-    queryFn: () => {
+    queryFn: async () => {
       const params = date ? `?date=${date}` : "";
-      return api.get<CheckIn[]>(`/api/tenants/${tenantId}/check-ins${params}`);
+      const rows = await api.get<CheckInListApiRow[]>(
+        `/api/tenants/${tenantId}/check-ins${params}`,
+      );
+
+      return rows.map((row) => ({
+        id: row.checkIn.id,
+        tenantId: row.checkIn.tenant_id,
+        userId: row.checkIn.user_id,
+        method: row.checkIn.method,
+        checkedInAt: new Date(row.checkIn.timestamp).toISOString(),
+        userName: row.user?.name,
+        userEmail: row.user?.email,
+      }));
     },
     enabled: !!tenantId,
     staleTime: 30_000,
@@ -79,15 +105,19 @@ export function useCheckInByQr(tenantId: string) {
     mutationFn: (qrCode: string) =>
       api.post<{
         checkInId: string;
+        validation?: {
+          valid: boolean;
+          code: string;
+          message: string;
+        };
         member?: {
           name: string;
-          email?: string;
-          membershipName?: string;
-          photoUrl?: string;
+          email?: string | null;
+          membershipName?: string | null;
+          photoUrl?: string | null;
         };
-      }>(`/api/tenants/${tenantId}/check-ins`, {
+      }>(`/api/tenants/${tenantId}/check-ins/scan`, {
         qrCode,
-        method: "qr",
       }),
     onSuccess: () =>
       queryClient.invalidateQueries({
