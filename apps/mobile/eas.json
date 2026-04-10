@@ -24,9 +24,9 @@
       }
     },
     "production": {
+      "extends": "base",
       "autoIncrement": true,
       "distribution": "store",
-      "node": "22.22.1",
       "android": {
         "buildType": "app-bundle"
       },
