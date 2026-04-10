@@ -17,7 +17,7 @@
 //   GET /api/gate/qr-token?tenantId=xxx  (legacy, still works)
 //   GET /api/tenants/:id/check-ins/qr-code  (new permanent, preferred)
 
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { createDecipheriv, createHmac } from "crypto";
 import { db } from "@timeo/db";
 import { generateId } from "@timeo/db";
@@ -25,6 +25,7 @@ import {
   checkIns,
   users,
   auditLogs,
+  accessLogs,
   tenantMemberships,
   tenants,
   subscriptions,
@@ -42,8 +43,33 @@ const QR_SECRET = process.env.QR_TOKEN_SECRET ?? "timeo-qr-secret-change-me";
 const WS_FITNESS_QR_KEY = "wsfitness_secret";
 const QR_TIMESTAMP_TOLERANCE_SECONDS = 300;
 const QR_GRACE_DAYS = 365;
+const ZAH_RESPONSE_CONTENT_TYPE = "text/html; charset=utf-8";
 const HEX_8_REGEX = /^[0-9A-F]{8}$/i;
 const ENCRYPTED_QR_REGEX = /^[0-9A-F]{32}$/i;
+
+type KioskTokenVerificationResult =
+  | {
+      ok: true;
+      settings: Record<string, unknown>;
+    }
+  | {
+      ok: false;
+      status: number;
+      reason: string;
+    };
+
+type GateAccessType = "door" | "turnstile";
+
+type ZAHResponsePayload = {
+  result: number;
+  cmd: number;
+  description: string;
+  eventNo: number;
+  openCount?: number;
+  voiceIndex?: number;
+  isIn?: number;
+  time?: string;
+};
 
 const ValidateCardSchema = z.object({
   cardNo: z.string().min(1),
@@ -74,7 +100,224 @@ function daysSince(date: Date): number {
   return Math.max(0, Math.floor((Date.now() - date.getTime()) / 86400000));
 }
 
-async function verifyKioskToken(tenantId: string, providedToken: string) {
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function parseInteger(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value.trim(), 10);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function parsePositiveInteger(value: unknown): number | null {
+  const parsed = parseInteger(value);
+  if (parsed === null || parsed < 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function parseZahCommand(value: unknown): number | null {
+  const parsed = parseInteger(value);
+  if (parsed === 0 || parsed === 1) {
+    return parsed;
+  }
+
+  return null;
+}
+
+function getEventNo(value: unknown): number {
+  const parsed = parseInteger(value);
+  return parsed ?? 0;
+}
+
+function formatZahTimestamp(date: Date = new Date()): string {
+  const pad = (value: number) => value.toString().padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function sendZahResponse(c: Context, payload: ZAHResponsePayload) {
+  c.header("Content-Type", ZAH_RESPONSE_CONTENT_TYPE);
+  return c.body(JSON.stringify(payload));
+}
+
+function buildZahHeartbeatResponse(eventNo: number): ZAHResponsePayload {
+  return {
+    result: 0,
+    cmd: 0,
+    description: "ok",
+    eventNo,
+    time: formatZahTimestamp(),
+  };
+}
+
+function buildZahAllowedResponse(input: {
+  eventNo: number;
+  memberName: string;
+  graceMode: boolean;
+}): ZAHResponsePayload {
+  const safeMemberName = escapeHtml(input.memberName || "Member");
+  const statusLine = input.graceMode
+    ? "<font color='orange'>Please Renew</font>"
+    : "<font color='green'>Authorized</font>";
+
+  return {
+    result: 0,
+    cmd: 1,
+    eventNo: input.eventNo,
+    openCount: 1,
+    voiceIndex: 2,
+    isIn: 1,
+    description: `<h1>Welcome</h1><p>${safeMemberName}</p>${statusLine}`,
+  };
+}
+
+function buildZahDeniedResponse(eventNo: number, reason: string): ZAHResponsePayload {
+  return {
+    result: 0,
+    cmd: 1,
+    eventNo,
+    openCount: 0,
+    voiceIndex: 5,
+    isIn: 1,
+    description: `<h1>STOP</h1><font color='red'>${escapeHtml(reason)}</font>`,
+  };
+}
+
+function getGateAccessType(c: Context): GateAccessType {
+  return c.req.query("type") === "turnstile" ? "turnstile" : "door";
+}
+
+function resolveZahCredentials(c: Context): {
+  tenantId: string;
+  kioskToken: string;
+} {
+  const params = c.req.param();
+
+  const tenantId =
+    (params.tenantId ?? c.req.query("tenant") ?? c.req.query("tenantId") ?? "").trim();
+
+  const kioskToken = (params.kioskToken ?? c.req.query("token") ?? "").trim();
+
+  return {
+    tenantId,
+    kioskToken,
+  };
+}
+
+function getDoorGraceDays(settings: Record<string, unknown>): number {
+  const settingSources: unknown[] = [
+    settings.zahDoorGraceDays,
+    settings.gateGraceDays,
+    settings.doorGraceDays,
+    settings.qrGraceDays,
+    asRecord(settings.gate)?.zahDoorGraceDays,
+    asRecord(settings.gate)?.doorGraceDays,
+    asRecord(settings.gate)?.graceDays,
+    asRecord(settings.accessControl)?.zahDoorGraceDays,
+    asRecord(settings.accessControl)?.doorGraceDays,
+    asRecord(settings.accessControl)?.graceDays,
+  ];
+
+  for (const candidate of settingSources) {
+    const parsed = parsePositiveInteger(candidate);
+    if (parsed !== null) {
+      return parsed;
+    }
+  }
+
+  return QR_GRACE_DAYS;
+}
+
+function getDeviceSnFromPayload(
+  payload: Record<string, unknown>,
+  accessType: GateAccessType,
+): string {
+  const rawValue =
+    typeof payload.device_sn === "string"
+      ? payload.device_sn
+      : typeof payload.deviceSn === "string"
+        ? payload.deviceSn
+        : "";
+
+  const deviceSn = rawValue.trim();
+
+  if (deviceSn) {
+    return deviceSn;
+  }
+
+  return accessType === "turnstile" ? "zah-cloud-turnstile" : "zah-cloud-door";
+}
+
+async function logZahAccessAttempt(input: {
+  tenantId: string;
+  userId: string | null;
+  memberId: string | null;
+  eventNo: number;
+  allowed: boolean;
+  reason: string | null;
+  accessType: GateAccessType;
+  payload: Record<string, unknown>;
+}) {
+  const capTime =
+    typeof input.payload.cap_time === "string"
+      ? input.payload.cap_time
+      : typeof input.payload.time === "string"
+        ? input.payload.time
+        : null;
+
+  try {
+    await db.insert(accessLogs).values({
+      id: generateId(),
+      tenant_id: input.tenantId,
+      device_sn: getDeviceSnFromPayload(input.payload, input.accessType),
+      user_id: input.userId,
+      person_id_from_device: input.memberId,
+      match_result: input.allowed ? "allowed" : "denied",
+      deny_reason: input.allowed ? null : input.reason,
+      method: "qr",
+      sequence_no: input.eventNo,
+      cap_time: capTime,
+      device_raw_data: {
+        ...input.payload,
+        accessType: input.accessType,
+      },
+    });
+  } catch (err) {
+    console.error("Gate ZAH access-log error:", err);
+  }
+}
+
+async function verifyKioskToken(
+  tenantId: string,
+  providedToken: string,
+): Promise<KioskTokenVerificationResult> {
   const [tenantRow] = await db
     .select({ settings: tenants.settings })
     .from(tenants)
@@ -85,7 +328,7 @@ async function verifyKioskToken(tenantId: string, providedToken: string) {
     return { ok: false as const, status: 404, reason: "Not registered" };
   }
 
-  const tenantSettings = (tenantRow.settings ?? {}) as Record<string, unknown>;
+  const tenantSettings = asRecord(tenantRow.settings) ?? {};
   const expectedToken =
     typeof tenantSettings.kioskToken === "string"
       ? tenantSettings.kioskToken.trim()
@@ -95,7 +338,10 @@ async function verifyKioskToken(tenantId: string, providedToken: string) {
     return { ok: false as const, status: 401, reason: "Unauthorized" };
   }
 
-  return { ok: true as const };
+  return {
+    ok: true,
+    settings: tenantSettings,
+  };
 }
 
 function decryptQrHexPayload(encryptedHex: string): string | null {
@@ -166,6 +412,235 @@ function resolveMemberIdFromCardNo(cardNo: string): {
   }
 
   return { memberId: rawCardNo };
+}
+
+async function handleZahValidation(c: Context) {
+  const payload = asRecord(await c.req.json().catch(() => null)) ?? {};
+  const eventNo = getEventNo(payload.eventNo);
+  const cmd = parseZahCommand(payload.cmd);
+  const accessType = getGateAccessType(c);
+  const { tenantId, kioskToken } = resolveZahCredentials(c);
+
+  if (!tenantId || !kioskToken) {
+    return sendZahResponse(c, buildZahDeniedResponse(eventNo, "Unauthorized"));
+  }
+
+  try {
+    const tokenCheck = await verifyKioskToken(tenantId, kioskToken);
+
+    if (!tokenCheck.ok) {
+      return sendZahResponse(c, buildZahDeniedResponse(eventNo, tokenCheck.reason));
+    }
+
+    if (cmd === 0) {
+      return sendZahResponse(c, buildZahHeartbeatResponse(eventNo));
+    }
+
+    if (cmd !== 1) {
+      return sendZahResponse(c, buildZahDeniedResponse(eventNo, "Unsupported command"));
+    }
+
+    const cardNo = typeof payload.cardNo === "string" ? payload.cardNo : "";
+    const resolved = resolveMemberIdFromCardNo(cardNo);
+
+    if (!resolved.memberId) {
+      const reason = resolved.reason ?? "Invalid card value";
+
+      await logZahAccessAttempt({
+        tenantId,
+        userId: null,
+        memberId: null,
+        eventNo,
+        allowed: false,
+        reason,
+        accessType,
+        payload,
+      });
+
+      return sendZahResponse(c, buildZahDeniedResponse(eventNo, reason));
+    }
+
+    const memberCandidates = Array.from(
+      new Set([resolved.memberId, resolved.memberId.toUpperCase()]),
+    );
+
+    let matchedMember:
+      | {
+          userId: string;
+          memberId: string | null;
+          memberName: string;
+          memberStatus: string;
+        }
+      | null = null;
+
+    for (const candidate of memberCandidates) {
+      const [row] = await db
+        .select({
+          userId: tenantMemberships.user_id,
+          memberId: tenantMemberships.member_id,
+          memberName: users.name,
+          memberStatus: tenantMemberships.status,
+        })
+        .from(tenantMemberships)
+        .innerJoin(users, eq(tenantMemberships.user_id, users.id))
+        .where(
+          and(
+            eq(tenantMemberships.tenant_id, tenantId),
+            eq(tenantMemberships.member_id, candidate),
+          ),
+        )
+        .limit(1);
+
+      if (row) {
+        matchedMember = {
+          userId: row.userId,
+          memberId: row.memberId,
+          memberName: row.memberName ?? "Member",
+          memberStatus: row.memberStatus,
+        };
+        break;
+      }
+    }
+
+    if (!matchedMember) {
+      const reason = "Not registered";
+
+      await logZahAccessAttempt({
+        tenantId,
+        userId: null,
+        memberId: resolved.memberId,
+        eventNo,
+        allowed: false,
+        reason,
+        accessType,
+        payload,
+      });
+
+      return sendZahResponse(c, buildZahDeniedResponse(eventNo, reason));
+    }
+
+    if (matchedMember.memberStatus !== "active") {
+      const reason =
+        matchedMember.memberStatus === "suspended"
+          ? "Membership suspended"
+          : "Membership inactive";
+
+      await logZahAccessAttempt({
+        tenantId,
+        userId: matchedMember.userId,
+        memberId: matchedMember.memberId,
+        eventNo,
+        allowed: false,
+        reason,
+        accessType,
+        payload,
+      });
+
+      return sendZahResponse(c, buildZahDeniedResponse(eventNo, reason));
+    }
+
+    const [latestSubscription] = await db
+      .select({
+        status: subscriptions.status,
+        currentPeriodEnd: subscriptions.current_period_end,
+      })
+      .from(subscriptions)
+      .where(
+        and(
+          eq(subscriptions.tenant_id, tenantId),
+          eq(subscriptions.customer_id, matchedMember.userId),
+        ),
+      )
+      .orderBy(desc(subscriptions.current_period_end))
+      .limit(1);
+
+    if (!latestSubscription) {
+      const reason = "Membership expired";
+
+      await logZahAccessAttempt({
+        tenantId,
+        userId: matchedMember.userId,
+        memberId: matchedMember.memberId,
+        eventNo,
+        allowed: false,
+        reason,
+        accessType,
+        payload,
+      });
+
+      return sendZahResponse(c, buildZahDeniedResponse(eventNo, reason));
+    }
+
+    const now = new Date();
+    const subscriptionExpiry = latestSubscription.currentPeriodEnd;
+    const hasActiveSubscription =
+      latestSubscription.status === "active" && subscriptionExpiry >= now;
+
+    if (hasActiveSubscription) {
+      await logZahAccessAttempt({
+        tenantId,
+        userId: matchedMember.userId,
+        memberId: matchedMember.memberId,
+        eventNo,
+        allowed: true,
+        reason: null,
+        accessType,
+        payload,
+      });
+
+      return sendZahResponse(
+        c,
+        buildZahAllowedResponse({
+          eventNo,
+          memberName: matchedMember.memberName,
+          graceMode: false,
+        }),
+      );
+    }
+
+    const graceDays = accessType === "door" ? getDoorGraceDays(tokenCheck.settings) : 0;
+    const expiredDays = daysSince(subscriptionExpiry);
+
+    if (graceDays > 0 && expiredDays <= graceDays) {
+      await logZahAccessAttempt({
+        tenantId,
+        userId: matchedMember.userId,
+        memberId: matchedMember.memberId,
+        eventNo,
+        allowed: true,
+        reason: "grace_period",
+        accessType,
+        payload,
+      });
+
+      return sendZahResponse(
+        c,
+        buildZahAllowedResponse({
+          eventNo,
+          memberName: matchedMember.memberName,
+          graceMode: true,
+        }),
+      );
+    }
+
+    const reason = "Membership expired";
+
+    await logZahAccessAttempt({
+      tenantId,
+      userId: matchedMember.userId,
+      memberId: matchedMember.memberId,
+      eventNo,
+      allowed: false,
+      reason,
+      accessType,
+      payload,
+    });
+
+    return sendZahResponse(c, buildZahDeniedResponse(eventNo, reason));
+  } catch (err) {
+    console.error("Gate ZAH validation error:", err);
+    return sendZahResponse(c, buildZahDeniedResponse(eventNo, "Validation failed"));
+  }
 }
 
 // ─── Permanent QR helpers ────────────────────────────────────────────────────
@@ -523,6 +998,20 @@ app.post("/validate-qr", zValidator("json", ValidateQrSchema), async (c) => {
     );
   }
 });
+
+// ─── POST /zah* — Cloud-hosted ZAH2-compatible endpoint ────────────────────
+// Supports:
+//   /zah?tenant=<id>&token=<kioskToken>
+//   /zah/:tenantId/:kioskToken
+//   /zah/:tenantId/:kioskToken/tCheck
+//   /zah/:tenantId/:kioskToken/zah3check
+// Query:
+//   ?type=door (default, grace enabled)
+//   ?type=turnstile (strict, no grace)
+app.post("/zah", handleZahValidation);
+app.post("/zah/:tenantId/:kioskToken", handleZahValidation);
+app.post("/zah/:tenantId/:kioskToken/tCheck", handleZahValidation);
+app.post("/zah/:tenantId/:kioskToken/zah3check", handleZahValidation);
 
 // ─── POST /verify — Scanner verifies QR (permanent or legacy) ───────────────
 
