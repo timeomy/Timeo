@@ -537,7 +537,7 @@ describe("GET /api/tenants/:tenantId/gym/members/:id", () => {
 
     const mockMember = {
       user: { id: "usr_member123456789", name: "Alice", email: "alice@example.com", avatarUrl: null, createdAt: new Date() },
-      membership: { id: "mem_1", role: "customer", status: "active", notes: null, tags: [], joinedAt: new Date(), coachId: null },
+      membership: { id: "mem_1", role: "customer", status: "active", notes: null, tags: [], memberId: "mem_card_001", joinedAt: new Date(), coachId: null },
     };
 
     const mockActiveSub = {
@@ -552,11 +552,12 @@ describe("GET /api/tenants/:tenantId/gym/members/:id", () => {
     // 1. Auth middleware: user lookup
     // 2. Tenant middleware: membership check
     // 3. Member detail: .innerJoin().where().limit(1)
-    // 4. Subscription: .leftJoin().where().orderBy().limit(1)
-    // 5. Face registrations: .where()
-    // 6. Check-ins: .where().orderBy().limit()
-    // 7. Payment history: .where().orderBy()
-    // 8. Session credits: .leftJoin().where().orderBy()
+    // 4. Tenant lookup: .where().limit(1)
+    // 5. Subscription: .leftJoin().where().orderBy().limit(1)
+    // 6. Face registrations: .where()
+    // 7. Check-ins: .where().orderBy()
+    // 8. Payment history: .where().orderBy()
+    // 9. Session credits: .leftJoin().where().orderBy()
     let selectCallCount = 0;
     mockDb.select.mockImplementation(() => {
       selectCallCount++;
@@ -576,26 +577,31 @@ describe("GET /api/tenants/:tenantId/gym/members/:id", () => {
         return { from: vi.fn().mockReturnValue(ce) };
       }
       if (selectCallCount === 4) {
+        // Tenant lookup: .where().limit()
+        const ce = { where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([{ slug: "ws_fitness" }]) };
+        return { from: vi.fn().mockReturnValue(ce) };
+      }
+      if (selectCallCount === 5) {
         // Subscription: .leftJoin().where().orderBy().limit()
         const ce = { leftJoin: vi.fn().mockReturnThis(), where: vi.fn().mockReturnThis(), orderBy: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([mockActiveSub]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
-      if (selectCallCount === 5) {
+      if (selectCallCount === 6) {
         // Face registrations: .where()
         const ce = { where: vi.fn().mockResolvedValue([]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
-      if (selectCallCount === 6) {
+      if (selectCallCount === 7) {
         // Check-ins: .where().orderBy() [no limit]
         const ce = { where: vi.fn().mockReturnThis(), orderBy: vi.fn().mockResolvedValue([]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
-      if (selectCallCount === 7) {
+      if (selectCallCount === 8) {
         // Payment history: .where().orderBy()
         const ce = { where: vi.fn().mockReturnThis(), orderBy: vi.fn().mockResolvedValue([]) };
         return { from: vi.fn().mockReturnValue(ce) };
       }
-      if (selectCallCount === 8) {
+      if (selectCallCount === 9) {
         // Session credits: .leftJoin().where().orderBy()
         const ce = { leftJoin: vi.fn().mockReturnThis(), where: vi.fn().mockReturnThis(), orderBy: vi.fn().mockResolvedValue([]) };
         return { from: vi.fn().mockReturnValue(ce) };
