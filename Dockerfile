@@ -20,9 +20,10 @@ RUN pnpm install --frozen-lockfile --filter @timeo/web...
 
 # ─── Builder ─────────────────────────────────────────────────────────────────
 FROM base AS builder
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/ ./
 COPY apps/ ./apps/
 COPY packages/ ./packages/
+COPY scripts/ ./scripts/
 COPY turbo.json ./
 
 ARG NEXT_PUBLIC_API_URL=https://api.timeo.my
