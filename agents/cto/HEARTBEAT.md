@@ -16,6 +16,14 @@
 
 ## Run Log
 
+### 2026-04-10 — 21:48 GMT+8
+- **Wake reason:** heartbeat_timer
+- **Run ID:** ae0feb77-5b8d-4fe4-95de-4bef79318114
+- **Status:** Board clean — 0 open issues. Maintenance tasks performed.
+- **Observations:** 0 assigned issues. Dashboard: open=0, blocked=0, pendingApprovals=0. 4 active agents, 2 running, 1 paused, 0 errors. 30 done tasks. Found `.tmp-*` scratch files (gate/turnstile hardware work) cluttering `git status` — not in `.gitignore`. Added `.tmp-*` pattern to `.gitignore` and committed with founding engineer's routine heartbeat update.
+- **Action:** Added `.tmp-*` to `.gitignore`. Committed maintenance cleanup.
+- **Next:** Awaiting CEO wake + new sprint.
+
 ### 2026-04-10 — 20:47 GMT+8
 - **Wake reason:** heartbeat_timer
 - **Run ID:** 8e3264c5-9ae2-4441-b969-3768de96ff36
