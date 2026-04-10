@@ -7,8 +7,8 @@ const testEmail = (prefix: string) =>
 test.describe("Auth Flow", () => {
   test("sign-up shows verify-email page", async ({ page }) => {
     await page.goto("/sign-up");
-    // Real h1 text is "Create your account"
-    await expect(page.locator("h1")).toContainText(/create your account/i);
+    // Real h1 text is "Get started"
+    await expect(page.locator("h1")).toContainText(/get started/i);
 
     // Name field uses id="name", email uses id="email", password uses id="password"
     await page.fill("#name", "Test User");
@@ -24,8 +24,8 @@ test.describe("Auth Flow", () => {
 
   test("sign-in with wrong password shows error", async ({ page }) => {
     await page.goto("/sign-in");
-    // Real h1 text is "Welcome back"
-    await expect(page.locator("h1")).toContainText(/welcome back/i);
+    // Real h1 text is "Sign in to Timeo"
+    await expect(page.locator("h1")).toContainText(/sign in to timeo/i);
 
     await page.fill("#email", "nonexistent@example.com");
     await page.fill("#password", "WrongPassword123!");
@@ -150,7 +150,7 @@ test.describe("Auth Flow", () => {
     page,
   }) => {
     await page.goto("/sign-up");
-    await expect(page.locator("h1")).toContainText(/create your account/i);
+    await expect(page.locator("h1")).toContainText(/get started/i);
 
     // Submit with all fields empty → "All fields are required"
     await page.click('button[type="submit"]');
