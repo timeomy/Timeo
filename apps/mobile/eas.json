@@ -4,6 +4,12 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "base": {
+      "node": "22.22.1",
+      "pnpm": {
+        "version": "9.15.4"
+      }
+    },
     "development": {
       "developmentClient": true,
       "distribution": "internal",
