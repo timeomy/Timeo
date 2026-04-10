@@ -3,6 +3,11 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db, generateId } from "@timeo/db";
 import { sessionLogs, tenantMemberships, users } from "@timeo/db/schema";
+import {
+  SESSION_LOG_FEEDBACK_OPTIONS,
+  SESSION_LOG_TYPE_VALUES,
+  type SessionLogType,
+} from "@timeo/shared";
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { authMiddleware } from "../middleware/auth.js";
@@ -13,27 +18,57 @@ import { success, error } from "../lib/response.js";
 const app = new Hono();
 const coachUsers = alias(users, "session_log_coach_users");
 
-const SessionTypeSchema = z.enum([
-  "personal_training",
-  "group_class",
-  "assessment",
-  "consultation",
-  "pt",
-  "group",
+const SessionTypeSchema = z.union([
+  z.enum(SESSION_LOG_TYPE_VALUES),
+  z.literal("pt"),
+  z.literal("group"),
 ]);
+
+const ExerciseSchema = z.object({
+  name: z.string().min(1).max(120),
+  sets: z.number().int().min(0).optional(),
+  reps: z.number().int().min(0).optional(),
+  weight: z.number().optional(),
+  notes: z.string().max(500).optional(),
+});
 
 const CreateSessionLogSchema = z.object({
   clientId: z.string().min(1),
   sessionType: SessionTypeSchema,
-  duration: z.number().int().min(1).max(600),
+  duration: z.number().int().min(1).max(600).optional(),
+  durationMinutes: z.number().int().min(1).max(600).optional(),
   notes: z.string().max(5000).optional(),
+  exercises: z.array(ExerciseSchema).optional(),
+  clientFeedback: z.enum(SESSION_LOG_FEEDBACK_OPTIONS).optional(),
+  customSessionType: z.string().trim().max(120).optional(),
+  photoUrl: z.string().max(2_000_000).optional(),
+  metrics: z.record(z.unknown()).optional(),
   date: z.string().optional(),
   coachId: z.string().optional(),
+}).superRefine((value, ctx) => {
+  if (value.sessionType === "custom" && !value.customSessionType?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["customSessionType"],
+      message: "customSessionType is required when sessionType is custom",
+    });
+  }
+
+  if (
+    typeof value.duration !== "number" &&
+    typeof value.durationMinutes !== "number"
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["duration"],
+      message: "duration is required",
+    });
+  }
 });
 
 function normalizeSessionType(
   type: z.infer<typeof SessionTypeSchema>,
-): "personal_training" | "group_class" | "assessment" | "consultation" {
+): SessionLogType {
   if (type === "pt") return "personal_training";
   if (type === "group") return "group_class";
   return type;
@@ -56,6 +91,60 @@ function extractDurationMinutes(metrics: unknown): number | null {
   }
 
   return null;
+}
+
+function resolveDurationMinutes(input: z.infer<typeof CreateSessionLogSchema>): number {
+  if (typeof input.durationMinutes === "number") {
+    return Math.max(1, Math.round(input.durationMinutes));
+  }
+
+  if (typeof input.duration === "number") {
+    return Math.max(1, Math.round(input.duration));
+  }
+
+  const metricDuration =
+    input.metrics && typeof input.metrics === "object"
+      ? (input.metrics as Record<string, unknown>).durationMinutes
+      : undefined;
+
+  if (typeof metricDuration === "number" && Number.isFinite(metricDuration)) {
+    return Math.max(1, Math.round(metricDuration));
+  }
+
+  return 60;
+}
+
+function extractStringMetric(metrics: unknown, key: string): string | null {
+  if (!metrics || typeof metrics !== "object") return null;
+
+  const value = (metrics as Record<string, unknown>)[key];
+  if (typeof value !== "string") return null;
+
+  return value;
+}
+
+function buildMetrics(
+  input: z.infer<typeof CreateSessionLogSchema>,
+  durationMinutes: number,
+): Record<string, unknown> {
+  const metrics =
+    input.metrics && typeof input.metrics === "object"
+      ? { ...(input.metrics as Record<string, unknown>) }
+      : {};
+
+  metrics.durationMinutes = durationMinutes;
+
+  if (input.clientFeedback) {
+    metrics.clientFeedback = input.clientFeedback;
+  }
+  if (input.customSessionType?.trim()) {
+    metrics.customSessionType = input.customSessionType.trim();
+  }
+  if (input.photoUrl?.trim()) {
+    metrics.photoUrl = input.photoUrl.trim();
+  }
+
+  return metrics;
 }
 
 // POST /session-logs — create a coach session log
@@ -106,18 +195,22 @@ app.post(
         );
       }
 
+      const normalizedSessionType = normalizeSessionType(body.sessionType);
+      const durationMinutes = resolveDurationMinutes(body);
+      const metrics = buildMetrics(body, durationMinutes);
+
       const id = generateId();
       await db.insert(sessionLogs).values({
         id,
         tenant_id: tenantId,
         client_id: body.clientId,
         coach_id: effectiveCoachId,
-        session_type: normalizeSessionType(body.sessionType),
+        session_type: normalizedSessionType,
+        duration_minutes: durationMinutes,
+        client_feedback: body.clientFeedback ?? null,
         notes: body.notes ?? null,
-        exercises: [],
-        metrics: {
-          durationMinutes: body.duration,
-        },
+        exercises: body.exercises ?? [],
+        metrics,
         published: true,
         published_at: sessionDate,
         created_at: sessionDate,
@@ -130,9 +223,14 @@ app.post(
           id,
           clientId: body.clientId,
           coachId: effectiveCoachId,
-          sessionType: normalizeSessionType(body.sessionType),
-          duration: body.duration,
+          sessionType: normalizedSessionType,
+          duration: durationMinutes,
+          durationMinutes,
           notes: body.notes ?? null,
+          exercises: body.exercises ?? [],
+          clientFeedback: body.clientFeedback ?? null,
+          customSessionType: body.customSessionType ?? null,
+          photoUrl: body.photoUrl ?? null,
           date: sessionDate.toISOString(),
         }),
         201,
@@ -195,6 +293,8 @@ app.get(
           clientId: sessionLogs.client_id,
           coachId: sessionLogs.coach_id,
           sessionType: sessionLogs.session_type,
+          durationMinutes: sessionLogs.duration_minutes,
+          clientFeedback: sessionLogs.client_feedback,
           notes: sessionLogs.notes,
           metrics: sessionLogs.metrics,
           exercises: sessionLogs.exercises,
@@ -212,20 +312,29 @@ app.get(
 
       return c.json(
         success(
-          rows.map((row) => ({
-            id: row.id,
-            clientId: row.clientId,
-            coachId: row.coachId,
-            clientName: row.clientName,
-            clientAvatar: row.clientAvatar,
-            coachName: row.coachName,
-            sessionType: row.sessionType,
-            duration: extractDurationMinutes(row.metrics),
-            notes: row.notes,
-            exercises: (row.exercises as unknown[]) ?? [],
-            createdAt: row.createdAt?.toISOString() ?? new Date().toISOString(),
-            updatedAt: row.updatedAt?.toISOString() ?? new Date().toISOString(),
-          })),
+          rows.map((row) => {
+            const duration = row.durationMinutes ?? extractDurationMinutes(row.metrics);
+            return {
+              id: row.id,
+              clientId: row.clientId,
+              coachId: row.coachId,
+              clientName: row.clientName,
+              clientAvatar: row.clientAvatar,
+              coachName: row.coachName,
+              sessionType: row.sessionType,
+              duration,
+              durationMinutes: duration,
+              clientFeedback:
+                row.clientFeedback ??
+                extractStringMetric(row.metrics, "clientFeedback"),
+              customSessionType: extractStringMetric(row.metrics, "customSessionType"),
+              photoUrl: extractStringMetric(row.metrics, "photoUrl"),
+              notes: row.notes,
+              exercises: (row.exercises as unknown[]) ?? [],
+              createdAt: row.createdAt?.toISOString() ?? new Date().toISOString(),
+              updatedAt: row.updatedAt?.toISOString() ?? new Date().toISOString(),
+            };
+          }),
         ),
       );
     } catch (err) {
@@ -262,6 +371,8 @@ app.get(
           clientId: sessionLogs.client_id,
           coachId: sessionLogs.coach_id,
           sessionType: sessionLogs.session_type,
+          durationMinutes: sessionLogs.duration_minutes,
+          clientFeedback: sessionLogs.client_feedback,
           notes: sessionLogs.notes,
           metrics: sessionLogs.metrics,
           exercises: sessionLogs.exercises,
@@ -283,22 +394,31 @@ app.get(
       }
 
       return c.json(
-        success({
-          id: row.id,
-          clientId: row.clientId,
-          coachId: row.coachId,
-          clientName: row.clientName,
-          clientAvatar: row.clientAvatar,
-          coachName: row.coachName,
-          coachEmail: row.coachEmail,
-          sessionType: row.sessionType,
-          duration: extractDurationMinutes(row.metrics),
-          notes: row.notes,
-          metrics: row.metrics,
-          exercises: (row.exercises as unknown[]) ?? [],
-          createdAt: row.createdAt?.toISOString() ?? new Date().toISOString(),
-          updatedAt: row.updatedAt?.toISOString() ?? new Date().toISOString(),
-        }),
+        success((() => {
+          const duration = row.durationMinutes ?? extractDurationMinutes(row.metrics);
+          return {
+            id: row.id,
+            clientId: row.clientId,
+            coachId: row.coachId,
+            clientName: row.clientName,
+            clientAvatar: row.clientAvatar,
+            coachName: row.coachName,
+            coachEmail: row.coachEmail,
+            sessionType: row.sessionType,
+            duration,
+            durationMinutes: duration,
+            clientFeedback:
+              row.clientFeedback ??
+              extractStringMetric(row.metrics, "clientFeedback"),
+            customSessionType: extractStringMetric(row.metrics, "customSessionType"),
+            photoUrl: extractStringMetric(row.metrics, "photoUrl"),
+            notes: row.notes,
+            metrics: row.metrics,
+            exercises: (row.exercises as unknown[]) ?? [],
+            createdAt: row.createdAt?.toISOString() ?? new Date().toISOString(),
+            updatedAt: row.updatedAt?.toISOString() ?? new Date().toISOString(),
+          };
+        })()),
       );
     } catch (err) {
       return c.json(error("SESSION_LOG_DETAIL_ERROR", (err as Error).message), 500);

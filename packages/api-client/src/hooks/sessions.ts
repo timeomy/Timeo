@@ -54,6 +54,10 @@ interface SessionLog {
   /** Session type e.g. personal_training, group_class */
   sessionType?: string;
   duration?: number | null;
+  durationMinutes?: number | null;
+  clientFeedback?: string | null;
+  customSessionType?: string | null;
+  photoUrl?: string | null;
   clientName?: string;
   clientAvatar?: string | null;
   clientEmail?: string;
@@ -90,6 +94,10 @@ interface CreateSessionLogInput {
   exercises?: ExerciseEntry[];
   metrics?: Record<string, unknown>;
   duration?: number;
+  durationMinutes?: number;
+  clientFeedback?: "great" | "good" | "tired" | "struggling";
+  customSessionType?: string;
+  photoUrl?: string;
   date?: string;
 }
 
@@ -298,6 +306,10 @@ export function useCreateSessionLog(
         }
 
         const fallbackDuration = (() => {
+          if (typeof data.durationMinutes === "number") {
+            return Math.max(1, Math.round(data.durationMinutes));
+          }
+
           if (typeof data.duration === "number") return data.duration;
 
           const metricDuration = data.metrics?.durationMinutes;
@@ -313,7 +325,13 @@ export function useCreateSessionLog(
           coachId: data.coachId,
           sessionType: data.sessionType ?? "personal_training",
           duration: fallbackDuration,
+          durationMinutes: fallbackDuration,
+          clientFeedback: data.clientFeedback,
+          customSessionType: data.customSessionType,
+          photoUrl: data.photoUrl,
           notes: data.notes,
+          exercises: data.exercises,
+          metrics: data.metrics,
           date: data.date,
         });
       }
@@ -325,6 +343,10 @@ export function useCreateSessionLog(
           bookingId: undefined,
           creditId: data.creditId,
           sessionType: data.sessionType,
+          durationMinutes: data.durationMinutes,
+          clientFeedback: data.clientFeedback,
+          customSessionType: data.customSessionType,
+          photoUrl: data.photoUrl,
           notes: data.notes,
           exercises: data.exercises,
           metrics: data.metrics,

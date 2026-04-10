@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  SESSION_LOG_FEEDBACK_OPTIONS,
+  SESSION_LOG_TYPE_VALUES,
+} from "@timeo/shared";
 
 // ─── Bookings ─────────────────────────────────────────────────────────────────
 
@@ -160,16 +164,15 @@ export const CreateGiftCardSchema = z.object({
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 
-export const CreateSessionLogSchema = z.object({
+export const CreateSessionLogBaseSchema = z.object({
   clientId: z.string().min(1),
   bookingId: z.string().optional(),
   creditId: z.string().optional(),
-  sessionType: z.enum([
-    "personal_training",
-    "group_class",
-    "assessment",
-    "consultation",
-  ]),
+  sessionType: z.enum(SESSION_LOG_TYPE_VALUES),
+  durationMinutes: z.number().int().min(1).max(600).optional(),
+  clientFeedback: z.enum(SESSION_LOG_FEEDBACK_OPTIONS).optional(),
+  customSessionType: z.string().trim().max(120).optional(),
+  photoUrl: z.string().max(2_000_000).optional(),
   notes: z.string().optional(),
   exercises: z
     .array(
@@ -190,8 +193,23 @@ export const CreateSessionLogSchema = z.object({
       heartRate: z.number().optional(),
       bloodPressure: z.string().optional(),
       notes: z.string().optional(),
+      durationMinutes: z.number().int().optional(),
+      clientFeedback: z.enum(SESSION_LOG_FEEDBACK_OPTIONS).optional(),
+      customSessionType: z.string().trim().max(120).optional(),
+      photoUrl: z.string().max(2_000_000).optional(),
     })
+    .passthrough()
     .optional(),
+});
+
+export const CreateSessionLogSchema = CreateSessionLogBaseSchema.superRefine((value, ctx) => {
+  if (value.sessionType === "custom" && !value.customSessionType?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["customSessionType"],
+      message: "customSessionType is required when sessionType is custom",
+    });
+  }
 });
 
 // ─── Tenants ──────────────────────────────────────────────────────────────────

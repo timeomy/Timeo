@@ -167,6 +167,15 @@ export const sessionTypeEnum = pgEnum("session_type", [
   "group_class",
   "assessment",
   "consultation",
+  "leg_day",
+  "back_day",
+  "shoulder_day",
+  "chest_day",
+  "arms_day",
+  "full_body",
+  "cardio",
+  "core",
+  "custom",
 ]);
 
 // ─── Vouchers & Gift Cards ──────────────────────────────────────────────────

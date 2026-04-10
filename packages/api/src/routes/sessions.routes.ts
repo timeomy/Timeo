@@ -14,7 +14,7 @@ import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
 import { requireRole } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
-import { CreateSessionLogSchema } from "../lib/validation.js";
+import { CreateSessionLogBaseSchema } from "../lib/validation.js";
 import * as SessionService from "../services/session.service.js";
 
 const app = new Hono();
@@ -22,6 +22,26 @@ const app = new Hono();
 // ── alias tables for coach join ──────────────────────────────────────────────
 import { alias } from "drizzle-orm/pg-core";
 const coachUsers = alias(users, "coach");
+
+function extractDurationMinutes(metrics: unknown): number | null {
+  if (!metrics || typeof metrics !== "object") return null;
+
+  const value = (metrics as Record<string, unknown>).durationMinutes;
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+
+  return Math.round(value);
+}
+
+function extractStringMetric(metrics: unknown, key: string): string | null {
+  if (!metrics || typeof metrics !== "object") return null;
+
+  const value = (metrics as Record<string, unknown>)[key];
+  if (typeof value !== "string") return null;
+
+  return value;
+}
 
 // GET /tenants/:tenantId/sessions/packages - list session packages
 app.get("/packages", authMiddleware, tenantMiddleware, async (c) => {
@@ -77,6 +97,8 @@ app.get(
         bookingId: sessionLogs.booking_id,
         creditId: sessionLogs.credit_id,
         sessionType: sessionLogs.session_type,
+        durationMinutes: sessionLogs.duration_minutes,
+        clientFeedback: sessionLogs.client_feedback,
         notes: sessionLogs.notes,
         exercises: sessionLogs.exercises,
         metrics: sessionLogs.metrics,
@@ -91,22 +113,31 @@ app.get(
       .where(eq(sessionLogs.tenant_id, tenantId))
       .orderBy(desc(sessionLogs.created_at));
 
-    const flattened = rows.map((r) => ({
-      id: r.id,
-      tenantId: r.tenantId,
-      clientId: r.clientId,
-      coachId: r.coachId,
-      bookingId: r.bookingId,
-      creditId: r.creditId,
-      sessionType: r.sessionType,
-      notes: r.notes,
-      exercises: (r.exercises as unknown[]) ?? [],
-      metrics: r.metrics as Record<string, unknown> | null,
-      createdAt: r.createdAt?.toISOString() ?? new Date().toISOString(),
-      clientName: r.clientName ?? "Unknown",
-      clientEmail: r.clientEmail ?? null,
-      coachName: r.coachName ?? "Unknown",
-    }));
+    const flattened = rows.map((r) => {
+      const duration = r.durationMinutes ?? extractDurationMinutes(r.metrics);
+      return {
+        id: r.id,
+        tenantId: r.tenantId,
+        clientId: r.clientId,
+        coachId: r.coachId,
+        bookingId: r.bookingId,
+        creditId: r.creditId,
+        sessionType: r.sessionType,
+        duration,
+        durationMinutes: duration,
+        clientFeedback:
+          r.clientFeedback ?? extractStringMetric(r.metrics, "clientFeedback"),
+        customSessionType: extractStringMetric(r.metrics, "customSessionType"),
+        photoUrl: extractStringMetric(r.metrics, "photoUrl"),
+        notes: r.notes,
+        exercises: (r.exercises as unknown[]) ?? [],
+        metrics: r.metrics as Record<string, unknown> | null,
+        createdAt: r.createdAt?.toISOString() ?? new Date().toISOString(),
+        clientName: r.clientName ?? "Unknown",
+        clientEmail: r.clientEmail ?? null,
+        coachName: r.coachName ?? "Unknown",
+      };
+    });
 
     return c.json(success(flattened));
   },
@@ -114,10 +145,10 @@ app.get(
 
 // POST /tenants/:tenantId/sessions/logs - create session log
 // Accepts either clientId (user ID) OR clientEmail (we look up the user)
-const FlexibleSessionLogSchema = CreateSessionLogSchema.extend({
+const FlexibleSessionLogSchema = CreateSessionLogBaseSchema.extend({
   clientId: z.string().optional(),
   clientEmail: z.string().email().optional(),
-}).refine((d) => d.clientId || d.clientEmail, {
+}).refine((d: { clientId?: string; clientEmail?: string }) => d.clientId || d.clientEmail, {
   message: "Either clientId or clientEmail is required",
   path: ["clientId"],
 });
@@ -170,6 +201,10 @@ app.post(
         bookingId: body.bookingId,
         creditId: body.creditId,
         sessionType: body.sessionType,
+        durationMinutes: body.durationMinutes,
+        clientFeedback: body.clientFeedback,
+        customSessionType: body.customSessionType,
+        photoUrl: body.photoUrl,
         notes: body.notes,
         exercises: body.exercises,
         metrics: body.metrics,

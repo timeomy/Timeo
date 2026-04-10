@@ -145,6 +145,8 @@ export const sessionLogs = pgTable(
     booking_id: text("booking_id").references(() => bookings.id),
     credit_id: text("credit_id").references(() => sessionCredits.id),
     session_type: sessionTypeEnum("session_type").notNull(),
+    duration_minutes: integer("duration_minutes"),
+    client_feedback: text("client_feedback"),
     notes: text("notes"),
     exercises: jsonb("exercises").notNull().default([]),
     metrics: jsonb("metrics"),

@@ -78,6 +78,7 @@ const coachSidebarSections: SidebarSection[] = [
     label: "COACHING",
     links: [
       { href: "/dashboard/my-clients", label: "My Clients", icon: Users2 },
+      { href: "/dashboard/session-logs", label: "Session Logs", icon: NotebookPen },
       { href: "/dashboard/training-logs", label: "Training Logs", icon: Dumbbell },
     ],
   },
