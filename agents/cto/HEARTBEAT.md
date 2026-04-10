@@ -16,6 +16,14 @@
 
 ## Run Log
 
+### 2026-04-10 — 13:36 GMT+8
+- **Wake reason:** heartbeat_timer
+- **Run ID:** 8ac500a2-5f23-419b-908c-2fbee465de0b
+- **Status:** Board clean — 0 open issues. Committed uncommitted feature work.
+- **Observations:** Found 7 uncommitted files on `fix/prod-auth-recovery`. Changes implemented gym member inline edit: PATCH /members/:memberId + PATCH /members/:memberId/subscription API endpoints, useUpdateMember hook, QR code in member detail response, and full edit UI on member detail page. All 11 packages typecheck clean (cached).
+- **Action:** Reviewed, verified typecheck, and committed as `feat(gym): member edit + subscription date update` (999f0ab).
+- **Next:** Awaiting new sprint from CEO.
+
 ### 2026-04-10 — 11:33 GMT+8
 - **Wake reason:** heartbeat_timer
 - **Run ID:** (manual session)
