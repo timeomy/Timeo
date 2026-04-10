@@ -16,6 +16,14 @@
 
 ## Run Log
 
+### 2026-04-10 — 16:41 GMT+8
+- **Wake reason:** heartbeat_timer
+- **Run ID:** 5e5cdc83-ab0c-4664-a9ba-eded91b81d63
+- **Status:** Board clean — 0 open issues. Committed gate/QR code engineer work.
+- **Observations:** Found 14 uncommitted files on `fix/prod-auth-recovery`. Changes implement encrypted QR code check-in system: AES-128-ECB rotating QR (30s TTL) in `qr-encryption.ts`, ZAH2 door controller (`door-controller.js`), `/api/gate/validate-qr` endpoint with 365-day grace mode, permanent QR format (`TM:memberId:hmac`), QR modal integrated into portal home + profile pages. Security fix applied: `.env.example` had real credentials replaced with placeholders. `tsconfig.tsbuildinfo` removed from git tracking. All 11 packages typecheck clean. Committed as `feat(gate): encrypted QR code check-in + ZAH2 door controller` (5c5e412).
+- **Action:** Reviewed, security-fixed, typechecked, and committed.
+- **Next:** Awaiting new sprint from CEO.
+
 ### 2026-04-10 — 14:38 GMT+8
 - **Wake reason:** heartbeat_timer
 - **Run ID:** 54d7b094-ca69-430f-92d2-3cad6aecdda5
