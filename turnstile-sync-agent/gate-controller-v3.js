@@ -9,6 +9,11 @@ const PORT = parseInt(process.env.GATE_PORT || "8889", 10);
 const TIMEO_API = (process.env.TIMEO_API_URL || "https://api.timeo.my").replace(/\/+$/, "");
 const TENANT_ID = process.env.TENANT_ID || "";
 const KIOSK_TOKEN = process.env.KIOSK_TOKEN || "";
+const ENCRYPTED_QR_REGEX = /^[0-9a-fA-F]{32}$/;
+
+function isEncryptedQr(cardNo) {
+  return ENCRYPTED_QR_REGEX.test(String(cardNo || "").trim());
+}
 
 function toInt(value, fallback = 0) {
   const n = Number(value);
@@ -54,7 +59,7 @@ function buildZah3Reply(reqBody, base) {
   return reply;
 }
 
-async function validateCard(cardNo) {
+async function validateCard(cardNo, endpointPath = "/api/gate/validate-card") {
   const normalized = String(cardNo || "").trim();
 
   if (!normalized) {
@@ -82,7 +87,7 @@ async function validateCard(cardNo) {
   }
 
   try {
-    const response = await fetch(`${TIMEO_API}/api/gate/validate-card`, {
+    const response = await fetch(`${TIMEO_API}${endpointPath}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -99,7 +104,7 @@ async function validateCard(cardNo) {
     return {
       valid: Boolean(payload.valid),
       error: toInt(payload.error, payload.valid ? 0 : 8),
-      tts: String(payload.tts || (payload.valid ? "Verify successful" : "Validation failed")),
+      tts: String(payload.tts || payload.reason || (payload.valid ? "Verify successful" : "Validation failed")),
       memberName: payload.memberName ? String(payload.memberName) : null,
       planName: payload.planName ? String(payload.planName) : null,
       expiryDate: payload.expiryDate ? String(payload.expiryDate) : null,
@@ -107,6 +112,12 @@ async function validateCard(cardNo) {
         payload.daysRemaining === null || payload.daysRemaining === undefined
           ? null
           : toInt(payload.daysRemaining, null),
+      graceMode: Boolean(payload.graceMode),
+      graceDaysRemaining:
+        payload.graceDaysRemaining === null || payload.graceDaysRemaining === undefined
+          ? null
+          : toInt(payload.graceDaysRemaining, null),
+      reason: payload.reason ? String(payload.reason) : null,
       statusCode: response.status,
     };
   } catch (err) {
@@ -119,11 +130,23 @@ async function validateCard(cardNo) {
       planName: null,
       expiryDate: null,
       daysRemaining: null,
+      graceMode: false,
+      graceDaysRemaining: null,
+      reason: null,
     };
   }
 }
 
 function buildResponseFromValidation(validation, label) {
+  if (validation?.valid && validation?.graceMode) {
+    const graceDays = toInt(validation.graceDaysRemaining, 0);
+    return {
+      error: 0,
+      tts: "Membership grace period",
+      msg: `Verify successful;Grace:${graceDays} days left;Please renew membership`,
+    };
+  }
+
   if (!validation || !validation.valid) {
     if (validation?.tts === "Membership expired") {
       return {
@@ -143,8 +166,8 @@ function buildResponseFromValidation(validation, label) {
 
     return {
       error: 8,
-      tts: validation?.tts || "Validation failed",
-      msg: `Validation failed;${validation?.tts || "Access denied"};Please contact staff`,
+      tts: validation?.tts || validation?.reason || "Validation failed",
+      msg: `Validation failed;${validation?.tts || validation?.reason || "Access denied"};Please contact staff`,
     };
   }
 
@@ -232,7 +255,10 @@ const server = http.createServer(async (req, res) => {
     }
 
     console.log(`[CARD] ${cardNo}`);
-    const validation = await validateCard(cardNo);
+    const endpointPath = isEncryptedQr(cardNo)
+      ? "/api/gate/validate-qr"
+      : "/api/gate/validate-card";
+    const validation = await validateCard(cardNo, endpointPath);
     const base = buildResponseFromValidation(validation, `Card ${cardNo}`);
     const reply = buildZah3Reply(parsedBody, base);
 
@@ -252,7 +278,7 @@ const server = http.createServer(async (req, res) => {
     const personIdentifier = extractFaceIdentifier(parsedBody);
     console.log(`[FACE] ${personIdentifier || "unknown"}`);
 
-    const validation = await validateCard(personIdentifier);
+    const validation = await validateCard(personIdentifier, "/api/gate/validate-card");
     const reply = buildResponseFromValidation(validation, `Face ${personIdentifier || "unknown"}`);
 
     if (reply.error === 0) {
@@ -277,4 +303,3 @@ console.log(`Port: ${PORT} | API: ${TIMEO_API}`);
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`[READY] Listening on port ${PORT}`);
 });
-

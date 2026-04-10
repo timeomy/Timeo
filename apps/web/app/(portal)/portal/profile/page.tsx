@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   useChangePassword,
-  useGenerateQrCode,
   useMemberQrCode,
   useUpdateUserProfile,
   useUserProfile,
@@ -83,8 +82,7 @@ export default function ProfilePage() {
   const { user, signOut } = useTimeoWebAuthContext();
   const { tenantId } = useTenantId();
   const { data: userProfile } = useUserProfile();
-  const { data: qrCode } = useMemberQrCode(tenantId);
-  const generateQrMutation = useGenerateQrCode(tenantId ?? "");
+  const { data: memberQrData } = useMemberQrCode(tenantId);
   const updateProfileMutation = useUpdateUserProfile();
   const changePasswordMutation = useChangePassword();
 
@@ -112,7 +110,10 @@ export default function ProfilePage() {
   });
 
   const displayName = user?.name ?? user?.email ?? "Member";
-  const memberId = user?.id?.slice(0, 12).toUpperCase() ?? "MEMBER";
+  const memberId =
+    memberQrData?.memberId?.toUpperCase() ??
+    user?.id?.slice(0, 12).toUpperCase() ??
+    "MEMBER";
   const appVersion = process.env.NEXT_PUBLIC_APP_VERSION ?? "web-1.0.0";
 
   useEffect(() => {
@@ -153,19 +154,7 @@ export default function ProfilePage() {
     }
   }
 
-  async function handleOpenQr() {
-    if (!tenantId) {
-      return;
-    }
-
-    if (!qrCode?.code) {
-      try {
-        await generateQrMutation.mutateAsync({ tenantId });
-      } catch {
-        // Keep modal visible with fallback state.
-      }
-    }
-
+  function handleOpenQr() {
     setIsQrOpen(true);
   }
 
@@ -240,9 +229,10 @@ export default function ProfilePage() {
             <button
               type="button"
               onClick={handleOpenQr}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/[0.14] bg-emerald-500/15 text-emerald-300 transition-colors hover:bg-emerald-500/25"
+              className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-white/[0.14] bg-emerald-500/15 px-3 text-xs font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/25"
             >
               <QrCode className="h-5 w-5" />
+              My QR Code
             </button>
           </div>
         </CardContent>
@@ -466,17 +456,8 @@ export default function ProfilePage() {
       <MemberQrModal
         open={isQrOpen}
         onOpenChange={setIsQrOpen}
-        qrCode={qrCode?.code}
         memberName={displayName}
         memberId={memberId}
-        regenerating={generateQrMutation.isPending}
-        onRegenerate={
-          tenantId
-            ? () => {
-                void generateQrMutation.mutateAsync({ tenantId });
-              }
-            : undefined
-        }
       />
     </div>
   );

@@ -6,6 +6,7 @@ interface MemberQrCode {
   id: string;
   tenantId: string;
   userId: string;
+  memberId?: string | null;
   code: string;
   expiresAt?: string;
   createdAt: string;

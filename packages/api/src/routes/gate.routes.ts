@@ -18,7 +18,7 @@
 //   GET /api/tenants/:id/check-ins/qr-code  (new permanent, preferred)
 
 import { Hono } from "hono";
-import { createHmac } from "crypto";
+import { createDecipheriv, createHmac } from "crypto";
 import { db } from "@timeo/db";
 import { generateId } from "@timeo/db";
 import {
@@ -39,8 +39,18 @@ import * as AccessControl from "../services/access-control.service.js";
 
 const app = new Hono();
 const QR_SECRET = process.env.QR_TOKEN_SECRET ?? "timeo-qr-secret-change-me";
+const WS_FITNESS_QR_KEY = "wsfitness_secret";
+const QR_TIMESTAMP_TOLERANCE_SECONDS = 300;
+const QR_GRACE_DAYS = 365;
+const HEX_8_REGEX = /^[0-9A-F]{8}$/i;
+const ENCRYPTED_QR_REGEX = /^[0-9A-F]{32}$/i;
 
 const ValidateCardSchema = z.object({
+  cardNo: z.string().min(1),
+  tenantId: z.string().min(1),
+});
+
+const ValidateQrSchema = z.object({
   cardNo: z.string().min(1),
   tenantId: z.string().min(1),
 });
@@ -58,6 +68,104 @@ function getCardCandidates(cardNo: string): string[] {
 
 function daysUntil(date: Date): number {
   return Math.max(0, Math.ceil((date.getTime() - Date.now()) / 86400000));
+}
+
+function daysSince(date: Date): number {
+  return Math.max(0, Math.floor((Date.now() - date.getTime()) / 86400000));
+}
+
+async function verifyKioskToken(tenantId: string, providedToken: string) {
+  const [tenantRow] = await db
+    .select({ settings: tenants.settings })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+
+  if (!tenantRow) {
+    return { ok: false as const, status: 404, reason: "Not registered" };
+  }
+
+  const tenantSettings = (tenantRow.settings ?? {}) as Record<string, unknown>;
+  const expectedToken =
+    typeof tenantSettings.kioskToken === "string"
+      ? tenantSettings.kioskToken.trim()
+      : "";
+
+  if (!providedToken || !expectedToken || providedToken !== expectedToken) {
+    return { ok: false as const, status: 401, reason: "Unauthorized" };
+  }
+
+  return { ok: true as const };
+}
+
+function decryptQrHexPayload(encryptedHex: string): string | null {
+  try {
+    const decipher = createDecipheriv(
+      "aes-128-ecb",
+      Buffer.from(WS_FITNESS_QR_KEY, "utf8"),
+      null,
+    );
+    decipher.setAutoPadding(false);
+
+    const decrypted = Buffer.concat([
+      decipher.update(Buffer.from(encryptedHex, "hex")),
+      decipher.final(),
+    ]);
+
+    return decrypted.toString("utf8");
+  } catch {
+    return null;
+  }
+}
+
+function resolveMemberIdFromCardNo(cardNo: string): {
+  memberId: string | null;
+  reason?: string;
+  qrTimestamp?: number;
+} {
+  const rawCardNo = cardNo.trim();
+
+  if (!rawCardNo) {
+    return { memberId: null, reason: "Invalid card value" };
+  }
+
+  if (ENCRYPTED_QR_REGEX.test(rawCardNo)) {
+    const decrypted = decryptQrHexPayload(rawCardNo);
+
+    if (!decrypted || decrypted.length < 16) {
+      return { memberId: null, reason: "Invalid QR code" };
+    }
+
+    const payload = decrypted.slice(0, 16).toUpperCase();
+    const memberIdHex = payload.slice(0, 8);
+    const timestampHex = payload.slice(8, 16);
+
+    if (!HEX_8_REGEX.test(memberIdHex) || !HEX_8_REGEX.test(timestampHex)) {
+      return { memberId: null, reason: "Invalid QR payload" };
+    }
+
+    const qrTimestamp = parseInt(timestampHex, 16);
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+
+    if (!Number.isFinite(qrTimestamp)) {
+      return { memberId: null, reason: "Invalid QR timestamp" };
+    }
+
+    if (Math.abs(currentTimestamp - qrTimestamp) > QR_TIMESTAMP_TOLERANCE_SECONDS) {
+      return { memberId: null, reason: "QR expired" };
+    }
+
+    return {
+      memberId: memberIdHex,
+      qrTimestamp,
+    };
+  }
+
+  if (HEX_8_REGEX.test(rawCardNo)) {
+    return { memberId: rawCardNo.toUpperCase() };
+  }
+
+  return { memberId: rawCardNo };
 }
 
 // ─── Permanent QR helpers ────────────────────────────────────────────────────
@@ -130,24 +238,14 @@ app.post("/validate-card", zValidator("json", ValidateCardSchema), async (c) => 
   const providedToken = (c.req.header("X-Kiosk-Token") ?? "").trim();
 
   try {
-    const [tenantRow] = await db
-      .select({ settings: tenants.settings })
-      .from(tenants)
-      .where(eq(tenants.id, tenantId))
-      .limit(1);
+    const tokenCheck = await verifyKioskToken(tenantId, providedToken);
 
-    if (!tenantRow) {
-      return c.json({ valid: false, error: 8, tts: "Not registered" }, 404);
-    }
-
-    const tenantSettings = (tenantRow.settings ?? {}) as Record<string, unknown>;
-    const expectedToken =
-      typeof tenantSettings.kioskToken === "string"
-        ? tenantSettings.kioskToken.trim()
-        : "";
-
-    if (!providedToken || !expectedToken || providedToken !== expectedToken) {
-      return c.json({ valid: false, error: 8, tts: "Unauthorized" }, 401);
+    if (!tokenCheck.ok) {
+      const payload = { valid: false, error: 8, tts: tokenCheck.reason };
+      if (tokenCheck.status === 404) {
+        return c.json(payload, 404);
+      }
+      return c.json(payload, 401);
     }
 
     const candidates = getCardCandidates(cardNo);
@@ -231,6 +329,198 @@ app.post("/validate-card", zValidator("json", ValidateCardSchema), async (c) => 
   } catch (err) {
     console.error("Gate validate-card error:", err);
     return c.json({ valid: false, error: 8, tts: "Validation failed" }, 500);
+  }
+});
+
+// ─── POST /validate-qr — Kiosk QR/card validation with grace support ─────────
+
+app.post("/validate-qr", zValidator("json", ValidateQrSchema), async (c) => {
+  const { cardNo, tenantId } = c.req.valid("json");
+  const providedToken = (c.req.header("X-Kiosk-Token") ?? "").trim();
+
+  try {
+    const tokenCheck = await verifyKioskToken(tenantId, providedToken);
+
+    if (!tokenCheck.ok) {
+      const payload = {
+        valid: false,
+        error: 8,
+        tts: tokenCheck.reason,
+        reason: tokenCheck.reason,
+        memberName: "",
+        expiryDate: null,
+        daysRemaining: 0,
+        graceMode: false,
+        graceDaysRemaining: 0,
+      };
+      if (tokenCheck.status === 404) {
+        return c.json(payload, 404);
+      }
+      return c.json(payload, 401);
+    }
+
+    const resolved = resolveMemberIdFromCardNo(cardNo);
+
+    if (!resolved.memberId) {
+      return c.json(
+        {
+          valid: false,
+          error: 8,
+          tts: resolved.reason ?? "Invalid card value",
+          reason: resolved.reason ?? "Invalid card value",
+          memberName: "",
+          expiryDate: null,
+          daysRemaining: 0,
+          graceMode: false,
+          graceDaysRemaining: 0,
+        },
+        400,
+      );
+    }
+
+    const memberCandidates = Array.from(
+      new Set([resolved.memberId, resolved.memberId.toUpperCase()]),
+    );
+
+    let matchedMember:
+      | {
+          userId: string;
+          memberId: string | null;
+          memberName: string;
+        }
+      | null = null;
+
+    for (const candidate of memberCandidates) {
+      const [row] = await db
+        .select({
+          userId: tenantMemberships.user_id,
+          memberId: tenantMemberships.member_id,
+          memberName: users.name,
+        })
+        .from(tenantMemberships)
+        .innerJoin(users, eq(tenantMemberships.user_id, users.id))
+        .where(
+          and(
+            eq(tenantMemberships.tenant_id, tenantId),
+            eq(tenantMemberships.member_id, candidate),
+          ),
+        )
+        .limit(1);
+
+      if (row) {
+        matchedMember = row;
+        break;
+      }
+    }
+
+    if (!matchedMember) {
+      return c.json(
+        {
+          valid: false,
+          error: 8,
+          tts: "Not registered",
+          reason: "Member not found",
+          memberName: "",
+          expiryDate: null,
+          daysRemaining: 0,
+          graceMode: false,
+          graceDaysRemaining: 0,
+        },
+        404,
+      );
+    }
+
+    const [latestSubscription] = await db
+      .select({
+        id: subscriptions.id,
+        status: subscriptions.status,
+        currentPeriodEnd: subscriptions.current_period_end,
+      })
+      .from(subscriptions)
+      .where(
+        and(
+          eq(subscriptions.tenant_id, tenantId),
+          eq(subscriptions.customer_id, matchedMember.userId),
+        ),
+      )
+      .orderBy(desc(subscriptions.current_period_end))
+      .limit(1);
+
+    if (!latestSubscription) {
+      return c.json(
+        {
+          valid: false,
+          error: 8,
+          tts: "Membership expired",
+          reason: "No subscription found",
+          memberName: matchedMember.memberName,
+          expiryDate: null,
+          daysRemaining: 0,
+          graceMode: false,
+          graceDaysRemaining: 0,
+        },
+        404,
+      );
+    }
+
+    const expiryDate = latestSubscription.currentPeriodEnd;
+    const expiredDays = daysSince(expiryDate);
+
+    if (expiryDate >= new Date()) {
+      return c.json({
+        valid: true,
+        error: 0,
+        tts: "Membership active",
+        reason: "Membership active",
+        memberName: matchedMember.memberName,
+        expiryDate: expiryDate.toISOString(),
+        daysRemaining: daysUntil(expiryDate),
+        graceMode: false,
+        graceDaysRemaining: 0,
+      });
+    }
+
+    if (expiredDays <= QR_GRACE_DAYS) {
+      return c.json({
+        valid: true,
+        error: 0,
+        tts: "Membership grace period",
+        reason: "Membership in grace period",
+        memberName: matchedMember.memberName,
+        expiryDate: expiryDate.toISOString(),
+        daysRemaining: 0,
+        graceMode: true,
+        graceDaysRemaining: QR_GRACE_DAYS - expiredDays,
+      });
+    }
+
+    return c.json({
+      valid: false,
+      error: 8,
+      tts: "Membership expired",
+      reason: "Membership expired",
+      memberName: matchedMember.memberName,
+      expiryDate: expiryDate.toISOString(),
+      daysRemaining: 0,
+      graceMode: false,
+      graceDaysRemaining: 0,
+    });
+  } catch (err) {
+    console.error("Gate validate-qr error:", err);
+    return c.json(
+      {
+        valid: false,
+        error: 8,
+        tts: "Validation failed",
+        reason: "Validation failed",
+        memberName: "",
+        expiryDate: null,
+        daysRemaining: 0,
+        graceMode: false,
+        graceDaysRemaining: 0,
+      },
+      500,
+    );
   }
 });
 

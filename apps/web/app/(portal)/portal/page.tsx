@@ -4,7 +4,6 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  useGenerateQrCode,
   useMemberQrCode,
   useMyBookings,
   useMyCheckInHistory,
@@ -156,12 +155,12 @@ export default function PortalHomePage() {
     limit: 5,
   });
   const { data: myBookings = [], isLoading: bookingsLoading } = useMyBookings(tenantId);
-  const { data: qrCode } = useMemberQrCode(tenantId);
-  const qrMutation = useGenerateQrCode(tenantId ?? "");
+  const { data: memberQrData } = useMemberQrCode(tenantId);
 
   const firstName = user?.name?.split(" ")[0] ?? "Member";
   const displayName = user?.name ?? user?.email ?? "Member";
-  const memberBadgeId = user?.id?.slice(0, 8).toUpperCase() ?? "MEMBER";
+  const memberBadgeId =
+    memberQrData?.memberId?.toUpperCase() ?? user?.id?.slice(0, 8).toUpperCase() ?? "MEMBER";
 
   if (!tenantId) {
     return <EmptyTenantState firstName={firstName} />;
@@ -215,17 +214,7 @@ export default function PortalHomePage() {
       .slice(0, 5);
   }, [checkInHistory?.items, myBookings]);
 
-  async function handleOpenQr() {
-    if (!tenantId) return;
-
-    if (!qrCode?.code) {
-      try {
-        await qrMutation.mutateAsync({ tenantId });
-      } catch {
-        // Silent fail keeps the modal fallback state.
-      }
-    }
-
+  function handleOpenQr() {
     setIsQrOpen(true);
   }
 
@@ -368,9 +357,10 @@ export default function PortalHomePage() {
             <button
               type="button"
               onClick={handleOpenQr}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition-colors hover:bg-white/15"
+              className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/15"
             >
               <QrCode className="h-5 w-5" />
+              My QR Code
             </button>
           </div>
 
@@ -465,17 +455,8 @@ export default function PortalHomePage() {
       <MemberQrModal
         open={isQrOpen}
         onOpenChange={setIsQrOpen}
-        qrCode={qrCode?.code}
         memberName={displayName}
         memberId={memberBadgeId}
-        regenerating={qrMutation.isPending}
-        onRegenerate={
-          tenantId
-            ? () => {
-                void qrMutation.mutateAsync({ tenantId });
-              }
-            : undefined
-        }
       />
     </div>
   );
