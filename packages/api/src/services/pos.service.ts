@@ -1,6 +1,15 @@
 import { db } from "@timeo/db";
-import { posTransactions, products, stockMovements, auditLogs } from "@timeo/db/schema";
-import { eq } from "drizzle-orm";
+import {
+  posTransactions,
+  products,
+  stockMovements,
+  auditLogs,
+  memberships,
+  subscriptions,
+  sessionPackages,
+  sessionCredits,
+} from "@timeo/db/schema";
+import { and, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { generateId } from "@timeo/db";
 import { emitToTenant } from "../realtime/socket.js";
 import { SocketEvents } from "../realtime/events.js";
@@ -12,6 +21,12 @@ interface PosItem {
   name: string;
   price: number;
   quantity: number;
+}
+
+function addMonths(base: Date, months: number): Date {
+  const next = new Date(base);
+  next.setMonth(next.getMonth() + months);
+  return next;
 }
 
 export async function createPosTransaction(input: {
@@ -60,8 +75,180 @@ export async function createPosTransaction(input: {
     details: { total, paymentMethod: input.paymentMethod },
   });
 
-  // Decrement stock for product items
+  // Grant entitlements and process product stock movements
   for (const item of input.items) {
+    if (item.type === "membership") {
+      const [membershipPlan] = await db
+        .select({ id: memberships.id, durationMonths: memberships.duration_months })
+        .from(memberships)
+        .where(
+          and(
+            eq(memberships.id, item.referenceId),
+            eq(memberships.tenant_id, input.tenantId),
+          ),
+        )
+        .limit(1);
+
+      if (!membershipPlan) {
+        throw new Error(`Membership plan not found: ${item.referenceId}`);
+      }
+
+      const now = new Date();
+      const quantity = Math.max(1, item.quantity);
+      const durationMonths = (membershipPlan.durationMonths ?? 1) * quantity;
+
+      const [activeSub] = await db
+        .select()
+        .from(subscriptions)
+        .where(
+          and(
+            eq(subscriptions.tenant_id, input.tenantId),
+            eq(subscriptions.customer_id, input.customerId),
+            eq(subscriptions.status, "active"),
+            gt(subscriptions.current_period_end, now),
+          ),
+        )
+        .orderBy(desc(subscriptions.current_period_end))
+        .limit(1);
+
+      const extensionBase = activeSub?.current_period_end ?? now;
+      const periodEnd = addMonths(extensionBase, durationMonths);
+      const pricePaid = item.price * quantity;
+
+      let subscriptionId: string;
+
+      if (activeSub) {
+        subscriptionId = activeSub.id;
+
+        await db
+          .update(subscriptions)
+          .set({
+            membership_id: membershipPlan.id,
+            status: "active",
+            current_period_end: periodEnd,
+            cancel_at_period_end: false,
+            package_type: "membership",
+            price_paid: pricePaid,
+            updated_at: now,
+          })
+          .where(eq(subscriptions.id, activeSub.id));
+      } else {
+        subscriptionId = generateId();
+
+        await db.insert(subscriptions).values({
+          id: subscriptionId,
+          tenant_id: input.tenantId,
+          customer_id: input.customerId,
+          membership_id: membershipPlan.id,
+          status: "active",
+          current_period_start: now,
+          current_period_end: periodEnd,
+          package_type: "membership",
+          price_paid: pricePaid,
+        });
+      }
+
+      await db.insert(auditLogs).values({
+        id: generateId(),
+        tenant_id: input.tenantId,
+        actor_id: input.staffId,
+        actor_role: "staff",
+        action: "pos.entitlement_membership_granted",
+        resource_type: "subscription",
+        resource_id: subscriptionId,
+        details: {
+          transactionId: txId,
+          membershipId: membershipPlan.id,
+          quantity,
+          pricePaid,
+        },
+      });
+
+      continue;
+    }
+
+    if (item.type === "session_package") {
+      const [pkg] = await db
+        .select({ id: sessionPackages.id, sessionCount: sessionPackages.session_count })
+        .from(sessionPackages)
+        .where(
+          and(
+            eq(sessionPackages.id, item.referenceId),
+            eq(sessionPackages.tenant_id, input.tenantId),
+          ),
+        )
+        .limit(1);
+
+      if (!pkg) {
+        throw new Error(`Session package not found: ${item.referenceId}`);
+      }
+
+      const now = new Date();
+      const quantity = Math.max(1, item.quantity);
+      const sessionsToAdd = pkg.sessionCount * quantity;
+
+      const [activeCredits] = await db
+        .select()
+        .from(sessionCredits)
+        .where(
+          and(
+            eq(sessionCredits.tenant_id, input.tenantId),
+            eq(sessionCredits.user_id, input.customerId),
+            eq(sessionCredits.package_id, pkg.id),
+            sql`${sessionCredits.total_sessions} > ${sessionCredits.used_sessions}`,
+            or(
+              isNull(sessionCredits.expires_at),
+              gt(sessionCredits.expires_at, now),
+            ),
+          ),
+        )
+        .orderBy(desc(sessionCredits.purchased_at))
+        .limit(1);
+
+      let sessionCreditId: string;
+
+      if (activeCredits) {
+        sessionCreditId = activeCredits.id;
+
+        await db
+          .update(sessionCredits)
+          .set({
+            total_sessions: activeCredits.total_sessions + sessionsToAdd,
+          })
+          .where(eq(sessionCredits.id, activeCredits.id));
+      } else {
+        sessionCreditId = generateId();
+
+        await db.insert(sessionCredits).values({
+          id: sessionCreditId,
+          tenant_id: input.tenantId,
+          user_id: input.customerId,
+          package_id: pkg.id,
+          total_sessions: sessionsToAdd,
+          used_sessions: 0,
+          purchased_at: now,
+        });
+      }
+
+      await db.insert(auditLogs).values({
+        id: generateId(),
+        tenant_id: input.tenantId,
+        actor_id: input.staffId,
+        actor_role: "staff",
+        action: "pos.entitlement_session_credits_granted",
+        resource_type: "session_credit",
+        resource_id: sessionCreditId,
+        details: {
+          transactionId: txId,
+          packageId: pkg.id,
+          quantity,
+          sessionsAdded: sessionsToAdd,
+        },
+      });
+
+      continue;
+    }
+
     if (item.type === "product") {
       const [product] = await db
         .select()
