@@ -44,7 +44,7 @@ export default function SignUpPage() {
         return;
       }
 
-      router.push("/post-login");
+      router.push("/verify-email");
     } catch {
       setError("An unexpected error occurred");
       setLoading(false);
@@ -157,7 +157,7 @@ export default function SignUpPage() {
 
           {error && (
             <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3">
-              <p className="text-sm text-red-400">{error}</p>
+              <p className="text-sm text-destructive">{error}</p>
             </div>
           )}
 

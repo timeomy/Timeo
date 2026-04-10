@@ -108,8 +108,8 @@ test.describe("Auth Flow", () => {
     await page.goto("/sign-in?redirect=https://evil.com");
     // The page should load normally without being redirected externally
     await expect(page).toHaveURL(/\/sign-in/);
-    // Real h1 is "Welcome back"
-    await expect(page.locator("h1")).toContainText(/welcome back/i);
+    // Real h1 is "Sign in to Timeo"
+    await expect(page.locator("h1")).toContainText(/sign in to timeo/i);
   });
 
   test("protected routes redirect to sign-in when unauthenticated", async ({
@@ -173,7 +173,7 @@ test.describe("Auth Flow", () => {
   }) => {
     // Use seeded test user credentials (assumes db seed has been run)
     await page.goto("/sign-in");
-    await expect(page.locator("h1")).toContainText(/welcome back/i);
+    await expect(page.locator("h1")).toContainText(/sign in to timeo/i);
 
     await page.fill("#email", "gym@demo.my");
     await page.fill("#password", "GymAdmin123!");
@@ -199,7 +199,7 @@ test.describe("Auth Flow", () => {
 
     // Should navigate to sign-in page
     await expect(page).toHaveURL(/\/sign-in/, { timeout: 8000 });
-    await expect(page.locator("h1")).toContainText(/welcome back/i);
+    await expect(page.locator("h1")).toContainText(/sign in to timeo/i);
   });
 
   test("sign-in with redirect parameter goes to specified page", async ({
@@ -207,7 +207,7 @@ test.describe("Auth Flow", () => {
   }) => {
     // Test that the redirect parameter is respected (but safe)
     await page.goto("/sign-in?redirect=/dashboard");
-    await expect(page.locator("h1")).toContainText(/welcome back/i);
+    await expect(page.locator("h1")).toContainText(/sign in to timeo/i);
 
     // Fill in seeded credentials
     await page.fill("#email", "gym@demo.my");
@@ -265,7 +265,7 @@ test.describe("Dashboard Access", () => {
     await expect(page).toHaveURL(/\/sign-in\?redirect=%2Fdashboard/, {
       timeout: 8000,
     });
-    await expect(page.locator("h1")).toContainText(/welcome back/i);
+    await expect(page.locator("h1")).toContainText(/sign in to timeo/i);
   });
 
   test("sign-out from dashboard redirects to home page", async ({ page }) => {

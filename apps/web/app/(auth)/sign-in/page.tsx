@@ -103,7 +103,7 @@ export default function SignInPage() {
         </div>
 
         {error && (
-          <p className="text-sm text-red-400">{error}</p>
+          <p className="text-sm text-destructive">{error}</p>
         )}
 
         <Button
