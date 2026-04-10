@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useTenantId } from "@/hooks/use-tenant-id";
+import { MemberDetailPanel } from "@/member/member-detail-panel";
 import { getInitials } from "@timeo/shared";
 import { useGymMembers } from "@timeo/api-client";
 import type { GymMember } from "@timeo/api-client";
@@ -16,6 +16,8 @@ import {
   Avatar,
   AvatarImage,
   AvatarFallback,
+  Sheet,
+  SheetContent,
   Skeleton,
   cn,
 } from "@timeo/ui/web";
@@ -24,12 +26,7 @@ import {
   Users2,
   NotebookPen,
   UserPlus,
-  CheckCircle2,
-  XCircle,
-  Clock,
   ChevronRight,
-  Shield,
-  User,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -63,7 +60,15 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   },
 };
 
-function ClientCard({ member, index }: { member: GymMember; index: number }) {
+function ClientCard({
+  member,
+  index,
+  onSelect,
+}: {
+  member: GymMember;
+  index: number;
+  onSelect: (memberId: string) => void;
+}) {
   const roleCfg = ROLE_CONFIG[member.role] ?? ROLE_CONFIG.customer;
   const statusCfg = STATUS_CONFIG[member.status] ?? STATUS_CONFIG.inactive;
 
@@ -73,19 +78,21 @@ function ClientCard({ member, index }: { member: GymMember; index: number }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, delay: index * 0.03 }}
     >
-      <Link href={`/dashboard/gym/members`}>
+      <button
+        type="button"
+        className="w-full text-left"
+        onClick={() => onSelect(member.userId)}
+      >
         <Card className="glass-card transition-all hover:border-primary/20 hover:bg-white/[0.04] cursor-pointer group">
           <CardContent className="p-4">
             <div className="flex items-center gap-4">
-              {/* Avatar */}
               <Avatar className="h-12 w-12 shrink-0">
-                {(member.avatarUrl) && <AvatarImage src={member.avatarUrl} alt={member.name} />}
+                {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt={member.name} />}
                 <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">
                   {getInitials(member.name)}
                 </AvatarFallback>
               </Avatar>
 
-              {/* Info */}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-semibold text-white truncate">{member.name}</p>
@@ -109,7 +116,7 @@ function ClientCard({ member, index }: { member: GymMember; index: number }) {
             </div>
           </CardContent>
         </Card>
-      </Link>
+      </button>
     </motion.div>
   );
 }
@@ -134,6 +141,7 @@ export default function ClientsPage() {
   const { tenantId } = useTenantId();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | "customer" | "staff" | "admin">("all");
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
 
   const { data: members, isLoading } = useGymMembers(tenantId ?? "");
 
@@ -246,10 +254,28 @@ export default function ClientsPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((member, index) => (
-            <ClientCard key={member.userId} member={member} index={index} />
+            <ClientCard
+              key={member.userId}
+              member={member}
+              index={index}
+              onSelect={setSelectedMemberId}
+            />
           ))}
         </div>
       )}
+
+      <Sheet
+        open={Boolean(selectedMemberId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedMemberId(null);
+          }
+        }}
+      >
+        <SheetContent side="right" className="w-full max-w-full sm:max-w-[480px] p-0">
+          <MemberDetailPanel tenantId={tenantId} memberId={selectedMemberId} />
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

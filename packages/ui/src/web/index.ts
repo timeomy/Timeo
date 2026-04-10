@@ -22,6 +22,19 @@ export {
   DialogDescription,
   type DialogProps,
 } from "./Dialog";
+export {
+  Sheet,
+  SheetTrigger,
+  SheetClose,
+  SheetOverlay,
+  SheetContent,
+  SheetHeader,
+  SheetFooter,
+  SheetTitle,
+  SheetDescription,
+  type SheetProps,
+  type SheetContentProps,
+} from "./Sheet";
 export { Select, type SelectProps, type SelectOption } from "./Select";
 export { Separator, type SeparatorProps } from "./Separator";
 export { Skeleton } from "./Skeleton";

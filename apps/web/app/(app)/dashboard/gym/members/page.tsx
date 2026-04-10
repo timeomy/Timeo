@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useTenantId } from "@/hooks/use-tenant-id";
+import { MemberDetailPanel } from "@/member/member-detail-panel";
 import {
   Card,
   CardContent,
@@ -20,6 +20,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Sheet,
+  SheetContent,
   Skeleton,
   cn,
 } from "@timeo/ui/web";
@@ -195,9 +197,11 @@ function buildPageNumbers(currentPage: number, totalPages: number): number[] {
 
 export default function GymMembersPage() {
   const router = useRouter();
+  const { tenantId } = useTenantId();
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const { data, isLoading, isFetching } = useGymMembers({ page, search });
 
   useEffect(() => {
@@ -294,19 +298,17 @@ export default function GymMembersPage() {
               </TableHeader>
               <TableBody>
                 {members.map((member) => {
-                  const memberDetailHref = `/dashboard/gym/members/${member.id}`;
-
                   return (
                     <TableRow
                       key={member.id}
                       className="cursor-pointer border-border transition-colors hover:bg-muted/40"
                       role="link"
                       tabIndex={0}
-                      onClick={() => router.push(memberDetailHref)}
+                      onClick={() => setSelectedMemberId(member.id)}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
-                          router.push(memberDetailHref);
+                          setSelectedMemberId(member.id);
                         }
                       }}
                     >
@@ -321,14 +323,9 @@ export default function GymMembersPage() {
                         </Avatar>
                       </TableCell>
                       <TableCell>
-                        <Link
-                          href={memberDetailHref}
-                          prefetch
-                          onClick={(event) => event.stopPropagation()}
-                          className="block text-sm font-medium text-foreground hover:text-primary"
-                        >
+                        <p className="text-sm font-medium text-foreground">
                           {member.name}
-                        </Link>
+                        </p>
                         {member.memberId && (
                           <p className="text-xs text-muted-foreground">ID: {member.memberId}</p>
                         )}
@@ -416,6 +413,19 @@ export default function GymMembersPage() {
           </div>
         )}
       </Card>
+
+      <Sheet
+        open={Boolean(selectedMemberId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedMemberId(null);
+          }
+        }}
+      >
+        <SheetContent side="right" className="w-full max-w-full sm:max-w-[480px] p-0">
+          <MemberDetailPanel tenantId={tenantId} memberId={selectedMemberId} />
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
