@@ -179,7 +179,7 @@ const server = http.createServer(async (req, res) => {
     body = {};
   }
 
-  if (req.method !== "POST" || url !== "/zah3check") {
+  if (req.method !== "POST" || (url !== "/zah3check" && url !== "/api/tCheck" && url !== "/api/tcheck")) {
     const notFoundResponse = buildZahResponse(body, {
       cmd: 0,
       voiceIndex: 5,
