@@ -10,15 +10,9 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
-COPY packages/auth/package.json ./packages/auth/
-COPY packages/api-client/package.json ./packages/api-client/
-COPY packages/ui/package.json ./packages/ui/
-COPY packages/shared/package.json ./packages/shared/
-COPY packages/config-ts/package.json ./packages/config-ts/
-COPY packages/config-eslint/package.json ./packages/config-eslint/
-COPY packages/analytics/package.json ./packages/analytics/
-COPY packages/db/package.json ./packages/db/
-RUN pnpm install --frozen-lockfile --filter @timeo/web...
+COPY apps/mobile/package.json ./apps/mobile/
+COPY packages/ ./packages/
+RUN pnpm install --frozen-lockfile
 
 # ─── Builder ─────────────────────────────────────────────────────────────────
 FROM base AS builder
