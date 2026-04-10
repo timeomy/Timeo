@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../client";
 
 export interface GymMember {
@@ -133,6 +133,20 @@ export interface MemberDetail {
     method: string;
     timestamp: string;
   }>;
+  qrCode?: string | null;
+}
+
+export interface UpdateMemberPayload {
+  name?: string;
+  email?: string;
+  phone?: string | null;
+  avatar_url?: string | null;
+  role?: "customer" | "coach" | "staff" | "admin";
+  status?: "active" | "suspended" | "inactive";
+  notes?: string | null;
+  tags?: string[];
+  coach_id?: string | null;
+  member_id?: string | null;
 }
 
 export function useGymMembers(tenantId: string | null | undefined) {
@@ -200,6 +214,44 @@ export function useCoaches(tenantId: string | null | undefined) {
         avatarUrl: row.avatar_url,
         role: row.role,
       }));
+    },
+  });
+}
+
+export function useUpdateMember(tenantId: string | null | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      memberId,
+      payload,
+    }: {
+      memberId: string;
+      payload: UpdateMemberPayload;
+    }) => {
+      if (!tenantId) {
+        throw new Error("Tenant ID is required to update a member");
+      }
+
+      return api.patch<{
+        user: MemberDetail["user"];
+        membership: MemberDetail["membership"];
+      }>(
+        `/api/tenants/${tenantId}/members/${encodeURIComponent(memberId)}`,
+        payload,
+      );
+    },
+    onSuccess: (_data, { memberId }) => {
+      if (!tenantId) {
+        return;
+      }
+
+      queryClient.invalidateQueries({
+        queryKey: ["gym", tenantId, "member-detail", memberId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["gym", tenantId, "members"],
+      });
     },
   });
 }

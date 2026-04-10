@@ -95,6 +95,46 @@ const CreateMemberSchema = z.object({
   packageId: z.string().optional(),
 });
 
+const UpdateMemberSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  email: z.string().email().optional(),
+  phone: z.string().trim().max(50).nullable().optional(),
+  avatar_url: z.string().url().nullable().optional(),
+  role: z.enum(["customer", "coach", "staff", "admin"]).optional(),
+  status: z.enum(["active", "suspended", "inactive"]).optional(),
+  notes: z.string().trim().max(4000).nullable().optional(),
+  tags: z.array(z.string().trim().min(1).max(64)).max(50).optional(),
+  coach_id: z.string().trim().min(1).nullable().optional(),
+  member_id: z
+    .string()
+    .trim()
+    .min(1)
+    .max(64)
+    .regex(/^[a-fA-F0-9]+$/)
+    .nullable()
+    .optional(),
+});
+
+const UpdateMemberSubscriptionSchema = z.object({
+  endDate: z.string().min(1),
+});
+
+function normalizeMembershipStatusForEdit(
+  status: string | null | undefined,
+): "active" | "suspended" | "inactive" {
+  if (status === "active" || status === "suspended") {
+    return status;
+  }
+
+  return "inactive";
+}
+
+function mapEditableStatusToDb(
+  status: "active" | "suspended" | "inactive",
+): "active" | "suspended" | "removed" {
+  return status === "inactive" ? "removed" : status;
+}
+
 // ─── GET /overview — Gym dashboard stats ────────────────────────────────────
 
 app.get(
@@ -511,6 +551,12 @@ app.get(
         return c.json(error("NOT_FOUND", "Member not found"), 404);
       }
 
+      const [tenantRow] = await db
+        .select({ slug: tenants.slug })
+        .from(tenants)
+        .where(eq(tenants.id, tenantId))
+        .limit(1);
+
       const now = new Date();
 
       // Current/latest subscription
@@ -715,6 +761,11 @@ app.get(
             .filter(Boolean)
         : [];
 
+      const qrCode =
+        tenantRow?.slug && memberRow.membership.memberId
+          ? `TIMEO:${tenantRow.slug}:${memberRow.membership.memberId}:${computeHmac(tenantRow.slug, memberRow.membership.memberId)}`
+          : null;
+
       return c.json(
         success({
           user: {
@@ -759,10 +810,310 @@ app.get(
             registered: hasFaceRegistered,
             registrations: faceRegs,
           },
+          qrCode,
         }),
       );
     } catch (err) {
       return c.json(error("MEMBER_DETAIL_ERROR", (err as Error).message), 500);
+    }
+  },
+);
+
+// ─── PATCH /members/:memberId — Admin edit member profile & membership ─────
+
+app.patch(
+  "/members/:memberId",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  zValidator("json", UpdateMemberSchema),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+    const memberId = c.req.param("memberId");
+    const body = c.req.valid("json");
+
+    try {
+      const [existingMember] = await db
+        .select({
+          userId: users.id,
+          authId: users.auth_id,
+          membershipId: tenantMemberships.id,
+        })
+        .from(tenantMemberships)
+        .innerJoin(users, eq(tenantMemberships.user_id, users.id))
+        .where(
+          and(
+            eq(tenantMemberships.tenant_id, tenantId),
+            eq(tenantMemberships.user_id, memberId),
+          ),
+        )
+        .limit(1);
+
+      if (!existingMember) {
+        return c.json(error("NOT_FOUND", "Member not found"), 404);
+      }
+
+      const userUpdates: Partial<typeof users.$inferInsert> = {};
+      const membershipUpdates: Partial<typeof tenantMemberships.$inferInsert> = {};
+      const authUpdates: Partial<typeof authUser.$inferInsert> = {};
+
+      if (body.name !== undefined) {
+        const normalizedName = body.name.trim();
+        userUpdates.name = normalizedName;
+        authUpdates.name = normalizedName;
+      }
+
+      if (body.email !== undefined) {
+        const normalizedEmail = body.email.trim().toLowerCase();
+        userUpdates.email = normalizedEmail;
+        authUpdates.email = normalizedEmail;
+      }
+
+      if (body.phone !== undefined) {
+        userUpdates.phone = body.phone?.trim() || null;
+      }
+
+      if (body.avatar_url !== undefined) {
+        userUpdates.avatar_url = body.avatar_url?.trim() || null;
+      }
+
+      if (body.role !== undefined) {
+        membershipUpdates.role = body.role;
+      }
+
+      if (body.status !== undefined) {
+        membershipUpdates.status = mapEditableStatusToDb(body.status);
+      }
+
+      if (body.notes !== undefined) {
+        membershipUpdates.notes = body.notes?.trim() || null;
+      }
+
+      if (body.tags !== undefined) {
+        membershipUpdates.tags = Array.from(
+          new Set(
+            body.tags
+              .map((tag) => tag.trim())
+              .filter(Boolean),
+          ),
+        );
+      }
+
+      if (body.coach_id !== undefined) {
+        membershipUpdates.coach_id = body.coach_id?.trim() || null;
+      }
+
+      if (body.member_id !== undefined) {
+        membershipUpdates.member_id = body.member_id?.trim().toUpperCase() || null;
+      }
+
+      if (membershipUpdates.coach_id) {
+        const [coachMembership] = await db
+          .select({ id: tenantMemberships.id })
+          .from(tenantMemberships)
+          .where(
+            and(
+              eq(tenantMemberships.tenant_id, tenantId),
+              eq(tenantMemberships.user_id, membershipUpdates.coach_id),
+              eq(tenantMemberships.status, "active"),
+              or(
+                eq(tenantMemberships.role, "coach"),
+                eq(tenantMemberships.role, "staff"),
+                eq(tenantMemberships.role, "admin"),
+              ),
+            ),
+          )
+          .limit(1);
+
+        if (!coachMembership) {
+          return c.json(
+            error("INVALID_COACH", "Selected coach is not active in this tenant"),
+            422,
+          );
+        }
+      }
+
+      if (Object.keys(userUpdates).length > 0) {
+        userUpdates.updated_at = new Date();
+      }
+
+      if (Object.keys(authUpdates).length > 0) {
+        authUpdates.updatedAt = new Date();
+      }
+
+      await db.transaction(async (tx) => {
+        if (Object.keys(userUpdates).length > 0) {
+          await tx.update(users).set(userUpdates).where(eq(users.id, existingMember.userId));
+        }
+
+        if (Object.keys(membershipUpdates).length > 0) {
+          await tx
+            .update(tenantMemberships)
+            .set(membershipUpdates)
+            .where(eq(tenantMemberships.id, existingMember.membershipId));
+        }
+
+        if (existingMember.authId && Object.keys(authUpdates).length > 0) {
+          await tx
+            .update(authUser)
+            .set(authUpdates)
+            .where(eq(authUser.id, existingMember.authId));
+        }
+      });
+
+      const [updatedMember] = await db
+        .select({
+          user: {
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            phone: users.phone,
+            avatarUrl: users.avatar_url,
+          },
+          membership: {
+            id: tenantMemberships.id,
+            role: tenantMemberships.role,
+            status: tenantMemberships.status,
+            notes: tenantMemberships.notes,
+            tags: tenantMemberships.tags,
+            memberId: tenantMemberships.member_id,
+            coachId: tenantMemberships.coach_id,
+          },
+        })
+        .from(tenantMemberships)
+        .innerJoin(users, eq(tenantMemberships.user_id, users.id))
+        .where(
+          and(
+            eq(tenantMemberships.tenant_id, tenantId),
+            eq(tenantMemberships.user_id, memberId),
+          ),
+        )
+        .limit(1);
+
+      if (!updatedMember) {
+        return c.json(error("NOT_FOUND", "Member not found"), 404);
+      }
+
+      const tags = Array.isArray(updatedMember.membership.tags)
+        ? updatedMember.membership.tags
+            .map((tag) => (typeof tag === "string" ? tag.trim() : ""))
+            .filter(Boolean)
+        : [];
+
+      return c.json(
+        success({
+          user: {
+            ...updatedMember.user,
+            memberId: updatedMember.membership.memberId,
+          },
+          membership: {
+            ...updatedMember.membership,
+            status: normalizeMembershipStatusForEdit(updatedMember.membership.status),
+            tags,
+          },
+        }),
+      );
+    } catch (err) {
+      const code = (err as { code?: string })?.code;
+      if (code === "23505") {
+        return c.json(error("CONFLICT", "Email already exists"), 409);
+      }
+
+      return c.json(error("MEMBER_UPDATE_ERROR", (err as Error).message), 500);
+    }
+  },
+);
+
+// ─── PATCH /members/:memberId/subscription — Admin edit subscription dates ─
+
+app.patch(
+  "/members/:memberId/subscription",
+  authMiddleware,
+  tenantMiddleware,
+  requireRole("admin"),
+  zValidator("json", UpdateMemberSubscriptionSchema),
+  async (c) => {
+    const tenantId = c.get("tenantId");
+    const memberId = c.req.param("memberId");
+    const body = c.req.valid("json");
+
+    const nextEndDate = new Date(body.endDate);
+    if (Number.isNaN(nextEndDate.getTime())) {
+      return c.json(error("BAD_REQUEST", "Invalid endDate"), 400);
+    }
+
+    try {
+      const [memberRow] = await db
+        .select({ id: tenantMemberships.id })
+        .from(tenantMemberships)
+        .where(
+          and(
+            eq(tenantMemberships.tenant_id, tenantId),
+            eq(tenantMemberships.user_id, memberId),
+          ),
+        )
+        .limit(1);
+
+      if (!memberRow) {
+        return c.json(error("NOT_FOUND", "Member not found"), 404);
+      }
+
+      const [latestSubscription] = await db
+        .select({
+          id: subscriptions.id,
+          status: subscriptions.status,
+          membershipId: subscriptions.membership_id,
+          planName: memberships.name,
+          currentPeriodStart: subscriptions.current_period_start,
+          currentPeriodEnd: subscriptions.current_period_end,
+          cancelAtPeriodEnd: subscriptions.cancel_at_period_end,
+        })
+        .from(subscriptions)
+        .leftJoin(memberships, eq(subscriptions.membership_id, memberships.id))
+        .where(
+          and(
+            eq(subscriptions.tenant_id, tenantId),
+            eq(subscriptions.customer_id, memberId),
+          ),
+        )
+        .orderBy(desc(subscriptions.current_period_end))
+        .limit(1);
+
+      if (!latestSubscription) {
+        return c.json(error("NOT_FOUND", "Subscription not found"), 404);
+      }
+
+      await db
+        .update(subscriptions)
+        .set({
+          current_period_end: nextEndDate,
+          updated_at: new Date(),
+        })
+        .where(eq(subscriptions.id, latestSubscription.id));
+
+      const now = new Date();
+      const isActive = latestSubscription.status === "active" && nextEndDate > now;
+
+      return c.json(
+        success({
+          id: latestSubscription.id,
+          status: latestSubscription.status,
+          membershipId: latestSubscription.membershipId,
+          planName: latestSubscription.planName,
+          currentPeriodStart: latestSubscription.currentPeriodStart,
+          currentPeriodEnd: nextEndDate,
+          startDate: latestSubscription.currentPeriodStart,
+          endDate: nextEndDate,
+          cancelAtPeriodEnd: latestSubscription.cancelAtPeriodEnd,
+          daysRemaining: Math.ceil((nextEndDate.getTime() - now.getTime()) / 86400000),
+          isActive,
+        }),
+      );
+    } catch (err) {
+      return c.json(
+        error("MEMBER_SUBSCRIPTION_UPDATE_ERROR", (err as Error).message),
+        500,
+      );
     }
   },
 );

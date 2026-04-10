@@ -377,8 +377,14 @@ export {
   useGymMembers,
   useMemberDetail,
   useCoaches,
+  useUpdateMember,
 } from "./gym";
-export type { GymMember, CoachOption, MemberDetail } from "./gym";
+export type {
+  GymMember,
+  CoachOption,
+  MemberDetail,
+  UpdateMemberPayload,
+} from "./gym";
 
 export {
   useMissionControl,
