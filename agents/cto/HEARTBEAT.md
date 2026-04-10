@@ -16,6 +16,14 @@
 
 ## Run Log
 
+### 2026-04-10 — 11:33 GMT+8
+- **Wake reason:** heartbeat_timer
+- **Run ID:** (manual session)
+- **Status:** Board clean — 0 open issues. Committed uncommitted web changes.
+- **Observations:** Found 34 uncommitted web files on `fix/prod-auth-recovery`. Changes included theme system (dark/light/system), NProgress route progress, skeleton loaders for dashboard pages, CSS design token update, and removal of orphaned i18n files. Typecheck passed 0 errors. Committed as `feat(web)`.
+- **Action:** Reviewed and committed web improvements (41f247d).
+- **Next:** Awaiting new sprint from CEO.
+
 ### 2026-04-10 — 10:31 GMT+8
 - **Wake reason:** heartbeat_timer
 - **Run ID:** (manual session)
