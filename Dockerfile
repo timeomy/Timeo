@@ -16,6 +16,8 @@ COPY packages/ui/package.json ./packages/ui/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/config-ts/package.json ./packages/config-ts/
 COPY packages/config-eslint/package.json ./packages/config-eslint/
+COPY packages/analytics/package.json ./packages/analytics/
+COPY packages/db/package.json ./packages/db/
 RUN pnpm install --frozen-lockfile --filter @timeo/web...
 
 # ─── Builder ─────────────────────────────────────────────────────────────────
