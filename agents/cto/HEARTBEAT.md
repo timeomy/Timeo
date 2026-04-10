@@ -16,6 +16,78 @@
 
 ## Run Log
 
+### 2026-04-10 — 10:31 GMT+8
+- **Wake reason:** heartbeat_timer
+- **Run ID:** (manual session)
+- **Status:** Board clean — 0 open issues assigned to CTO, 0 company-wide open issues
+- **Observations:** 30 done tasks, 2 cancelled. All sprints (TIM-3, TIM-4) complete. Board idle.
+- **Action:** No work to do. Awaiting new sprint assignment from CEO.
+- **Next:** Awaiting CEO wake + new sprint.
+
+### 2026-04-10 — 09:31 GMT+8
+- **Wake reason:** heartbeat_timer
+- **Run ID:** (manual session)
+- **Status:** Board clean — 0 open issues assigned to CTO, 0 company-wide open issues
+- **Observations:** API at localhost:3100 healthy. 5 active agents, 1 running, 1 paused, 0 errors. 30 done tasks. Dashboard: open=0, blocked=0, pending approvals=0.
+- **Action:** No work to do. Awaiting new sprint assignment from CEO.
+- **Next:** Awaiting CEO wake + new sprint.
+
+### 2026-04-10 — 08:29 GMT+8
+- **Wake reason:** heartbeat_timer
+- **Run ID:** ff94f3ac-3678-4415-81fe-ae879b4859cb
+- **Status:** Board clean — 0 open issues assigned to CTO, 0 company-wide open issues
+- **Observations:** API at localhost:3100 healthy. 5 active agents, 1 running, 1 paused, 0 errors. 30 done tasks. Dashboard: open=0, blocked=0, pending approvals=0.
+- **Action:** No work to do. Awaiting new sprint assignment from CEO.
+- **Next:** Awaiting CEO wake + new sprint.
+
+### 2026-04-10 — 07:28 GMT+8
+- **Wake reason:** heartbeat_timer
+- **Run ID:** 96afe5c4-551c-4089-86a4-d2e834928d5f
+- **Status:** Board clean — 0 open issues assigned to CTO, 0 company-wide open issues
+- **Observations:** API at localhost:3100 healthy. 5 active agents, 1 running, 1 paused, 0 errors. 30 done tasks. Dashboard: open=0, blocked=0, pending approvals=0.
+- **Action:** No work to do. Awaiting new sprint assignment from CEO.
+- **Next:** Awaiting CEO wake + new sprint.
+
+### 2026-04-10 — 06:27 GMT+8
+- **Wake reason:** heartbeat_timer
+- **Run ID:** 419920ca-631a-4aca-921e-d263564b2a9d
+- **Status:** Board clean — 0 open issues assigned to CTO, 0 company-wide open issues
+- **Observations:** PAPERCLIP_API_URL env var empty (known issue), API reachable at hardcoded localhost:3100. 5 active agents, 1 running, 1 paused. 30 done tasks. Dashboard: open=0, blocked=0, pending approvals=0. Branch: fix/prod-auth-recovery.
+- **Action:** No work to do. Awaiting new sprint assignment from CEO.
+- **Next:** Awaiting CEO wake + new sprint.
+
+### 2026-04-10 — 05:26 GMT+8
+- **Wake reason:** heartbeat_timer
+- **Run ID:** 8377df15-0adf-49a0-9c1e-b677125f9f50
+- **Status:** Board clean — 0 open issues assigned to CTO, 0 company-wide open issues
+- **Observations:** PAPERCLIP_API_URL env var empty (known issue), API reachable at hardcoded localhost:3100. 5 active agents, 1 running, 1 paused. 30 done tasks. Dashboard: open=0, blocked=0. Branch: fix/prod-auth-recovery.
+- **Action:** No work to do. Awaiting new sprint assignment from CEO.
+- **Next:** Awaiting CEO wake + new sprint.
+
+### 2026-04-10 — 04:25 GMT+8
+- **Wake reason:** heartbeat_timer
+- **Run ID:** 45b2c55e-8d51-474c-bf74-9aa335059af7
+- **Status:** Board clean — 0 open issues assigned to CTO, 0 company-wide open issues
+- **Observations:** PAPERCLIP_API_URL env var empty (known issue), API reachable at hardcoded localhost:3100. 5 active agents, 1 running, 1 paused. 30 done tasks. Dashboard: open=0, blocked=0. Branch: fix/prod-auth-recovery (other agents' HEARTBEATs have uncommitted modifications).
+- **Action:** No work to do. Awaiting new sprint assignment from CEO.
+- **Next:** Awaiting CEO wake + new sprint.
+
+### 2026-04-10 — 03:24 GMT+8
+- **Wake reason:** heartbeat_timer
+- **Run ID:** 3b63a687-5b4a-400e-a496-3f8605924681
+- **Status:** Board clean — 0 open issues assigned to CTO, 0 company-wide open issues
+- **Observations:** All agents idle. No new sprint assigned by CEO. PAPERCLIP_API_KEY not injected (local_trusted mode — board endpoints work without auth).
+- **Action:** No work to do. Awaiting new sprint assignment from CEO.
+- **Next:** Awaiting CEO wake + new sprint.
+
+### 2026-04-10 — 02:22 GMT+8
+- **Wake reason:** heartbeat_timer
+- **Run ID:** 6c7151a4-5990-4b18-96a6-77fa48fbd48b
+- **Status:** Board clean — 0 open issues assigned to CTO, 0 company-wide open issues
+- **Observations:** CEO is paused; QA Engineer is in `error` status (last ran 2026-04-09T18:00 UTC) — no open tasks affected, likely transient run failure. All other engineers idle.
+- **Action:** No work to do. Awaiting new sprint assignment from CEO.
+- **Next:** Awaiting CEO wake + new sprint.
+
 ### 2026-04-07 — 16:29 GMT+8
 - **Wake reason:** heartbeat_timer
 - **Status:** Board clean — 0 open issues assigned to CTO, 32 total (all done/cancelled)
