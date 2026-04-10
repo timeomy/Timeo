@@ -16,7 +16,7 @@ import { generateId } from "@timeo/db";
 import { sendMail } from "@timeo/auth/email";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
-import { requireRole } from "../middleware/rbac.js";
+import { requireCapability } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
 import { sanitizePlanName } from "../lib/plan-name.js";
 import { createNotification } from "../services/notification.service.js";
@@ -59,7 +59,7 @@ app.get(
   "/",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("billing_transactional"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const status = c.req.query("status");
@@ -258,7 +258,7 @@ app.post(
   "/:id/approve",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("billing_transactional"),
   zValidator("json", ApproveRequestSchema),
   async (c) => {
     const user = c.get("user");
@@ -503,7 +503,7 @@ app.post(
   "/:id/reject",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("billing_transactional"),
   zValidator("json", RejectRequestSchema),
   async (c) => {
     const tenantId = c.get("tenantId");
@@ -586,7 +586,7 @@ app.post(
   "/:id/reminder",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("billing_transactional"),
   zValidator("json", ReminderSchema),
   async (c) => {
     const tenantId = c.get("tenantId");
@@ -657,7 +657,7 @@ app.post(
   "/:id/request-receipt",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("billing_transactional"),
   zValidator("json", ReminderSchema),
   async (c) => {
     const tenantId = c.get("tenantId");

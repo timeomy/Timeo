@@ -6,7 +6,7 @@ import { posTransactions, users } from "@timeo/db/schema";
 import { eq, desc, and, gte } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
-import { requireRole } from "../middleware/rbac.js";
+import { requireCapability } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
 import { CreatePosTransactionSchema } from "../lib/validation.js";
 import * as PosService from "../services/pos.service.js";
@@ -19,7 +19,7 @@ app.get(
   "/",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin", "staff"),
+  requireCapability("pos_access"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const rows = await db
@@ -40,7 +40,7 @@ app.get(
   "/daily-summary",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin", "staff"),
+  requireCapability("pos_access"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const startOfToday = new Date();
@@ -85,7 +85,7 @@ app.get(
   "/monthly-statement",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("pos_access"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const now = new Date();
@@ -133,7 +133,7 @@ app.get(
   "/:txId",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin", "staff"),
+  requireCapability("pos_access"),
   async (c) => {
     const [row] = await db
       .select()
@@ -150,7 +150,7 @@ app.post(
   "/",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin", "staff"),
+  requireCapability("pos_access"),
   zValidator("json", CreatePosTransactionSchema),
   async (c) => {
     const user = c.get("user");
@@ -211,6 +211,7 @@ app.post(
   "/duitnow-qr",
   authMiddleware,
   tenantMiddleware,
+  requireCapability("pos_access"),
   zValidator("json", DuitNowQRSchema),
   async (c) => {
     const body = c.req.valid("json");
@@ -236,7 +237,7 @@ app.patch(
   "/:txId/void",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("pos_access"),
   async (c) => {
     const user = c.get("user");
     try {
@@ -253,7 +254,7 @@ app.delete(
   "/:txId",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("pos_access"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const txId = c.req.param("txId");

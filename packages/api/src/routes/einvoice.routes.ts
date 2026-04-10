@@ -11,7 +11,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { generateId } from "@timeo/db";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
-import { requireRole } from "../middleware/rbac.js";
+import { requireCapability } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
 import { CreateEInvoiceSchema } from "../lib/validation.js";
 import { z } from "zod";
@@ -315,7 +315,7 @@ app.get(
   "/profile",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("billing_strategic"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const [tenant] = await db
@@ -333,7 +333,7 @@ app.put(
   "/profile",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("billing_strategic"),
   zValidator("json", EInvoiceProfileSchema),
   async (c) => {
     const user = c.get("user");
@@ -364,7 +364,7 @@ app.get(
   "/",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("billing_transactional"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const status = c.req.query("status");
@@ -483,7 +483,7 @@ app.post(
   "/:requestId/submit",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("billing_transactional"),
   zValidator("json", MarkSubmittedSchema),
   async (c) => {
     const requestId = c.req.param("requestId");
@@ -513,7 +513,7 @@ app.patch(
   "/:requestId/submitted",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("billing_transactional"),
   zValidator("json", MarkSubmittedSchema),
   async (c) => {
     const requestId = c.req.param("requestId");
@@ -543,7 +543,7 @@ app.patch(
   "/:requestId/rejected",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("billing_transactional"),
   zValidator("json", MarkRejectedSchema),
   async (c) => {
     const requestId = c.req.param("requestId");
@@ -588,7 +588,7 @@ app.patch(
   "/:requestId/pending",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("billing_transactional"),
   async (c) => {
     const requestId = c.req.param("requestId");
     const user = c.get("user");

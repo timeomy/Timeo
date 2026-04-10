@@ -33,9 +33,10 @@ function parseCookie(headers: Headers, name: string): string | undefined {
 function normalizeRole(role?: string | null): TenantRole {
   if (!role) return "customer";
 
-  const normalized = role.toLowerCase();
+  const normalized = role.toLowerCase().replace(/[\s-]+/g, "_");
   if (normalized === "owner") return "admin";
   if (normalized === "member") return "customer";
+  if (normalized === "front_desk") return "staff";
   if (normalized === "platform_admin") return "platform_admin";
   if (normalized === "admin") return "admin";
   if (normalized === "staff") return "staff";

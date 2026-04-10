@@ -11,7 +11,7 @@ import {
 import { and, eq, desc, count, sum, max } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
-import { requireRole } from "../middleware/rbac.js";
+import { requireCapability, requireRole } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
 import { UpdateCustomerSchema } from "../lib/validation.js";
 
@@ -230,7 +230,7 @@ app.patch(
   "/:customerId",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin", "staff"),
+  requireCapability("edit_customer"),
   zValidator("json", UpdateCustomerSchema),
   async (c) => {
     const tenantId = c.get("tenantId");

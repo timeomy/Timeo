@@ -20,9 +20,10 @@ const ROLE_POWER: Record<TimeoRole, number> = {
 export function normalizeTimeoRole(role: string | null | undefined): TimeoRole {
   if (!role) return "customer";
 
-  const normalized = role.toLowerCase();
+  const normalized = role.toLowerCase().replace(/[\s-]+/g, "_");
   if (normalized === "member") return "customer";
   if (normalized === "owner") return "admin";
+  if (normalized === "front_desk") return "staff";
   if (normalized === "platform_admin") return "platform_admin";
   if (normalized === "admin") return "admin";
   if (normalized === "staff") return "staff";

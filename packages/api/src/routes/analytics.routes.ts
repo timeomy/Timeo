@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
-import { requireRole } from "../middleware/rbac.js";
+import { requireCapability } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
 import * as AnalyticsService from "../services/analytics.service.js";
 
@@ -22,7 +22,7 @@ app.get(
   "/revenue",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("view_analytics"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const { from, to } = parseDateRange(c);
@@ -41,7 +41,7 @@ app.get(
   "/bookings",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("view_analytics"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const { from, to } = parseDateRange(c);
@@ -60,7 +60,7 @@ app.get(
   "/top-services",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("view_analytics"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const { from, to } = parseDateRange(c);
@@ -79,7 +79,7 @@ app.get(
   "/orders",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("view_analytics"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const { from, to } = parseDateRange(c);
@@ -98,7 +98,7 @@ app.get(
   "/top-products",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("view_analytics"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const { from, to } = parseDateRange(c);
@@ -117,7 +117,7 @@ app.get(
   "/staff",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("view_analytics"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const { from, to } = parseDateRange(c);
@@ -136,7 +136,7 @@ app.get(
   "/revenue/trend",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("view_analytics"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const { from, to } = parseDateRange(c);
@@ -155,7 +155,7 @@ app.get(
   "/bookings/trend",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("view_analytics"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const { from, to } = parseDateRange(c);
@@ -174,7 +174,7 @@ app.get(
   "/customers",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("view_analytics"),
   async (c) => {
     const tenantId = c.get("tenantId");
 

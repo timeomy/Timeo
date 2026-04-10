@@ -14,7 +14,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
-import { requireRole } from "../middleware/rbac.js";
+import { requireCapability } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
 
 const app = new Hono();
@@ -231,7 +231,7 @@ app.get(
   "/clients",
   authMiddleware,
   tenantMiddleware,
-  requireRole("coach", "staff", "admin"),
+  requireCapability("coach_session_log"),
   async (c) => {
     const user = c.get("user");
     const tenantId = c.get("tenantId");
@@ -329,7 +329,7 @@ app.get(
   "/schedule",
   authMiddleware,
   tenantMiddleware,
-  requireRole("coach", "staff", "admin"),
+  requireCapability("coach_session_log"),
   async (c) => {
     const user = c.get("user");
     const tenantId = c.get("tenantId");
@@ -449,7 +449,7 @@ app.get(
   "/attendance/classes/:classId",
   authMiddleware,
   tenantMiddleware,
-  requireRole("coach", "staff", "admin"),
+  requireCapability("coach_session_log"),
   async (c) => {
     const user = c.get("user");
     const tenantId = c.get("tenantId");
@@ -504,7 +504,7 @@ app.patch(
   "/attendance/classes/:classId/enrollments/:enrollmentId",
   authMiddleware,
   tenantMiddleware,
-  requireRole("coach", "staff", "admin"),
+  requireCapability("coach_session_log"),
   zValidator("json", AttendanceUpdateSchema),
   async (c) => {
     const user = c.get("user");

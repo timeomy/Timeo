@@ -16,7 +16,7 @@ import {
 import { and, eq, desc, or, sql, inArray, gte, lte } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
-import { requireRole } from "../middleware/rbac.js";
+import { requireCapability, requireRole } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
 import { generateId } from "@timeo/db";
 
@@ -27,7 +27,7 @@ app.get(
   "/exercises",
   authMiddleware,
   tenantMiddleware,
-  requireRole("staff", "coach", "admin"),
+  requireCapability("coach_session_log"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const typesParam = c.req.query("types");
@@ -70,7 +70,7 @@ app.post(
   "/exercises",
   authMiddleware,
   tenantMiddleware,
-  requireRole("staff", "coach", "admin"),
+  requireCapability("coach_session_log"),
   zValidator(
     "json",
     z.object({
@@ -119,7 +119,7 @@ app.get(
   "/me/clients",
   authMiddleware,
   tenantMiddleware,
-  requireRole("staff", "coach", "admin"),
+  requireCapability("coach_session_log"),
   async (c) => {
     const user = c.get("user");
     const tenantId = c.get("tenantId");
@@ -233,7 +233,7 @@ app.get(
   "/me/clients/:clientId/package",
   authMiddleware,
   tenantMiddleware,
-  requireRole("staff", "coach", "admin"),
+  requireCapability("coach_session_log"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const clientId = c.req.param("clientId");
@@ -292,7 +292,7 @@ app.get(
   "/me/clients/:clientId/last-weight",
   authMiddleware,
   tenantMiddleware,
-  requireRole("staff", "coach", "admin"),
+  requireCapability("coach_session_log"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const clientId = c.req.param("clientId");
@@ -321,7 +321,7 @@ app.get(
   "/me/clients/:clientId/notes",
   authMiddleware,
   tenantMiddleware,
-  requireRole("staff", "coach", "admin"),
+  requireCapability("coach_session_log"),
   async (c) => {
     const user = c.get("user");
     const tenantId = c.get("tenantId");
@@ -364,7 +364,7 @@ app.put(
   "/me/clients/:clientId/notes",
   authMiddleware,
   tenantMiddleware,
-  requireRole("staff", "coach", "admin"),
+  requireCapability("coach_session_log"),
   zValidator("json", z.object({ notes: z.string() })),
   async (c) => {
     const user = c.get("user");
@@ -492,7 +492,7 @@ app.get(
   "/",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin", "staff"),
+  requireCapability("coach_session_log"),
   async (c) => {
     const tenantId = c.get("tenantId");
 
@@ -531,7 +531,7 @@ app.get(
   "/me/availability",
   authMiddleware,
   tenantMiddleware,
-  requireRole("staff", "coach", "admin"),
+  requireCapability("coach_session_log"),
   async (c) => {
     const user = c.get("user");
     const tenantId = c.get("tenantId");
@@ -563,7 +563,7 @@ app.post(
   "/me/availability",
   authMiddleware,
   tenantMiddleware,
-  requireRole("staff", "coach", "admin"),
+  requireCapability("coach_session_log"),
   zValidator(
     "json",
     z.object({
@@ -607,7 +607,7 @@ app.delete(
   "/me/availability/:slotId",
   authMiddleware,
   tenantMiddleware,
-  requireRole("staff", "coach", "admin"),
+  requireCapability("coach_session_log"),
   async (c) => {
     const user = c.get("user");
     const tenantId = c.get("tenantId");
@@ -639,7 +639,7 @@ app.get(
   "/me/bookings",
   authMiddleware,
   tenantMiddleware,
-  requireRole("staff", "coach", "admin"),
+  requireCapability("coach_session_log"),
   async (c) => {
     const user = c.get("user");
     const tenantId = c.get("tenantId");
@@ -681,7 +681,7 @@ app.post(
   "/me/bookings",
   authMiddleware,
   tenantMiddleware,
-  requireRole("staff", "coach", "admin"),
+  requireCapability("coach_session_log"),
   zValidator(
     "json",
     z.object({
@@ -727,7 +727,7 @@ app.patch(
   "/me/bookings/:bookingId",
   authMiddleware,
   tenantMiddleware,
-  requireRole("staff", "coach", "admin"),
+  requireCapability("coach_session_log"),
   zValidator(
     "json",
     z.object({
@@ -770,7 +770,7 @@ app.get(
   "/training-logs",
   authMiddleware,
   tenantMiddleware,
-  requireRole("staff", "coach", "admin"),
+  requireCapability("coach_session_log"),
   async (c) => {
     const user = c.get("user");
     const tenantId = c.get("tenantId");
@@ -841,7 +841,7 @@ app.post(
   "/training-logs",
   authMiddleware,
   tenantMiddleware,
-  requireRole("staff", "coach", "admin"),
+  requireCapability("coach_session_log"),
   zValidator(
     "json",
     z.object({

@@ -14,7 +14,7 @@ import {
 import { sendMail } from "@timeo/auth/email";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
-import { requireRole } from "../middleware/rbac.js";
+import { requireCapability } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
 import { createNotification } from "../services/notification.service.js";
 
@@ -222,7 +222,7 @@ function buildSimplePdf(lines: string[]) {
 }
 
 // GET /tenants/:tenantId/invoices
-app.get("/", authMiddleware, tenantMiddleware, requireRole("admin"), async (c) => {
+app.get("/", authMiddleware, tenantMiddleware, requireCapability("billing_transactional"), async (c) => {
   const tenantId = c.get("tenantId");
   const status = c.req.query("status");
   const memberId = c.req.query("memberId");
@@ -432,7 +432,7 @@ app.post(
   "/",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("billing_transactional"),
   zValidator("json", CreateInvoiceSchema),
   async (c) => {
     const tenantId = c.get("tenantId");
@@ -615,7 +615,7 @@ app.patch(
   "/:id",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("billing_transactional"),
   zValidator("json", UpdateInvoiceSchema),
   async (c) => {
     const tenantId = c.get("tenantId");
@@ -670,7 +670,7 @@ app.post(
   "/:id/email",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("billing_transactional"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const user = c.get("user");

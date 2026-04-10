@@ -18,7 +18,7 @@ import {
 import { eq, desc, and, ilike, count, or, gt, gte, sql } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
-import { requireRole } from "../middleware/rbac.js";
+import { requireCapability, requireRole } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
 import * as CheckInService from "../services/check-in.service.js";
 import * as AccessControlService from "../services/access-control.service.js";
@@ -823,7 +823,7 @@ app.patch(
   "/members/:memberId",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("edit_customer"),
   zValidator("json", UpdateMemberSchema),
   async (c) => {
     const tenantId = c.get("tenantId");

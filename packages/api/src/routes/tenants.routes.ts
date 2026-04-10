@@ -12,7 +12,7 @@ import {
 import { and, eq, ilike, inArray, sql } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
-import { requireRole } from "../middleware/rbac.js";
+import { requireCapability } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
 import {
   CreateTenantSchema,
@@ -355,10 +355,12 @@ app.post(
 app.patch(
   "/:tenantId/settings",
   authMiddleware,
+  tenantMiddleware,
+  requireCapability("manage_tenant"),
   zValidator("json", UpdateTenantSettingsSchema),
   async (c) => {
     const user = c.get("user");
-    const tenantId = c.req.param("tenantId");
+    const tenantId = c.get("tenantId");
     const body = c.req.valid("json");
 
     try {
@@ -371,9 +373,9 @@ app.patch(
 );
 
 // PATCH /tenants/:tenantId/branding
-app.patch("/:tenantId/branding", authMiddleware, async (c) => {
+app.patch("/:tenantId/branding", authMiddleware, tenantMiddleware, requireCapability("manage_tenant"), async (c) => {
   const user = c.get("user");
-  const tenantId = c.req.param("tenantId");
+  const tenantId = c.get("tenantId");
   const body = await c.req.json();
 
   try {
@@ -416,7 +418,7 @@ app.patch(
   "/:tenantId/feature-flags",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("manage_tenant"),
   zValidator(
     "json",
     z.object({
@@ -498,7 +500,7 @@ app.get(
   "/:tenantId/settings/payments",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("billing_strategic"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const [row] = await db
@@ -522,7 +524,7 @@ app.patch(
   "/:tenantId/settings/payments",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("billing_strategic"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const body = await c.req.json() as { paymentMethods?: Record<string, boolean> };

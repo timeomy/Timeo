@@ -13,7 +13,7 @@ import {
 import { eq, and } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
-import { requireRole } from "../middleware/rbac.js";
+import { requireCapability } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
 
 const app = new Hono();
@@ -30,7 +30,7 @@ app.get(
   "/",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin", "staff"),
+  requireCapability("manage_staff"),
   async (c) => {
     const tenantId = c.get("tenantId");
 
@@ -79,7 +79,7 @@ app.post(
   "/invite",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("manage_staff"),
   zValidator(
     "json",
     z.object({
@@ -222,7 +222,7 @@ app.patch(
   "/:memberId",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("manage_staff"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const memberId = c.req.param("memberId");
@@ -277,7 +277,7 @@ app.delete(
   "/:memberId",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("manage_staff"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const memberId = c.req.param("memberId");

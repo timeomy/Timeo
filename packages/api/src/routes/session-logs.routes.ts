@@ -12,7 +12,7 @@ import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
-import { requireRole } from "../middleware/rbac.js";
+import { requireCapability } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
 
 const app = new Hono();
@@ -152,7 +152,7 @@ app.post(
   "/",
   authMiddleware,
   tenantMiddleware,
-  requireRole("coach", "staff", "admin"),
+  requireCapability("coach_session_log"),
   zValidator("json", CreateSessionLogSchema),
   async (c) => {
     const user = c.get("user");
@@ -249,7 +249,7 @@ app.get(
   "/",
   authMiddleware,
   tenantMiddleware,
-  requireRole("coach", "staff", "admin"),
+  requireCapability("coach_session_log"),
   async (c) => {
     const user = c.get("user");
     const tenantId = c.get("tenantId");
@@ -348,7 +348,7 @@ app.get(
   "/:id",
   authMiddleware,
   tenantMiddleware,
-  requireRole("coach", "staff", "admin"),
+  requireCapability("coach_session_log"),
   async (c) => {
     const user = c.get("user");
     const tenantId = c.get("tenantId");

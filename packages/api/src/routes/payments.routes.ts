@@ -4,7 +4,7 @@ import { payments } from "@timeo/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
-import { requireRole } from "../middleware/rbac.js";
+import { requireCapability } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
 import * as PaymentService from "../services/payment.service.js";
 
@@ -15,7 +15,7 @@ app.get(
   "/",
   authMiddleware,
   tenantMiddleware,
-  requireRole("admin"),
+  requireCapability("billing_transactional"),
   async (c) => {
     const tenantId = c.get("tenantId");
     const rows = await db
