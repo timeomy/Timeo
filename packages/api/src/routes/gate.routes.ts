@@ -31,7 +31,7 @@ import {
   subscriptions,
   memberships,
 } from "@timeo/db/schema";
-import { eq, and, ilike, desc } from "drizzle-orm";
+import { eq, and, ilike, desc, or, sql } from "drizzle-orm";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { authMiddleware } from "../middleware/auth.js";
@@ -90,6 +90,54 @@ function getCardCandidates(cardNo: string): string[] {
   if (!normalized) return [];
   const lastEight = normalized.length > 8 ? normalized.slice(-8) : normalized;
   return Array.from(new Set([normalized, lastEight].filter(Boolean)));
+}
+
+function getExternalIdCandidates(cardNo: string): string[] {
+  const raw = cardNo.trim();
+  const normalized = normalizeCardNo(cardNo);
+
+  return Array.from(
+    new Set([raw, raw.toUpperCase(), raw.toLowerCase(), normalized].filter(Boolean)),
+  );
+}
+
+function getLegacyCardCandidates(cardNo: string): {
+  numericPart: string | null;
+  candidates: string[];
+} {
+  const raw = cardNo.trim();
+
+  if (!raw) {
+    return {
+      numericPart: null,
+      candidates: [],
+    };
+  }
+
+  const withoutSuffix = raw.replace(/_0$/i, "");
+  const numericMatch = withoutSuffix.match(/\d+/);
+
+  if (!numericMatch) {
+    return {
+      numericPart: null,
+      candidates: [],
+    };
+  }
+
+  const numeric = numericMatch[0];
+  const normalizedNumeric = numeric.replace(/^0+/, "") || "0";
+
+  return {
+    numericPart: normalizedNumeric,
+    candidates: Array.from(
+      new Set([
+        numeric,
+        normalizedNumeric,
+        `${numeric}_0`,
+        `${normalizedNumeric}_0`,
+      ]),
+    ),
+  };
 }
 
 function daysUntil(date: Date): number {
@@ -723,9 +771,14 @@ app.post("/validate-card", zValidator("json", ValidateCardSchema), async (c) => 
       return c.json(payload, 401);
     }
 
-    const candidates = getCardCandidates(cardNo);
+    const trimmedCardNo = cardNo.trim();
+    const memberIdCandidates = Array.from(
+      new Set([trimmedCardNo, trimmedCardNo.toUpperCase(), ...getCardCandidates(cardNo)]),
+    ).filter(Boolean);
+    const externalIdCandidates = getExternalIdCandidates(cardNo);
+    const legacyLookup = getLegacyCardCandidates(cardNo);
 
-    if (candidates.length === 0) {
+    if (memberIdCandidates.length === 0 && externalIdCandidates.length === 0) {
       return c.json({ valid: false, error: 8, tts: "Not registered" });
     }
 
@@ -737,7 +790,7 @@ app.post("/validate-card", zValidator("json", ValidateCardSchema), async (c) => 
         }
       | null = null;
 
-    for (const candidate of candidates) {
+    for (const candidate of memberIdCandidates) {
       const [row] = await db
         .select({
           userId: tenantMemberships.user_id,
@@ -749,7 +802,7 @@ app.post("/validate-card", zValidator("json", ValidateCardSchema), async (c) => 
         .where(
           and(
             eq(tenantMemberships.tenant_id, tenantId),
-            ilike(tenantMemberships.member_id, candidate),
+            eq(tenantMemberships.member_id, candidate),
           ),
         )
         .limit(1);
@@ -757,6 +810,84 @@ app.post("/validate-card", zValidator("json", ValidateCardSchema), async (c) => 
       if (row) {
         matchedMember = row;
         break;
+      }
+    }
+
+    if (!matchedMember) {
+      for (const candidate of externalIdCandidates) {
+        const [row] = await db
+          .select({
+            userId: tenantMemberships.user_id,
+            memberId: tenantMemberships.member_id,
+            memberName: users.name,
+          })
+          .from(tenantMemberships)
+          .innerJoin(users, eq(tenantMemberships.user_id, users.id))
+          .where(
+            and(
+              eq(tenantMemberships.tenant_id, tenantId),
+              eq(tenantMemberships.external_id, candidate),
+            ),
+          )
+          .limit(1);
+
+        if (row) {
+          matchedMember = row;
+          break;
+        }
+      }
+    }
+
+    if (!matchedMember && legacyLookup.candidates.length > 0) {
+      for (const candidate of legacyLookup.candidates) {
+        const [row] = await db
+          .select({
+            userId: tenantMemberships.user_id,
+            memberId: tenantMemberships.member_id,
+            memberName: users.name,
+          })
+          .from(tenantMemberships)
+          .innerJoin(users, eq(tenantMemberships.user_id, users.id))
+          .where(
+            and(
+              eq(tenantMemberships.tenant_id, tenantId),
+              or(
+                eq(tenantMemberships.member_id, candidate),
+                eq(tenantMemberships.external_id, candidate),
+              ),
+            ),
+          )
+          .limit(1);
+
+        if (row) {
+          matchedMember = row;
+          break;
+        }
+      }
+    }
+
+    if (!matchedMember && legacyLookup.numericPart) {
+      const [row] = await db
+        .select({
+          userId: tenantMemberships.user_id,
+          memberId: tenantMemberships.member_id,
+          memberName: users.name,
+        })
+        .from(tenantMemberships)
+        .innerJoin(users, eq(tenantMemberships.user_id, users.id))
+        .where(
+          and(
+            eq(tenantMemberships.tenant_id, tenantId),
+            or(
+              sql`regexp_replace(coalesce(${tenantMemberships.member_id}, ''), '[^0-9]', '', 'g') = ${legacyLookup.numericPart}`,
+              sql`regexp_replace(coalesce(${tenantMemberships.external_id}, ''), '[^0-9]', '', 'g') = ${legacyLookup.numericPart}`,
+            ),
+          ),
+        )
+        .limit(1);
+
+      if (row) {
+        matchedMember = row;
       }
     }
 
