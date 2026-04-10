@@ -9,6 +9,7 @@ import { tenantMiddleware } from "../middleware/tenant.js";
 import { requireRole } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
 import { CreateMembershipPlanSchema } from "../lib/validation.js";
+import { sanitizePlanName } from "../lib/plan-name.js";
 
 const app = new Hono();
 
@@ -45,11 +46,16 @@ app.post(
     const tenantId = c.get("tenantId");
     const body = c.req.valid("json");
     const id = generateId();
+    const sanitizedName = sanitizePlanName(body.name);
+
+    if (!sanitizedName) {
+      return c.json(error("VALIDATION_ERROR", "Plan name is invalid"), 422);
+    }
 
     await db.insert(memberships).values({
       id,
       tenant_id: tenantId,
-      name: body.name,
+      name: sanitizedName,
       description: body.description,
       price: body.price,
       currency: body.currency,

@@ -18,6 +18,7 @@ import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
 import { requireRole } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
+import { sanitizePlanName } from "../lib/plan-name.js";
 import { createNotification } from "../services/notification.service.js";
 
 const app = new Hono();
@@ -162,7 +163,7 @@ app.post(
       if (!plan.is_active) {
         return c.json(error("INACTIVE", "Plan is not currently available"), 422);
       }
-      planName = plan.name;
+      planName = sanitizePlanName(plan.name);
       planDurationMonths = plan.duration_months ?? (plan.interval === "yearly" ? 12 : 1);
       planPrice = plan.price;
     } else {
@@ -183,7 +184,7 @@ app.post(
       if (!pkg.is_active) {
         return c.json(error("INACTIVE", "Package is not currently available"), 422);
       }
-      planName = pkg.name;
+      planName = sanitizePlanName(pkg.name);
       planSessionCount = pkg.session_count;
       planPrice = pkg.price;
     }

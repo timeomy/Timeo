@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import {
   Card,
@@ -30,83 +30,130 @@ import {
   CheckCircle2,
   XCircle,
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-
-// ---- Types ----
+const PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 300;
 
 type GymMember = {
   id: string;
   name: string;
   email: string;
-  phone: string | null;
   photoUrl: string | null;
   membershipStatus: "active" | "expired" | "suspended";
-  membershipPlan: string | null;
+  membershipRole: string | null;
+  memberId: string | null;
   faceEnrolled: boolean;
   lastCheckIn: string | null;
 };
 
-// ---- Data hook ----
+type RawGymMember = {
+  membership?: {
+    role?: string;
+    status?: string;
+    memberId?: string | null;
+  };
+  user?: {
+    id?: string;
+    name?: string;
+    email?: string;
+    avatarUrl?: string | null;
+  };
+};
 
-function useGymMembers() {
-  const { tenantId } = useTenantId();
-  return useQuery<GymMember[]>({
-    queryKey: ["gym", tenantId, "/members"],
-    queryFn: async () => {
-      const rows: GymMember[] = [];
-      let page = 1;
-      let totalPages = 1;
+type MembersPageData = {
+  members: GymMember[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+};
 
-      while (page <= totalPages) {
-        const res = await fetch(
-          `${API_URL}/api/tenants/${tenantId}/gym/members?page=${page}&limit=100`,
-          { credentials: "include" },
-        );
-        const data = await res.json();
+function toGymMember(item: RawGymMember): GymMember {
+  const status = item.membership?.status;
+  const membershipStatus: GymMember["membershipStatus"] =
+    status === "active"
+      ? "active"
+      : status === "suspended"
+        ? "suspended"
+        : "expired";
 
-        if (!data.success) {
-          throw new Error(data.error?.message || "Failed to load members");
-        }
-
-        const result = data.data;
-        const rawList: Array<{
-          membership?: { id?: string; status?: string; role?: string };
-          user?: { id?: string; name?: string; email?: string; avatarUrl?: string };
-        }> = Array.isArray(result) ? result : (result?.members ?? []);
-
-        rows.push(
-          ...rawList.map((item) => {
-            if (item.user) {
-              return {
-                id: item.user.id ?? item.membership?.id ?? "",
-                name: item.user.name ?? "",
-                email: item.user.email ?? "",
-                phone: null,
-                photoUrl: item.user.avatarUrl ?? null,
-                membershipStatus: (item.membership?.status as "active" | "expired" | "suspended") ?? "active",
-                membershipPlan: item.membership?.role ?? null,
-                faceEnrolled: false,
-                lastCheckIn: null,
-              } as GymMember;
-            }
-
-            return item as unknown as GymMember;
-          }),
-        );
-
-        totalPages = Math.max(1, result?.pagination?.totalPages ?? 1);
-        page += 1;
-      }
-
-      return rows;
-    },
-    enabled: !!tenantId,
-  });
+  return {
+    id: item.user?.id ?? item.membership?.memberId ?? "",
+    name: item.user?.name ?? "",
+    email: item.user?.email ?? "",
+    photoUrl: item.user?.avatarUrl ?? null,
+    membershipStatus,
+    membershipRole: item.membership?.role ?? null,
+    memberId: item.membership?.memberId ?? null,
+    faceEnrolled: false,
+    lastCheckIn: null,
+  };
 }
 
-// ---- Helpers ----
+function useGymMembers({
+  page,
+  search,
+}: {
+  page: number;
+  search: string;
+}) {
+  const { tenantId } = useTenantId();
+
+  return useQuery<MembersPageData>({
+    queryKey: ["gym", tenantId, "members", page, search],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(PAGE_SIZE),
+      });
+      if (search) {
+        params.set("search", search);
+      }
+
+      const res = await fetch(
+        `${API_URL}/api/tenants/${tenantId}/gym/members?${params.toString()}`,
+        { credentials: "include" },
+      );
+      const payload = await res.json();
+
+      if (!payload.success) {
+        throw new Error(payload.error?.message || "Failed to load members");
+      }
+
+      const result = payload.data;
+      const rawList: RawGymMember[] = Array.isArray(result)
+        ? result
+        : (result?.members ?? []);
+      const pagination = Array.isArray(result)
+        ? {
+            total: rawList.length,
+            page,
+            limit: PAGE_SIZE,
+            totalPages: 1,
+          }
+        : {
+            total: Number(result?.pagination?.total ?? 0),
+            page: Number(result?.pagination?.page ?? page),
+            limit: Number(result?.pagination?.limit ?? PAGE_SIZE),
+            totalPages: Math.max(1, Number(result?.pagination?.totalPages ?? 1)),
+          };
+
+      return {
+        members: rawList.map(toGymMember),
+        pagination,
+      };
+    },
+    enabled: !!tenantId,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+  });
+}
 
 const STATUS_BADGE: Record<string, string> = {
   active: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
@@ -132,23 +179,60 @@ function getInitial(name: string | null, email: string | null) {
   return (name?.[0] ?? email?.[0] ?? "?").toUpperCase();
 }
 
-// ---- Page ----
+function buildPageNumbers(currentPage: number, totalPages: number): number[] {
+  const maxVisiblePages = 5;
+  const startPage = Math.max(
+    1,
+    Math.min(currentPage - 2, totalPages - maxVisiblePages + 1),
+  );
+  const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+  return Array.from(
+    { length: endPage - startPage + 1 },
+    (_, index) => startPage + index,
+  );
+}
 
 export default function GymMembersPage() {
   const router = useRouter();
+  const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const { data: members, isLoading } = useGymMembers();
+  const { data, isLoading, isFetching } = useGymMembers({ page, search });
 
-  const filtered =
-    members?.filter(
-      (m) =>
-        m.name.toLowerCase().includes(search.toLowerCase()) ||
-        m.email.toLowerCase().includes(search.toLowerCase()),
-    ) ?? [];
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => clearTimeout(timeout);
+  }, [searchInput]);
+
+  const members = data?.members ?? [];
+  const pagination = data?.pagination ?? {
+    total: 0,
+    page,
+    limit: PAGE_SIZE,
+    totalPages: 1,
+  };
+  const totalPages = Math.max(1, pagination.totalPages);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  const pageNumbers = useMemo(
+    () => buildPageNumbers(page, totalPages),
+    [page, totalPages],
+  );
+
+  const showInitialLoading = isLoading && !data;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <Button
@@ -165,9 +249,9 @@ export default function GymMembersPage() {
               Gym Members
             </h1>
             <p className="text-sm text-muted-foreground">
-              {isLoading
+              {showInitialLoading
                 ? "Loading..."
-                : `${members?.length ?? 0} member${(members?.length ?? 0) !== 1 ? "s" : ""}`}
+                : `${pagination.total} member${pagination.total !== 1 ? "s" : ""}`}
             </p>
           </div>
         </div>
@@ -180,24 +264,22 @@ export default function GymMembersPage() {
         </Button>
       </div>
 
-      {/* Search */}
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
         <Input
-          placeholder="Search by name or email..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name, email, or member ID..."
+          value={searchInput}
+          onChange={(event) => setSearchInput(event.target.value)}
           className="pl-9"
         />
       </div>
 
-      {/* Table */}
       <Card className="glass-card">
         <CardContent className="p-0">
-          {isLoading ? (
+          {showInitialLoading ? (
             <LoadingSkeleton />
-          ) : filtered.length === 0 ? (
-            <EmptyState hasMembers={(members?.length ?? 0) > 0} />
+          ) : members.length === 0 ? (
+            <EmptyState isSearching={Boolean(search)} />
           ) : (
             <Table>
               <TableHeader>
@@ -211,89 +293,138 @@ export default function GymMembersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((member) => {
+                {members.map((member) => {
                   const memberDetailHref = `/dashboard/gym/members/${member.id}`;
+
                   return (
-                  <TableRow
-                    key={member.id}
-                    className="cursor-pointer border-border transition-colors hover:bg-muted/40"
-                    role="link"
-                    tabIndex={0}
-                    onClick={() => router.push(memberDetailHref)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        router.push(memberDetailHref);
-                      }
-                    }}
-                  >
-                    <TableCell>
-                      <Avatar className="h-9 w-9">
-                        {(member.photoUrl) && <AvatarImage src={member.photoUrl} alt={member.name} />}
-                        <AvatarFallback className="text-xs bg-primary/10 text-primary font-bold">
-                          {getInitial(member.name, member.email)}
-                        </AvatarFallback>
-                      </Avatar>
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        href={memberDetailHref}
-                        prefetch
-                        onClick={(event) => event.stopPropagation()}
-                        className="block text-sm font-medium text-foreground hover:text-primary"
-                      >
-                        {member.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <p className="text-sm text-muted-foreground">{member.email}</p>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-xs",
-                          STATUS_BADGE[member.membershipStatus] ??
-                            STATUS_BADGE.expired,
+                    <TableRow
+                      key={member.id}
+                      className="cursor-pointer border-border transition-colors hover:bg-muted/40"
+                      role="link"
+                      tabIndex={0}
+                      onClick={() => router.push(memberDetailHref)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          router.push(memberDetailHref);
+                        }
+                      }}
+                    >
+                      <TableCell>
+                        <Avatar className="h-9 w-9">
+                          {member.photoUrl && (
+                            <AvatarImage src={member.photoUrl} alt={member.name} />
+                          )}
+                          <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
+                            {getInitial(member.name, member.email)}
+                          </AvatarFallback>
+                        </Avatar>
+                      </TableCell>
+                      <TableCell>
+                        <Link
+                          href={memberDetailHref}
+                          prefetch
+                          onClick={(event) => event.stopPropagation()}
+                          className="block text-sm font-medium text-foreground hover:text-primary"
+                        >
+                          {member.name}
+                        </Link>
+                        {member.memberId && (
+                          <p className="text-xs text-muted-foreground">ID: {member.memberId}</p>
                         )}
-                      >
-                        {member.membershipStatus}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {member.faceEnrolled ? (
-                        <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                      ) : (
-                        <XCircle className="h-5 w-5 text-muted-foreground/50" />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {member.lastCheckIn ? (
-                        <span className="text-sm text-muted-foreground">
-                          {formatRelative(member.lastCheckIn)}
-                        </span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground/70">Never</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                )})}
+                      </TableCell>
+                      <TableCell>
+                        <p className="text-sm text-muted-foreground">{member.email}</p>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-xs",
+                            STATUS_BADGE[member.membershipStatus] ?? STATUS_BADGE.expired,
+                          )}
+                        >
+                          {member.membershipStatus}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {member.faceEnrolled ? (
+                          <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                        ) : (
+                          <XCircle className="h-5 w-5 text-muted-foreground/50" />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {member.lastCheckIn ? (
+                          <span className="text-sm text-muted-foreground">
+                            {formatRelative(member.lastCheckIn)}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground/70">Never</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
         </CardContent>
+
+        {totalPages > 1 && (
+          <div className="flex flex-col gap-3 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              Page {pagination.page} of {totalPages} ({pagination.total} members)
+              {isFetching && " · Updating..."}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 px-2"
+                disabled={page <= 1 || isFetching}
+                onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              {pageNumbers.map((pageNumber) => (
+                <Button
+                  key={pageNumber}
+                  size="sm"
+                  variant={pageNumber === page ? "default" : "outline"}
+                  className="h-8 min-w-8 px-2"
+                  disabled={isFetching}
+                  onClick={() => setPage(pageNumber)}
+                >
+                  {pageNumber}
+                </Button>
+              ))}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 px-2"
+                disabled={page >= totalPages || isFetching}
+                onClick={() =>
+                  setPage((currentPage) =>
+                    Math.min(totalPages, currentPage + 1),
+                  )
+                }
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );
 }
 
-// ---- Supporting Components ----
-
 function LoadingSkeleton() {
   return (
-    <div className="p-4 space-y-3">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4">
+    <div className="space-y-3 p-4">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} className="flex items-center gap-4">
           <Skeleton className="h-9 w-9 rounded-full" />
           <div className="flex-1 space-y-2">
             <Skeleton className="h-4 w-28" />
@@ -308,21 +439,21 @@ function LoadingSkeleton() {
   );
 }
 
-function EmptyState({ hasMembers }: { hasMembers: boolean }) {
+function EmptyState({ isSearching }: { isSearching: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <div className="mb-3 rounded-full bg-muted p-3">
-        {hasMembers ? (
+        {isSearching ? (
           <Search className="h-6 w-6 text-muted-foreground" />
         ) : (
           <UserCheck className="h-6 w-6 text-muted-foreground" />
         )}
       </div>
       <p className="text-sm font-medium text-muted-foreground">
-        {hasMembers ? "No members match your search" : "No members yet"}
+        {isSearching ? "No members match your search" : "No members yet"}
       </p>
       <p className="mt-1 max-w-xs text-xs text-muted-foreground/80">
-        {hasMembers
+        {isSearching
           ? "Try adjusting your search query."
           : "Members will appear here once they are added to your gym."}
       </p>

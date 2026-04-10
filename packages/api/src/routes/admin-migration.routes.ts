@@ -21,6 +21,7 @@ import {
 import { authMiddleware } from "../middleware/auth.js";
 import { requirePlatformAdmin } from "../middleware/rbac.js";
 import { error, success } from "../lib/response.js";
+import { sanitizePlanName } from "../lib/plan-name.js";
 
 const app = new Hono();
 
@@ -501,12 +502,13 @@ async function upsertPlan(
   const durationMonths = payload.durationMonths ?? null;
   const durationDays = payload.durationDays ?? null;
   const interval = payload.interval ?? inferInterval(durationDays, durationMonths);
+  const sanitizedPlanName = sanitizePlanName(payload.name);
 
   const values = {
     tenant_id: WSFITNESS_TENANT_ID,
     external_id: payload.externalId,
-    name: payload.name,
-    description: payload.description ?? payload.name,
+    name: sanitizedPlanName,
+    description: payload.description ?? sanitizedPlanName,
     price: payload.priceCents,
     currency: "MYR",
     interval,

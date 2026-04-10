@@ -15,7 +15,7 @@ import {
   sessionPackages,
   sessionCredits,
 } from "@timeo/db/schema";
-import { eq, desc, and, like, count, or, gt, gte, sql } from "drizzle-orm";
+import { eq, desc, and, ilike, count, or, gt, gte, sql } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
 import { requireRole } from "../middleware/rbac.js";
@@ -445,8 +445,9 @@ app.get(
         ? and(
             baseCondition,
             or(
-              like(users.name, `%${search}%`),
-              like(users.email, `%${search}%`),
+              ilike(users.name, `%${search}%`),
+              ilike(users.email, `%${search}%`),
+              ilike(tenantMemberships.member_id, `%${search}%`),
             ),
           )
         : baseCondition;
@@ -467,10 +468,7 @@ app.get(
             id: tenantMemberships.id,
             role: tenantMemberships.role,
             status: tenantMemberships.status,
-            notes: tenantMemberships.notes,
-            tags: tenantMemberships.tags,
-            joinedAt: tenantMemberships.joined_at,
-            coachId: tenantMemberships.coach_id,
+            memberId: tenantMemberships.member_id,
           },
           user: {
             id: users.id,
