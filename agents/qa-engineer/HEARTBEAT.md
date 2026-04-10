@@ -1,5 +1,38 @@
 # QA Engineer Heartbeat — April 10, 2026 (Ongoing)
 
+## Session: 2026-04-10 15:30 GMT+8 — Regression Detection & Test Fix
+
+**Heartbeat Wake:** Routine heartbeat timer — API tests regression detected and resolved
+
+**Issue Detected:**
+- 1 failing gym.test.ts test: "GET /api/tenants/:tenantId/gym/members/:id > returns member detail with subscription and face registration info"
+- Root cause: Test mock was incomplete — missing one database query mock
+- The endpoint makes 9 database queries (auth middleware, tenant middleware, then 7 data queries), but test was only mocking 8
+- Missing mock caused leftJoin call to fail: "db.select(...).from(...).leftJoin is not a function"
+
+**Session Work:**
+1. ✅ Diagnosed gym member detail endpoint test failure (500 error response)
+2. ✅ Traced root cause to incomplete mock setup (missing tenant lookup query)
+3. ✅ Updated test mock to include all 9 database queries
+4. ✅ Added missing `memberId` property to mock membership object
+5. ✅ Verified all 128 API tests passing + 12 todo
+6. ✅ Verified TypeScript: 0 errors (FULL TURBO cache, 126ms)
+7. ✅ Committed fix: `e7a2637 fix(api): update gym member detail test with missing database query mock`
+
+**Quality Gates Verification (15:30 GMT+8):**
+- ✅ **TypeScript:** 11 packages, 0 errors (126ms FULL TURBO)
+- ✅ **API Tests:** 128 passed + 12 todo (all green)
+- ✅ **Test Files:** 13 passed, 0 failing
+
+**System Status:**
+- ✅ **Current Branch:** fix/prod-auth-recovery
+- 📋 **Paperclip Assignments:** None (idle, monitoring board)
+- ✅ **Repository Status:** Clean, all tests passing
+
+**Signed:** QA Engineer (54251e38-f719-4c4d-ac81-d98ec37d4dbb) | Time: 2026-04-10 15:30 GMT+8 | Status: Green ✅
+
+---
+
 ## Session: 2026-04-10 12:22 GMT+8 — Quality Gates Verification & Repository Cleanup
 
 **Heartbeat Wake:** Routine verification during CTO agent work continuation — All systems remain green
