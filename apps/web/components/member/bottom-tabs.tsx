@@ -59,20 +59,21 @@ export function BottomTabs() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-white/[0.08] bg-[#090b11]/95 backdrop-blur-xl">
+    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border/80 bg-background/95 backdrop-blur-xl">
       <div className="mx-auto max-w-md px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
-        <div className="grid grid-cols-5 gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-2">
+        <div className="grid grid-cols-5 gap-2 rounded-2xl border border-border/80 bg-card/80 p-2">
           {tabs.map((tab) => {
             const active = isActive(pathname, tab);
             return (
               <Link
                 key={tab.href}
                 href={tab.href}
+                prefetch
                 className={cn(
                   "flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium transition-all active:scale-[0.97]",
                   active
                     ? "bg-emerald-500/15 text-emerald-300"
-                    : "text-white/50 hover:bg-white/[0.05] hover:text-white"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
                 <tab.icon className="h-4.5 w-4.5" />

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TimeoLogo } from "@/timeo-logo";
+import { ThemeToggle } from "@/theme-toggle";
 
 export default function AuthLayout({
   children,
@@ -7,13 +8,14 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col bg-[#0A0F1E]">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       {/* Top bar */}
-      <header className="border-b border-white/[0.06]">
+      <header className="border-b border-border/70">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <TimeoLogo size="sm" />
           </Link>
+          <ThemeToggle />
         </div>
       </header>
 
@@ -23,7 +25,7 @@ export default function AuthLayout({
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-white/[0.06] py-4 text-center text-xs text-white/20">
+      <footer className="border-t border-border/70 py-4 text-center text-xs text-muted-foreground">
         &copy; {new Date().getFullYear()} Timeo. All rights reserved.
       </footer>
     </div>

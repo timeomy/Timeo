@@ -15,6 +15,7 @@ import {
 } from "@timeo/ui/web";
 import { getInitials } from "@timeo/shared";
 import { TimeoLogo } from "@/timeo-logo";
+import { ThemeToggle } from "@/theme-toggle";
 import {
   Menu,
   X,
@@ -58,6 +59,7 @@ function NotificationBellWidget() {
           <span className="text-sm font-semibold">Notifications</span>
           <Link
             href="/notifications"
+            prefetch
             className="text-xs font-medium text-primary hover:underline"
           >
             View all
@@ -84,7 +86,7 @@ export function NavHeader() {
     <header className="glass-nav sticky top-0 z-50">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" prefetch className="flex items-center gap-2">
           <TimeoLogo size="md" />
         </Link>
 
@@ -96,6 +98,7 @@ export function NavHeader() {
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch
                 className={cn(
                   "inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   isActive
@@ -112,6 +115,7 @@ export function NavHeader() {
 
         {/* Desktop Auth */}
         <div className="hidden items-center gap-3 md:flex">
+          <ThemeToggle />
           {!isLoaded ? (
             <div className="h-8 w-20 animate-pulse rounded-md bg-muted" />
           ) : isSignedIn ? (
@@ -150,6 +154,7 @@ export function NavHeader() {
                     <Separator className="my-1" />
                     <Link
                       href="/post-login"
+                      prefetch
                       onClick={() => setProfileMenuOpen(false)}
                       className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
                     >
@@ -158,6 +163,7 @@ export function NavHeader() {
                     </Link>
                     <Link
                       href="/profile"
+                      prefetch
                       onClick={() => setProfileMenuOpen(false)}
                       className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent"
                     >
@@ -194,17 +200,20 @@ export function NavHeader() {
         </div>
 
         {/* Mobile Menu Button */}
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-md transition-colors hover:bg-accent md:hidden"
-          aria-label="Toggle menu"
-        >
-          {mobileMenuOpen ? (
-            <X className="h-5 w-5" />
-          ) : (
-            <Menu className="h-5 w-5" />
-          )}
-        </button>
+        <div className="flex items-center gap-2 md:hidden">
+          <ThemeToggle />
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-md transition-colors hover:bg-accent"
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? (
+              <X className="h-5 w-5" />
+            ) : (
+              <Menu className="h-5 w-5" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Menu */}
@@ -218,6 +227,7 @@ export function NavHeader() {
                 <Link
                   key={link.href}
                   href={link.href}
+                  prefetch
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
                     "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
@@ -240,6 +250,7 @@ export function NavHeader() {
               <>
                 <Link
                   href="/profile"
+                  prefetch
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                 >

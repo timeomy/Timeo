@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import {
@@ -128,6 +130,7 @@ function QuickAction({
   return (
     <Link
       href={href}
+      prefetch
       className="flex items-center gap-3 rounded-lg border border-white/[0.06] p-4 transition-all hover:border-primary/20 hover:bg-white/[0.03]"
     >
       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -162,6 +165,7 @@ const METHOD_STYLE: Record<string, string> = {
 
 export default function GymOverviewPage() {
   const { data, isLoading } = useGymOverview();
+  const [showLogoFallback, setShowLogoFallback] = useState(false);
 
   return (
     <div className="space-y-8">
@@ -169,19 +173,23 @@ export default function GymOverviewPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <img
-              src="/tenants/ws-fitness-logo.png"
-              alt="WS Fitness"
-              className="h-10 w-auto"
-              onError={(e) => {
-                const el = e.currentTarget as HTMLImageElement;
-                el.style.display = "none";
-                const fallback = el.nextElementSibling as HTMLElement | null;
-                if (fallback) fallback.style.display = "flex";
-              }}
-            />
+            {!showLogoFallback && (
+              <Image
+                src="/tenants/ws-fitness-logo.png"
+                alt="WS Fitness"
+                width={132}
+                height={40}
+                className="h-10 w-auto"
+                sizes="132px"
+                priority
+                onError={() => setShowLogoFallback(true)}
+              />
+            )}
             <div
-              className="hidden h-10 w-10 items-center justify-center rounded-xl bg-primary/10"
+              className={cn(
+                "h-10 w-10 items-center justify-center rounded-xl bg-primary/10",
+                showLogoFallback ? "flex" : "hidden",
+              )}
             >
               <Dumbbell className="h-5 w-5 text-primary" />
             </div>
@@ -282,7 +290,7 @@ export default function GymOverviewPage() {
       <Card className="glass-card">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg">Recent Activity</CardTitle>
-          <Link href="/dashboard/gym/checkins">
+          <Link href="/dashboard/gym/checkins" prefetch>
             <Button variant="ghost" size="sm" className="gap-1 text-xs">
               View All <ArrowRight className="h-3 w-3" />
             </Button>

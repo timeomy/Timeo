@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useTenantId } from "@/hooks/use-tenant-id";
@@ -153,17 +154,17 @@ export default function GymMembersPage() {
           <Button
             variant="ghost"
             size="sm"
-            className="gap-1.5 text-white/50 hover:text-white"
+            className="gap-1.5 text-muted-foreground hover:text-foreground"
             onClick={() => router.push("/dashboard/gym")}
           >
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
               Gym Members
             </h1>
-            <p className="text-sm text-white/50">
+            <p className="text-sm text-muted-foreground">
               {isLoading
                 ? "Loading..."
                 : `${members?.length ?? 0} member${(members?.length ?? 0) !== 1 ? "s" : ""}`}
@@ -200,23 +201,31 @@ export default function GymMembersPage() {
           ) : (
             <Table>
               <TableHeader>
-                <TableRow className="border-white/[0.06] hover:bg-transparent">
-                  <TableHead className="text-white/50">Photo</TableHead>
-                  <TableHead className="text-white/50">Name</TableHead>
-                  <TableHead className="text-white/50">Email</TableHead>
-                  <TableHead className="text-white/50">Membership</TableHead>
-                  <TableHead className="text-white/50">Face Enrolled</TableHead>
-                  <TableHead className="text-white/50">Last Check-in</TableHead>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="text-muted-foreground">Photo</TableHead>
+                  <TableHead className="text-muted-foreground">Name</TableHead>
+                  <TableHead className="text-muted-foreground">Email</TableHead>
+                  <TableHead className="text-muted-foreground">Membership</TableHead>
+                  <TableHead className="text-muted-foreground">Face Enrolled</TableHead>
+                  <TableHead className="text-muted-foreground">Last Check-in</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((member) => (
+                {filtered.map((member) => {
+                  const memberDetailHref = `/dashboard/gym/members/${member.id}`;
+                  return (
                   <TableRow
                     key={member.id}
-                    className="border-white/[0.06] hover:bg-white/[0.02] cursor-pointer"
-                    onClick={() =>
-                      router.push(`/dashboard/gym/members/${member.id}`)
-                    }
+                    className="cursor-pointer border-border transition-colors hover:bg-muted/40"
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => router.push(memberDetailHref)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        router.push(memberDetailHref);
+                      }
+                    }}
                   >
                     <TableCell>
                       <Avatar className="h-9 w-9">
@@ -227,12 +236,17 @@ export default function GymMembersPage() {
                       </Avatar>
                     </TableCell>
                     <TableCell>
-                      <p className="text-sm font-medium text-white">
+                      <Link
+                        href={memberDetailHref}
+                        prefetch
+                        onClick={(event) => event.stopPropagation()}
+                        className="block text-sm font-medium text-foreground hover:text-primary"
+                      >
                         {member.name}
-                      </p>
+                      </Link>
                     </TableCell>
                     <TableCell>
-                      <p className="text-sm text-white/60">{member.email}</p>
+                      <p className="text-sm text-muted-foreground">{member.email}</p>
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -250,20 +264,20 @@ export default function GymMembersPage() {
                       {member.faceEnrolled ? (
                         <CheckCircle2 className="h-5 w-5 text-emerald-400" />
                       ) : (
-                        <XCircle className="h-5 w-5 text-white/20" />
+                        <XCircle className="h-5 w-5 text-muted-foreground/50" />
                       )}
                     </TableCell>
                     <TableCell>
                       {member.lastCheckIn ? (
-                        <span className="text-sm text-white/60">
+                        <span className="text-sm text-muted-foreground">
                           {formatRelative(member.lastCheckIn)}
                         </span>
                       ) : (
-                        <span className="text-sm text-white/30">Never</span>
+                        <span className="text-sm text-muted-foreground/70">Never</span>
                       )}
                     </TableCell>
                   </TableRow>
-                ))}
+                )})}
               </TableBody>
             </Table>
           )}
@@ -280,14 +294,14 @@ function LoadingSkeleton() {
     <div className="p-4 space-y-3">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="flex items-center gap-4">
-          <Skeleton className="h-9 w-9 rounded-full bg-white/[0.06]" />
+          <Skeleton className="h-9 w-9 rounded-full" />
           <div className="flex-1 space-y-2">
-            <Skeleton className="h-4 w-28 bg-white/[0.06]" />
-            <Skeleton className="h-3 w-36 bg-white/[0.06]" />
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-3 w-36" />
           </div>
-          <Skeleton className="h-5 w-16 rounded-full bg-white/[0.06]" />
-          <Skeleton className="h-5 w-5 rounded bg-white/[0.06]" />
-          <Skeleton className="h-4 w-20 bg-white/[0.06]" />
+          <Skeleton className="h-5 w-16 rounded-full" />
+          <Skeleton className="h-5 w-5 rounded" />
+          <Skeleton className="h-4 w-20" />
         </div>
       ))}
     </div>
@@ -297,17 +311,17 @@ function LoadingSkeleton() {
 function EmptyState({ hasMembers }: { hasMembers: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="rounded-full bg-white/[0.04] p-3 mb-3">
+      <div className="mb-3 rounded-full bg-muted p-3">
         {hasMembers ? (
-          <Search className="h-6 w-6 text-white/30" />
+          <Search className="h-6 w-6 text-muted-foreground" />
         ) : (
-          <UserCheck className="h-6 w-6 text-white/30" />
+          <UserCheck className="h-6 w-6 text-muted-foreground" />
         )}
       </div>
-      <p className="text-sm font-medium text-white/50">
+      <p className="text-sm font-medium text-muted-foreground">
         {hasMembers ? "No members match your search" : "No members yet"}
       </p>
-      <p className="text-xs text-white/30 mt-1 max-w-xs">
+      <p className="mt-1 max-w-xs text-xs text-muted-foreground/80">
         {hasMembers
           ? "Try adjusting your search query."
           : "Members will appear here once they are added to your gym."}

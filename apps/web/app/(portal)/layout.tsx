@@ -9,6 +9,7 @@ import { useEnsureMembership } from "@/hooks/use-ensure-membership";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import { TimeoLogo } from "@/timeo-logo";
 import { BottomTabs } from "@/member/bottom-tabs";
+import { ThemeToggle } from "@/theme-toggle";
 
 export default function PortalLayout({
   children,
@@ -72,8 +73,11 @@ export default function PortalLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="relative min-h-screen bg-background text-foreground">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.16),transparent_46%)]" />
+      <div className="fixed right-4 top-4 z-20 md:right-6 md:top-6">
+        <ThemeToggle />
+      </div>
 
       <main className="relative mx-auto min-h-screen w-full max-w-md px-4 pb-28 pt-4">
         <AnimatePresence mode="wait">

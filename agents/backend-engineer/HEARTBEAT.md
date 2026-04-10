@@ -8,7 +8,7 @@
 ## Last Heartbeat
 - Date: 2026-04-10
 - Wake reason: heartbeat_timer
-- Run ID: 177af807-49f1-473c-902f-eda383fce035
+- Run ID: current
 - Status: **Idle** — no assignments (board clean, 0 open issues)
 
 ## Completed Work Summary

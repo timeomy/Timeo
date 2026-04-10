@@ -24,6 +24,7 @@ import {
 import { NotificationsBell } from "@/notifications-bell";
 import { TimeoLogo } from "@/timeo-logo";
 import { ViewModeSwitcher } from "@/view-mode-switcher";
+import { ThemeToggle } from "@/theme-toggle";
 import {
   LayoutDashboard,
   Calendar,
@@ -297,7 +298,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex h-full flex-col">
       {/* Logo */}
       <div className="p-4">
-        <Link href="/" className="flex items-center gap-2" onClick={onNavigate}>
+        <Link href="/" prefetch className="flex items-center gap-2" onClick={onNavigate}>
           <TimeoLogo size="md" />
         </Link>
       </div>
@@ -347,6 +348,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                       )}
                       <Link
                         href={link.href}
+                        prefetch
                         onClick={onNavigate}
                         className={cn(
                           "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors min-h-[44px]",
@@ -396,6 +398,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                     )}
                     <Link
                       href={link.href}
+                      prefetch
                       onClick={onNavigate}
                       className={cn(
                         "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors min-h-[44px]",
@@ -567,7 +570,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <FeatureFlagsProvider>
         <div className="flex h-screen bg-background">
           {/* Desktop Sidebar */}
-          <aside className="hidden w-64 flex-shrink-0 border-r border-white/[0.06] bg-card/50 lg:block">
+          <aside className="hidden w-64 flex-shrink-0 border-r border-border/70 bg-card/50 lg:block">
             <SidebarContent />
           </aside>
 
@@ -578,7 +581,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                 onClick={() => setMobileOpen(false)}
               />
-              <aside className="absolute left-0 top-0 h-full w-72 border-r border-white/[0.06] bg-card shadow-2xl">
+              <aside className="absolute left-0 top-0 h-full w-72 border-r border-border/70 bg-card shadow-2xl">
                 <SidebarContent onNavigate={() => setMobileOpen(false)} />
               </aside>
             </div>
@@ -599,14 +602,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
               <div className="flex items-center gap-2">
                 <ViewModeSwitcher />
+                <ThemeToggle />
                 <NotificationsBell />
               </div>
             </header>
 
             {/* Desktop Top Bar */}
-            <header className="hidden h-12 items-center justify-end border-b border-white/[0.06] px-6 lg:flex">
+            <header className="hidden h-12 items-center justify-end border-b border-border/70 px-6 lg:flex">
               <div className="flex items-center gap-2">
                 <ViewModeSwitcher />
+                <ThemeToggle />
                 <NotificationsBell />
               </div>
             </header>

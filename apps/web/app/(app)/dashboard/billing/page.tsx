@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   useApprovePaymentRequest,
   useCreateInvoice,
@@ -82,6 +82,7 @@ function exportCsv(filename: string, rows: string[][]) {
 
 export default function BillingDashboardPage() {
   const { tenantId } = useTenantId();
+  const [optimisticStatuses, setOptimisticStatuses] = useState<Record<string, "approved" | "rejected">>({});
 
   const { data: paymentRequests, isLoading: paymentLoading } = usePaymentRequests(tenantId);
   const { data: posRows, isLoading: posLoading } = usePosTransactions(tenantId);
@@ -116,11 +117,25 @@ export default function BillingDashboardPage() {
     });
   }, [posRows]);
 
+  const paymentRequestsResolved = useMemo(() => {
+    return (paymentRequests ?? []).map((row) => {
+      const optimisticStatus = optimisticStatuses[row.id];
+      if (!optimisticStatus) {
+        return row;
+      }
+
+      return {
+        ...row,
+        status: optimisticStatus,
+      };
+    });
+  }, [paymentRequests, optimisticStatuses]);
+
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const approvedRequests = (paymentRequests ?? []).filter((row) => row.status === "approved");
-  const pendingRequests = (paymentRequests ?? []).filter(
+  const approvedRequests = paymentRequestsResolved.filter((row) => row.status === "approved");
+  const pendingRequests = paymentRequestsResolved.filter(
     (row) => row.status === "pending_verification",
   );
 
@@ -201,7 +216,7 @@ export default function BillingDashboardPage() {
   }, [approvedRequests, normalizedPos, now]);
 
   const paymentHistory = useMemo(() => {
-    const requestRows = (paymentRequests ?? []).map((row) => ({
+    const requestRows = paymentRequestsResolved.map((row) => ({
       id: row.id,
       source: "payment_request" as const,
       reference: row.id,
@@ -229,18 +244,46 @@ export default function BillingDashboardPage() {
       (a, b) =>
         (parseDate(b.date)?.getTime() ?? 0) - (parseDate(a.date)?.getTime() ?? 0),
     );
-  }, [normalizedPos, paymentRequests]);
+  }, [normalizedPos, paymentRequestsResolved]);
 
   const isLoading = paymentLoading || posLoading || subscriptionsLoading;
 
   async function handleApprove(requestId: string) {
-    await approvePayment({ requestId });
+    setOptimisticStatuses((currentStatuses) => ({
+      ...currentStatuses,
+      [requestId]: "approved",
+    }));
+
+    try {
+      await approvePayment({ requestId });
+    } catch (error) {
+      setOptimisticStatuses((currentStatuses) => {
+        const nextStatuses = { ...currentStatuses };
+        delete nextStatuses[requestId];
+        return nextStatuses;
+      });
+      throw error;
+    }
   }
 
   async function handleReject(requestId: string) {
     const reason = window.prompt("Enter rejection reason");
     if (!reason?.trim()) return;
-    await rejectPayment({ requestId, adminNote: reason.trim() });
+    setOptimisticStatuses((currentStatuses) => ({
+      ...currentStatuses,
+      [requestId]: "rejected",
+    }));
+
+    try {
+      await rejectPayment({ requestId, adminNote: reason.trim() });
+    } catch (error) {
+      setOptimisticStatuses((currentStatuses) => {
+        const nextStatuses = { ...currentStatuses };
+        delete nextStatuses[requestId];
+        return nextStatuses;
+      });
+      throw error;
+    }
   }
 
   async function handleReminder(requestId: string) {
@@ -569,4 +612,3 @@ function EmptyState({ text }: { text: string }) {
     </div>
   );
 }
-

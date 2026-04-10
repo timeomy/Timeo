@@ -36,7 +36,6 @@ import {
   CreditCard,
   FileText,
   Bell,
-  Globe,
   Smartphone,
   Building,
   Key,

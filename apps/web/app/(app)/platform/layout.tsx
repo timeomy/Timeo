@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTimeoWebAuthContext, isRoleAtLeast } from "@timeo/auth/web";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
 import { Separator, cn } from "@timeo/ui/web";
+import { ThemeToggle } from "@/theme-toggle";
 import {
   LayoutDashboard,
   Building2,
@@ -50,6 +51,7 @@ function PlatformSidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="p-4">
         <Link
           href="/platform/dashboard"
+          prefetch
           className="flex items-center gap-2"
           onClick={onNavigate}
         >
@@ -89,6 +91,7 @@ function PlatformSidebar({ onNavigate }: { onNavigate?: () => void }) {
             <Link
               key={link.href}
               href={link.href}
+              prefetch
               onClick={onNavigate}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
@@ -112,6 +115,7 @@ function PlatformSidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="p-3">
         <Link
           href="/dashboard"
+          prefetch
           className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -186,7 +190,7 @@ export default function PlatformLayout({
   return (
     <div className="flex h-screen bg-background">
       {/* Desktop Sidebar */}
-      <aside className="hidden w-64 flex-shrink-0 border-r border-white/[0.06] bg-card/50 lg:block">
+      <aside className="hidden w-64 flex-shrink-0 border-r border-border/70 bg-card/50 lg:block">
         <PlatformSidebar />
       </aside>
 
@@ -197,7 +201,7 @@ export default function PlatformLayout({
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="absolute left-0 top-0 h-full w-72 border-r border-white/[0.06] bg-card shadow-2xl">
+          <aside className="absolute left-0 top-0 h-full w-72 border-r border-border/70 bg-card shadow-2xl">
             <PlatformSidebar onNavigate={() => setMobileOpen(false)} />
           </aside>
         </div>
@@ -218,6 +222,9 @@ export default function PlatformLayout({
               <Zap className="h-4 w-4 text-primary-foreground" />
             </div>
             <span className="font-semibold">Platform</span>
+          </div>
+          <div className="ml-auto">
+            <ThemeToggle />
           </div>
         </header>
 
