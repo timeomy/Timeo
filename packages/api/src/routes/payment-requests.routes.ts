@@ -11,7 +11,7 @@ import {
   memberQrCodes,
   users,
 } from "@timeo/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, gt, isNull, or, sql } from "drizzle-orm";
 import { generateId } from "@timeo/db";
 import { sendMail } from "@timeo/auth/email";
 import { authMiddleware } from "../middleware/auth.js";
@@ -300,6 +300,8 @@ app.post(
           and(
             eq(subscriptions.tenant_id, tenantId),
             eq(subscriptions.customer_id, req.customer_id),
+            eq(subscriptions.status, "active"),
+            gt(subscriptions.current_period_end, now),
           ),
         )
         .orderBy(desc(subscriptions.current_period_end))
@@ -373,20 +375,61 @@ app.post(
           .where(eq(memberQrCodes.id, existingQr[0].id));
       }
     } else {
-      // Create session credits
-      const sessionCount = req.plan_session_count ?? 1;
+      // Create session credits or top up active credits for same package.
+      const [pkg] = await db
+        .select({ sessionCount: sessionPackages.session_count })
+        .from(sessionPackages)
+        .where(
+          and(
+            eq(sessionPackages.id, req.plan_id!),
+            eq(sessionPackages.tenant_id, tenantId),
+          ),
+        )
+        .limit(1);
 
-      sessionCreditId = generateId();
-      await db.insert(sessionCredits).values({
-        id: sessionCreditId,
-        tenant_id: tenantId,
-        user_id: req.customer_id,
-        package_id: req.plan_id!,
-        total_sessions: sessionCount,
-        used_sessions: 0,
-        expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year expiry for session credits
-        purchased_at: now,
-      });
+      const sessionsToAdd = pkg?.sessionCount ?? req.plan_session_count ?? 1;
+
+      const [activeCredits] = await db
+        .select()
+        .from(sessionCredits)
+        .where(
+          and(
+            eq(sessionCredits.tenant_id, tenantId),
+            eq(sessionCredits.user_id, req.customer_id),
+            eq(sessionCredits.package_id, req.plan_id!),
+            sql`${sessionCredits.total_sessions} > ${sessionCredits.used_sessions}`,
+            or(
+              isNull(sessionCredits.expires_at),
+              gt(sessionCredits.expires_at, now),
+            ),
+          ),
+        )
+        .orderBy(desc(sessionCredits.purchased_at))
+        .limit(1);
+
+      if (activeCredits) {
+        sessionCreditId = activeCredits.id;
+
+        await db
+          .update(sessionCredits)
+          .set({
+            total_sessions: activeCredits.total_sessions + sessionsToAdd,
+          })
+          .where(eq(sessionCredits.id, activeCredits.id));
+      } else {
+        sessionCreditId = generateId();
+
+        await db.insert(sessionCredits).values({
+          id: sessionCreditId,
+          tenant_id: tenantId,
+          user_id: req.customer_id,
+          package_id: req.plan_id!,
+          total_sessions: sessionsToAdd,
+          used_sessions: 0,
+          expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          purchased_at: now,
+        });
+      }
     }
 
     // Update payment request to approved
