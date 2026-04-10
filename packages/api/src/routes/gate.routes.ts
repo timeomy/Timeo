@@ -1358,3 +1358,25 @@ app.delete("/register-nfc", authMiddleware, async (c) => {
 */
 
 export { app as gateRoutes };
+
+// ─── Serve avatar images ────────────────────────────────────────────────────
+import { readFile } from "fs/promises";
+import { join } from "path";
+
+app.get("/avatars/:filename", async (c) => {
+  const filename = c.req.param("filename");
+  // Sanitize filename
+  const safe = filename.replace(/[^a-zA-Z0-9._-]/g, "");
+  if (!safe || safe.includes("..")) {
+    return c.text("Not found", 404);
+  }
+  try {
+    const filePath = join("/app/avatars", safe);
+    const data = await readFile(filePath);
+    const ext = safe.split(".").pop()?.toLowerCase();
+    const contentType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+    return new Response(data, { headers: { "Content-Type": contentType, "Cache-Control": "public, max-age=86400" } });
+  } catch {
+    return c.text("Not found", 404);
+  }
+});

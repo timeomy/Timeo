@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { resolveHomePath, useTimeoWebAuthContext, useTimeoWebTenantContext, isRoleAtLeast } from "@timeo/auth/web";
+import { resolveHomePath, useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
 import { useTenant } from "@timeo/api-client";
-import type { TimeoRole } from "@timeo/auth/web";
-import { getInitials } from "@timeo/shared";
+import { getInitials, type Capability } from "@timeo/shared";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
 import { useUserProfile } from "@timeo/api-client";
 import { FeatureFlagsProvider, useFeatureFlags } from "@/hooks/use-feature-flags";
+import { useCapabilities, useHasCapability } from "@/hooks/use-capabilities";
 import { AnnouncementBanner } from "@/announcement-banner";
 import { MaintenanceGate } from "@/maintenance-gate";
 import {
@@ -34,13 +34,11 @@ import {
   Users,
   Users2,
   Settings,
-  Clock,
   Menu,
   LogOut,
   ChevronDown,
   Building2,
   Check,
-  Plus,
   ScanLine,
   NotebookPen,
   CreditCard,
@@ -50,12 +48,8 @@ import {
   FileText,
   BarChart3,
   Shield,
-  Dumbbell,
   Activity,
   Cpu,
-  Megaphone,
-  Monitor,
-  MonitorOff,
 } from "lucide-react";
 
 type SidebarLink = {
@@ -63,12 +57,11 @@ type SidebarLink = {
   label: string;
   icon: React.ElementType;
   flagKey?: string;
+  capability?: Capability;
 };
 
 type SidebarSection = {
   label?: string;
-  minRole?: TimeoRole;
-  maxRole?: TimeoRole;
   links: SidebarLink[];
 };
 
@@ -77,111 +70,135 @@ const coachSidebarSections: SidebarSection[] = [
   {
     label: "COACHING",
     links: [
-      { href: "/dashboard/my-clients", label: "My Clients", icon: Users2 },
-      { href: "/dashboard/session-logs", label: "Session Logs", icon: NotebookPen },
-      { href: "/dashboard/training-logs", label: "Training Logs", icon: Dumbbell },
-    ],
-  },
-  {
-    label: "ACCOUNT",
-    links: [
-      { href: "/dashboard/settings", label: "Settings", icon: Settings },
-    ],
-  },
-  {
-    label: "CONFIGURATION",
-    minRole: "admin",
-    links: [
-      { href: "/dashboard/settings/customize", label: "Customize UI", icon: Monitor },
       {
-        href: "/dashboard/settings/features",
-        label: "Feature Flags",
-        icon: MonitorOff,
+        href: "/dashboard/my-clients",
+        label: "My Clients",
+        icon: Users2,
+        capability: "coach_view_clients",
+      },
+      {
+        href: "/dashboard/session-logs",
+        label: "Session Logs",
+        icon: NotebookPen,
+        capability: "coach_session_log",
+      },
+      {
+        href: "/dashboard/my-schedule",
+        label: "Schedule",
+        icon: Calendar,
+        capability: "coach_session_log",
       },
     ],
   },
 ];
 
-
-// ─── Front Desk sidebar (limited view) ────────────────────────────────────────
-const frontDeskSections: SidebarSection[] = [
+// ─── Staff / Front Desk sidebar ───────────────────────────────────────────────
+const frontDeskSidebarSections: SidebarSection[] = [
   {
-    label: "FRONT DESK",
-    links: [
-      { href: "/dashboard/gym/checkins", label: "Check-in Feed", icon: Activity },
-      { href: "/dashboard/gym/scanner", label: "QR Scanner", icon: ScanLine },
-      { href: "/dashboard/gym/members", label: "Members", icon: UserCheck },
-    ],
-  },
-];
-
-const sidebarSections: SidebarSection[] = [
-  // ── OVERVIEW (all staff) ─────────────────────────────────────────────
-  {
-    label: "OVERVIEW",
+    label: "MISSION CONTROL",
     links: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    ],
-  },
-  // ── CLIENTS (staff+) ────────────────────────────────────────────────
-  {
-    label: "CLIENTS",
-    links: [
-      { href: "/dashboard/clients", label: "My Clients", icon: Users2 },
-      { href: "/dashboard/session-logs", label: "Session Logs", icon: NotebookPen },
-      { href: "/dashboard/bookings", label: "Bookings", icon: ClipboardList, flagKey: "appointments_enabled" },
-    ],
-  },
-  // ── GYM FLOOR (staff+) ──────────────────────────────────────────────
-  {
-    label: "GYM FLOOR",
-    links: [
-      { href: "/dashboard/gym/checkins", label: "Check-in Feed", icon: Activity },
+      { href: "/dashboard/gym/checkins", label: "Check-ins", icon: Activity },
       { href: "/dashboard/gym/scanner", label: "QR Scanner", icon: ScanLine },
-      { href: "/dashboard/scheduling", label: "Scheduling", icon: Clock, flagKey: "appointments_enabled" },
-    ],
-  },
-  // ── ACCOUNT (staff+) ────────────────────────────────────────────────
-  {
-    label: "ACCOUNT",
-    links: [
-      { href: "/dashboard/settings", label: "Settings", icon: Settings },
-    ],
-  },
-  // ── MARKETING (admin only) ──────────────────────────────────────────
-  {
-    label: "MARKETING",
-    minRole: "admin",
-    links: [
-      { href: "/dashboard/broadcasts", label: "Broadcasts", icon: Megaphone },
-    ],
-  },
-  // ── OPERATIONS (admin only) ─────────────────────────────────────────
-  {
-    label: "OPERATIONS",
-    minRole: "admin",
-    links: [
-      { href: "/dashboard/mission-control", label: "Mission Control", icon: Cpu },
-      { href: "/dashboard/gym/members", label: "Members", icon: UserCheck },
-      { href: "/dashboard/team", label: "Team", icon: Users },
-      { href: "/dashboard/gym/payments", label: "Payments", icon: CreditCard },
-      { href: "/dashboard/billing", label: "Billing", icon: FileText },
-      { href: "/dashboard/invoices", label: "Invoices", icon: FileText },
-      { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
+      {
+        href: "/dashboard/pos",
+        label: "POS",
+        icon: Store,
+        flagKey: "pos_enabled",
+        capability: "pos_access",
+      },
+      {
+        href: "/dashboard/bookings",
+        label: "Bookings",
+        icon: ClipboardList,
+        flagKey: "appointments_enabled",
+      },
+      {
+        href: "/dashboard/gym/members",
+        label: "Members",
+        icon: UserCheck,
+        capability: "edit_customer",
+      },
+      {
+        href: "/dashboard/billing",
+        label: "Billing",
+        icon: CreditCard,
+        capability: "billing_transactional",
+      },
+      {
+        href: "/dashboard/invoices",
+        label: "Invoices",
+        icon: FileText,
+        capability: "billing_transactional",
+      },
+      {
+        href: "/dashboard/session-logs",
+        label: "Session Logs",
+        icon: NotebookPen,
+        capability: "coach_session_log",
+      },
     ],
   },
 ];
 
-// Legacy flat list for any admin pages not in sections above
-const adminOnlyExtras: SidebarLink[] = [
-  { href: "/dashboard/customers", label: "Customers", icon: Users2 },
-  { href: "/dashboard/packages", label: "Packages", icon: CreditCard },
-  { href: "/dashboard/services", label: "Services", icon: Calendar, flagKey: "appointments_enabled" },
-  { href: "/dashboard/products", label: "Products", icon: ShoppingBag },
-  { href: "/dashboard/orders", label: "Orders", icon: Package },
-  { href: "/dashboard/vouchers", label: "Gift Cards & Vouchers", icon: Ticket },
-  { href: "/dashboard/pos", label: "POS", icon: Store, flagKey: "pos_enabled" },
-  { href: "/dashboard/e-invoice", label: "e-Invoice", icon: FileText },
+const adminSidebarSections: SidebarSection[] = [
+  ...frontDeskSidebarSections,
+  {
+    label: "OPERATIONS",
+    links: [
+      {
+        href: "/dashboard/mission-control",
+        label: "Mission Control",
+        icon: Cpu,
+        capability: "view_analytics",
+      },
+      { href: "/dashboard/products", label: "Products", icon: ShoppingBag },
+      { href: "/dashboard/orders", label: "Orders", icon: Package },
+      {
+        href: "/dashboard/services",
+        label: "Services",
+        icon: Calendar,
+        flagKey: "appointments_enabled",
+      },
+      { href: "/dashboard/packages", label: "Packages", icon: CreditCard },
+      { href: "/dashboard/vouchers", label: "Gift Cards & Vouchers", icon: Ticket },
+      {
+        href: "/dashboard/e-invoice",
+        label: "e-Invoice",
+        icon: FileText,
+        capability: "billing_transactional",
+      },
+    ],
+  },
+  {
+    label: "MANAGEMENT",
+    links: [
+      {
+        href: "/dashboard/analytics",
+        label: "Analytics",
+        icon: BarChart3,
+        capability: "view_analytics",
+      },
+      {
+        href: "/dashboard/team",
+        label: "Team Management",
+        icon: Users,
+        capability: "manage_staff",
+      },
+      {
+        href: "/dashboard/settings",
+        label: "System Settings",
+        icon: Settings,
+        capability: "billing_strategic",
+      },
+      {
+        href: "/admin",
+        label: "Tenant Management",
+        icon: Shield,
+        capability: "manage_tenant",
+      },
+    ],
+  },
 ];
 
 function TenantSwitcher() {
@@ -254,24 +271,17 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, signOut, activeRole, isPlatformAdmin, setViewMode, setViewAsRole } = useTimeoWebAuthContext();
-  const { activeTenant } = useTimeoWebTenantContext();
-  const { data: tenantDetail } = useTenant(activeTenant?.id);
-  const tenantLogoUrl: string | null = (tenantDetail as any)?.branding?.logoUrl ?? null;
   const flags = useFeatureFlags();
+  const capabilities = useCapabilities();
+  const canManageStaff = useHasCapability("manage_staff");
+  const canPosAccess = useHasCapability("pos_access");
+  const canEditCustomer = useHasCapability("edit_customer");
+  const canBillingTransactional = useHasCapability("billing_transactional");
+  const canCoachSessionLog = useHasCapability("coach_session_log");
+  const canCoachViewClients = useHasCapability("coach_view_clients");
 
   const displayName = user?.name || user?.email || "User";
-
-  const isAdminUser = isRoleAtLeast(activeRole, "admin");
-  const [frontDeskMode, setFrontDeskMode] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("timeo-front-desk-mode") === "true";
-  });
-
-  function toggleFrontDeskMode() {
-    const next = !frontDeskMode;
-    setFrontDeskMode(next);
-    localStorage.setItem("timeo-front-desk-mode", String(next));
-  }
+  const capabilitySet = useMemo(() => new Set(capabilities), [capabilities]);
 
   function isLinkActive(href: string) {
     if (href === "/dashboard") return pathname === "/dashboard";
@@ -280,20 +290,25 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   function isLinkVisible(link: SidebarLink) {
     if (link.flagKey && flags[link.flagKey] === false) return false;
+    if (link.capability && !capabilitySet.has(link.capability)) return false;
     return true;
   }
 
-  function isSectionVisible(section: SidebarSection) {
-    if (section.minRole && !isRoleAtLeast(activeRole, section.minRole)) return false;
-    return true;
-  }
+  const hasFrontDeskAccess =
+    canPosAccess || canEditCustomer || canBillingTransactional;
 
-  const isCoach = activeRole === "coach";
-  const activeSections = isCoach
-    ? coachSidebarSections
-    : (isAdminUser && frontDeskMode)
-      ? frontDeskSections
-      : sidebarSections;
+  const isCoachMode =
+    !canManageStaff &&
+    !hasFrontDeskAccess &&
+    (canCoachSessionLog || canCoachViewClients);
+
+  const activeSections = canManageStaff
+    ? adminSidebarSections
+    : isCoachMode
+      ? coachSidebarSections
+      : hasFrontDeskAccess
+        ? frontDeskSidebarSections
+        : [];
 
   return (
     <div className="flex h-full flex-col">
@@ -314,7 +329,6 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-3">
         {activeSections.map((section, sectionIndex) => {
-          if (!isSectionVisible(section)) return null;
           const visibleLinks = section.links.filter(isLinkVisible);
           if (visibleLinks.length === 0) return null;
 
@@ -369,54 +383,6 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           );
         })}
 
-        {/* Admin extras (hidden in sidebar but accessible via URL) */}
-        {!isCoach && isRoleAtLeast(activeRole, "admin") && (
-          <div className="mt-4">
-            <div className="mb-1 px-3 py-1">
-              <span className="text-xs font-semibold tracking-wider text-white/40 uppercase">
-                STORE
-              </span>
-            </div>
-            <div className="space-y-0.5">
-              {adminOnlyExtras.filter(isLinkVisible).map((link) => {
-                const isActive = isLinkActive(link.href);
-                return (
-                  <motion.div
-                    key={link.href}
-                    whileHover={{ x: 2 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="relative"
-                  >
-                    {isActive && (
-                      <motion.div
-                        layoutId="activeNavStore"
-                        className="absolute inset-0 rounded-lg bg-primary/10"
-                        transition={{ type: "spring", duration: 0.2, bounce: 0.1 }}
-                      />
-                    )}
-                    {isActive && (
-                      <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-primary" />
-                    )}
-                    <Link
-                      href={link.href}
-                      prefetch
-                      onClick={onNavigate}
-                      className={cn(
-                        "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors min-h-[44px]",
-                        isActive
-                          ? "text-primary pl-4"
-                          : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
-                      )}
-                    >
-                      <link.icon className={cn("h-4 w-4 shrink-0", isActive && "text-primary")} />
-                      {link.label}
-                    </Link>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </nav>
 
       <Separator className="bg-white/[0.06]" />
@@ -437,39 +403,6 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             C2 Control Center
           </button>
         </div>
-      )}
-
-      {/* Front Desk Mode Toggle */}
-      {isAdminUser && (
-        <>
-          <Separator className="bg-white/[0.06]" />
-          <div className="p-3">
-            <button
-              onClick={toggleFrontDeskMode}
-              className={cn(
-                "flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-medium transition-all",
-                frontDeskMode
-                  ? "border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
-                  : "border-white/[0.08] bg-white/[0.03] text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
-              )}
-            >
-              {frontDeskMode ? (
-                <MonitorOff className="h-4 w-4" />
-              ) : (
-                <Monitor className="h-4 w-4" />
-              )}
-              <span className="flex-1 text-left">
-                {frontDeskMode ? "Exit Front Desk" : "Front Desk Mode"}
-              </span>
-              <span className={cn(
-                "rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
-                frontDeskMode ? "bg-amber-500/20 text-amber-300" : "bg-white/10 text-white/40"
-              )}>
-                {frontDeskMode ? "ON" : "OFF"}
-              </span>
-            </button>
-          </div>
-        </>
       )}
 
       <Separator className="bg-white/[0.06]" />
