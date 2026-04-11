@@ -21,6 +21,7 @@ export default function DirectoryPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [brokenLogos, setBrokenLogos] = useState<Record<string, boolean>>({});
   const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(
     null
   );
@@ -70,58 +71,68 @@ export default function DirectoryPage() {
         </div>
       ) : businesses && businesses.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {businesses.map((biz) => (
-            <Card
-              key={biz.id}
-              className="glass border-white/[0.08] transition-colors hover:border-white/[0.15]"
-            >
-              <CardContent className="flex flex-col gap-4 p-5">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
-                    style={{
-                      backgroundColor: biz.primaryColor
-                        ? `${biz.primaryColor}20`
-                        : "hsl(var(--primary) / 0.1)",
-                    }}
-                  >
-                    {biz.logoUrl ? (
-                      <img
-                        src={biz.logoUrl}
-                        alt={biz.name}
-                        className="h-8 w-8 rounded-lg object-cover"
-                      />
-                    ) : (
-                      <Building2
-                        className="h-6 w-6"
-                        style={{
-                          color: biz.primaryColor ?? "hsl(var(--primary))",
-                        }}
-                      />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold text-white">
-                      {biz.name}
-                    </p>
-                    <p className="text-xs text-white/40">{biz.slug}</p>
-                  </div>
-                </div>
+          {businesses.map((biz) => {
+            const showLogo = !!biz.logoUrl && !brokenLogos[biz.id];
 
-                <div className="rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-2 text-center">
-                  <p className="text-xs text-white/50">
-                    Have an invite code?{" "}
-                    <button
-                      onClick={() => router.push("/join")}
-                      className="text-primary underline-offset-2 hover:underline"
+            return (
+              <Card
+                key={biz.id}
+                className="glass border-white/[0.08] transition-colors hover:border-white/[0.15]"
+              >
+                <CardContent className="flex flex-col gap-4 p-5">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+                      style={{
+                        backgroundColor: biz.primaryColor
+                          ? `${biz.primaryColor}20`
+                          : "hsl(var(--primary) / 0.1)",
+                      }}
                     >
-                      Enter it here
-                    </button>
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                      {showLogo ? (
+                        <img
+                          src={biz.logoUrl ?? ""}
+                          alt={biz.name}
+                          className="h-8 w-8 rounded-lg object-cover"
+                          onError={() =>
+                            setBrokenLogos((prev) => ({
+                              ...prev,
+                              [biz.id]: true,
+                            }))
+                          }
+                        />
+                      ) : (
+                        <Building2
+                          className="h-6 w-6"
+                          style={{
+                            color: biz.primaryColor ?? "hsl(var(--primary))",
+                          }}
+                        />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold text-white">
+                        {biz.name}
+                      </p>
+                      <p className="text-xs text-white/40">{biz.slug}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-2 text-center">
+                    <p className="text-xs text-white/50">
+                      Have an invite code?{" "}
+                      <button
+                        onClick={() => router.push("/join")}
+                        className="text-primary underline-offset-2 hover:underline"
+                      >
+                        Enter it here
+                      </button>
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <div className="py-16 text-center">

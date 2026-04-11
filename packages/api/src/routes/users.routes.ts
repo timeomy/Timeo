@@ -135,7 +135,10 @@ app.post("/me/avatar", authMiddleware, async (c) => {
   // Save to disk
   const filename = `${userId}.jpg`;
   const savePath = `/opt/timeo-website/avatars/${filename}`;
-  const avatarUrl = `https://timeo.my/avatars/${filename}`;
+  const avatarBaseUrl = (
+    process.env.TIMEO_AVATAR_PUBLIC_BASE_URL ?? "https://app.timeo.my/avatars"
+  ).replace(/\/$/, "");
+  const avatarUrl = `${avatarBaseUrl}/${filename}`;
 
   const bytes = await file.arrayBuffer();
   const fs = await import("fs/promises");

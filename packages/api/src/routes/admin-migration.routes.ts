@@ -30,13 +30,13 @@ const WSFITNESS_TENANT_ID = "7Kw87VeAnXg4qDXi6UTbu";
 const AVATAR_STORAGE_DIR =
   process.env.TIMEO_AVATAR_STORAGE_DIR ?? "/opt/timeo-website/avatars";
 const AVATAR_PUBLIC_BASE_URL = (
-  process.env.TIMEO_AVATAR_PUBLIC_BASE_URL ?? "https://timeo.my/avatars"
+  process.env.TIMEO_AVATAR_PUBLIC_BASE_URL ?? "https://app.timeo.my/avatars"
 ).replace(/\/$/, "");
 
 const RECEIPT_STORAGE_DIR =
   process.env.TIMEO_RECEIPT_STORAGE_DIR ?? "/opt/timeo-website/receipts";
 const RECEIPT_PUBLIC_BASE_URL = (
-  process.env.TIMEO_RECEIPT_PUBLIC_BASE_URL ?? "https://timeo.my/receipts"
+  process.env.TIMEO_RECEIPT_PUBLIC_BASE_URL ?? "https://app.timeo.my/receipts"
 ).replace(/\/$/, "");
 
 const MAX_MEDIA_BYTES = 10 * 1024 * 1024;
