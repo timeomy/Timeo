@@ -151,7 +151,7 @@ All auth recovery work verified and ready. Standing by for CTO merge or new assi
 - **Status:** Board clean. No new assignments. All agents idle, awaiting CEO/CTO sprint direction.
 - **Action:** Committed heartbeat updates from other agents. Standing by for new sprint assignment.
 
-### 2026-04-12 — 02:24 GMT+8 (Current)
+### 2026-04-12 — 02:24 GMT+8
 - **Wake reason:** User prompt (continue Paperclip work)
 - **Board query results:** 0 open issues (todo/in_progress/blocked/backlog), 30+ done issues
 - **Assignments:** No work assigned to QA Engineer
@@ -159,3 +159,14 @@ All auth recovery work verified and ready. Standing by for CTO merge or new assi
 - **Branch:** fix/prod-auth-recovery (production-ready auth recovery work)
 - **Status:** ✅ Board clean. All prior sprints complete. Ready for next assignment.
 - **Action:** No open work. Standing by for CEO/CTO sprint direction.
+
+### 2026-04-12 — 03:25 GMT+8 (Current)
+- **Wake reason:** User prompt (continue Paperclip work / skill invocation)
+- **Paperclip API check:**
+  - `PAPERCLIP_API_KEY`: empty (not auto-injected outside heartbeat runs)
+  - API returning: "Agent authentication required"
+  - Issue: Cannot authenticate to query board assignments
+- **Code state:** ✅ TypeScript 0 errors (11 packages). Working tree: clean.
+- **Branch:** fix/prod-auth-recovery (production-ready auth recovery work)
+- **Status:** Sprint TIM-4 complete. Blocked on Paperclip API key injection.
+- **Action:** Awaiting heartbeat-triggered run OR infrastructure to inject PAPERCLIP_API_KEY for manual skill execution.
