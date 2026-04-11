@@ -9,6 +9,7 @@ import {
   useMemberDetail,
   useResetPlatformUserPassword,
   useSessionLogs,
+  useUploadFile,
   useUpdateMember,
   type MemberDetail,
   type UpdateMemberPayload,
@@ -43,6 +44,7 @@ import {
 import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowLeft,
+  Camera,
   CalendarClock,
   Coins,
   KeyRound,
@@ -55,6 +57,7 @@ import {
   User,
   X,
 } from "lucide-react";
+import { FacePhotoCapture } from "@/member/face-photo-capture";
 
 const STATUS_BADGE: Record<string, string> = {
   active: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
@@ -177,6 +180,7 @@ export default function GymMemberDetailPage() {
   });
 
   const updateMemberMutation = useUpdateMember(tenantId);
+  const uploadMemberPhotoMutation = useUploadFile(tenantId ?? "");
   const resetPasswordMutation = useResetPlatformUserPassword();
   const updateSubscriptionMutation = useMutation({
     mutationFn: async (endDate: string) => {
@@ -204,6 +208,7 @@ export default function GymMemberDetailPage() {
   });
 
   const [isEditing, setIsEditing] = useState(false);
+  const [isFaceCaptureOpen, setIsFaceCaptureOpen] = useState(false);
   const [isSubscriptionEditing, setIsSubscriptionEditing] = useState(false);
   const [editState, setEditState] = useState<MemberEditState | null>(null);
   const [tagInput, setTagInput] = useState("");
@@ -348,6 +353,40 @@ export default function GymMemberDetailPage() {
         "error",
         (err as Error | undefined)?.message ?? "Failed to update member details.",
       );
+    }
+  }
+
+  async function handleCaptureMemberPhoto(file: File) {
+    if (!tenantId) {
+      const message = "Tenant ID is required to upload a profile photo.";
+      showToast("error", message);
+      throw new Error(message);
+    }
+
+    try {
+      const uploaded = await uploadMemberPhotoMutation.mutateAsync(file);
+      await updateMemberMutation.mutateAsync({
+        memberId,
+        payload: {
+          avatar_url: uploaded.url,
+        },
+      });
+
+      setEditState((previous) =>
+        previous
+          ? {
+              ...previous,
+              avatarUrl: uploaded.url,
+            }
+          : previous,
+      );
+
+      showToast("success", "Member profile photo updated.");
+    } catch (err) {
+      const message =
+        (err as Error | undefined)?.message ?? "Failed to update member profile photo.";
+      showToast("error", message);
+      throw new Error(message);
     }
   }
 
@@ -511,6 +550,26 @@ export default function GymMemberDetailPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-1.5 border-white/20 bg-white/5 text-white hover:bg-white/10"
+                onClick={() => setIsFaceCaptureOpen(true)}
+                disabled={
+                  !tenantId ||
+                  uploadMemberPhotoMutation.isPending ||
+                  updateMemberMutation.isPending
+                }
+              >
+                {uploadMemberPhotoMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Camera className="h-4 w-4" />
+                )}
+                Update Profile Photo
+              </Button>
+
               <Badge
                 variant="outline"
                 className={cn(
@@ -1150,6 +1209,16 @@ export default function GymMemberDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <FacePhotoCapture
+        open={isFaceCaptureOpen}
+        onOpenChange={setIsFaceCaptureOpen}
+        onCapture={handleCaptureMemberPhoto}
+        isSubmitting={
+          uploadMemberPhotoMutation.isPending || updateMemberMutation.isPending
+        }
+        title="Update Member Photo"
+      />
     </div>
   );
 }

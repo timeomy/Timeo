@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   useChangePassword,
   useMemberQrCode,
+  useUploadFile,
   useUpdateUserProfile,
   useUserProfile,
 } from "@timeo/api-client";
@@ -30,12 +31,14 @@ import {
   Lock,
   LogOut,
   Mail,
+  Camera,
   Phone,
   QrCode,
   UserRound,
   UserSquare2,
 } from "lucide-react";
 import { useTenantId } from "@/hooks/use-tenant-id";
+import { FacePhotoCapture } from "@/member/face-photo-capture";
 import { MemberQrModal } from "@/member/qr-modal";
 
 type NotificationKey = "classReminders" | "paymentUpdates" | "promotions";
@@ -84,9 +87,11 @@ export default function ProfilePage() {
   const { data: userProfile } = useUserProfile();
   const { data: memberQrData } = useMemberQrCode(tenantId);
   const updateProfileMutation = useUpdateUserProfile();
+  const uploadProfilePhotoMutation = useUploadFile(tenantId ?? "");
   const changePasswordMutation = useChangePassword();
 
   const [isQrOpen, setIsQrOpen] = useState(false);
+  const [isFaceCaptureOpen, setIsFaceCaptureOpen] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileForm, setProfileForm] = useState({
@@ -158,6 +163,32 @@ export default function ProfilePage() {
     setIsQrOpen(true);
   }
 
+  async function handleCaptureProfilePhoto(file: File) {
+    if (!tenantId) {
+      const message = "Tenant is still loading. Please try again.";
+      setProfileError(message);
+      throw new Error(message);
+    }
+
+    setProfileError(null);
+    setProfileSaved(false);
+
+    try {
+      const uploaded = await uploadProfilePhotoMutation.mutateAsync(file);
+      await updateProfileMutation.mutateAsync({
+        avatar_url: uploaded.url,
+      });
+
+      setProfileForm((previous) => ({ ...previous, avatarUrl: uploaded.url }));
+      setProfileSaved(true);
+      window.setTimeout(() => setProfileSaved(false), 2000);
+    } catch (error) {
+      const message = (error as Error).message ?? "Unable to update profile photo";
+      setProfileError(message);
+      throw new Error(message);
+    }
+  }
+
   async function handleSaveProfile() {
     setProfileError(null);
     setProfileSaved(false);
@@ -223,6 +254,23 @@ export default function ProfilePage() {
                 <Badge className="mt-2 rounded-full border-white/[0.14] bg-white/[0.08] font-mono text-[11px] text-white/80">
                   Member ID: {memberId}
                 </Badge>
+                <button
+                  type="button"
+                  onClick={() => setIsFaceCaptureOpen(true)}
+                  disabled={
+                    !tenantId ||
+                    uploadProfilePhotoMutation.isPending ||
+                    updateProfileMutation.isPending
+                  }
+                  className="mt-2 inline-flex h-9 items-center gap-2 rounded-lg border border-white/[0.14] bg-white/[0.06] px-3 text-xs font-semibold text-white transition-colors hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {uploadProfilePhotoMutation.isPending || updateProfileMutation.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="h-3.5 w-3.5" />
+                  )}
+                  Update Profile Photo
+                </button>
               </div>
             </div>
 
@@ -458,6 +506,16 @@ export default function ProfilePage() {
         onOpenChange={setIsQrOpen}
         memberName={displayName}
         memberId={memberId}
+      />
+
+      <FacePhotoCapture
+        open={isFaceCaptureOpen}
+        onOpenChange={setIsFaceCaptureOpen}
+        onCapture={handleCaptureProfilePhoto}
+        isSubmitting={
+          uploadProfilePhotoMutation.isPending || updateProfileMutation.isPending
+        }
+        title="Update Profile Photo"
       />
     </div>
   );
