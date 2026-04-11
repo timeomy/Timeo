@@ -1,7 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useTenant, useUpdateTenantSettings, useUpdateTenantBranding } from "@timeo/api-client";
+import { useState, useEffect, useRef } from "react";
+import {
+  useTenant,
+  useUpdateTenantSettings,
+  useUpdateTenantBranding,
+  useUploadFile,
+} from "@timeo/api-client";
 import { authClient } from "@timeo/auth/web";
 import { useTenantId } from "@/hooks/use-tenant-id";
 import {
@@ -195,6 +200,10 @@ export default function SettingsPage() {
 
   const { mutateAsync: updateTenant } = useUpdateTenantSettings(tenantId ?? "");
   const { mutateAsync: updateBranding } = useUpdateTenantBranding(tenantId ?? "");
+  const { mutateAsync: uploadFile, isPending: logoUploading } = useUploadFile(
+    tenantId ?? "",
+  );
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
 
   // General form state
   const [businessName, setBusinessName] = useState("");
@@ -204,6 +213,10 @@ export default function SettingsPage() {
   // Branding form state
   const [primaryColor, setPrimaryColor] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+  const [logoValidationError, setLogoValidationError] = useState("");
+  const [logoLoadError, setLogoLoadError] = useState(false);
   const [brandingSaving, setBrandingSaving] = useState(false);
   const [brandingSuccess, setBrandingSuccess] = useState(false);
 
@@ -211,16 +224,82 @@ export default function SettingsPage() {
   const [timezone, setTimezone] = useState("");
   const [currency, setCurrency] = useState("");
 
+  const displayedLogoUrl = logoPreviewUrl ?? logoUrl;
+
+  useEffect(
+    () => () => {
+      if (logoPreviewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(logoPreviewUrl);
+      }
+    },
+    [logoPreviewUrl],
+  );
+
+  useEffect(() => {
+    setLogoLoadError(false);
+  }, [displayedLogoUrl]);
+
   // Populate form when tenant data loads
   useEffect(() => {
     if (tenant) {
+      const branding = (tenant.branding ?? {}) as Record<string, unknown>;
+      const nestedBranding = (branding.branding ?? {}) as Record<
+        string,
+        unknown
+      >;
+
       setBusinessName(tenant.name || "");
-      setPrimaryColor(tenant.branding?.primaryColor || "");
-      setLogoUrl(tenant.branding?.logoUrl || "");
+      setPrimaryColor(
+        (branding.primaryColor as string | undefined) ??
+          (nestedBranding.primaryColor as string | undefined) ??
+          "",
+      );
+      setLogoUrl(
+        (branding.logoUrl as string | undefined) ??
+          (nestedBranding.logoUrl as string | undefined) ??
+          tenant.logoUrl ??
+          tenant.logo ??
+          "",
+      );
       setTimezone((tenant as unknown as { timezone?: string }).timezone || "");
-      setCurrency(((tenant.branding) as { currency?: string } | undefined)?.currency || "");
+      setCurrency(
+        (branding.currency as string | undefined) ??
+          (nestedBranding.currency as string | undefined) ??
+          "",
+      );
+      setSelectedLogoFile(null);
+      setLogoPreviewUrl(null);
+      setLogoValidationError("");
     }
   }, [tenant]);
+
+  function handleSelectLogoClick() {
+    logoInputRef.current?.click();
+  }
+
+  function handleLogoFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      setLogoValidationError("");
+      return;
+    }
+
+    const validMimeTypes = ["image/jpeg", "image/png", "image/svg+xml"];
+    if (!validMimeTypes.includes(file.type)) {
+      setLogoValidationError("Please upload a JPG, PNG, or SVG file.");
+      setSelectedLogoFile(null);
+      setLogoPreviewUrl(null);
+      event.currentTarget.value = "";
+      return;
+    }
+
+    const preview = URL.createObjectURL(file);
+    setSelectedLogoFile(file);
+    setLogoPreviewUrl(preview);
+    setLogoValidationError("");
+    setLogoLoadError(false);
+    event.currentTarget.value = "";
+  }
 
   async function handleSaveGeneral() {
     if (!tenantId) return;
@@ -231,8 +310,12 @@ export default function SettingsPage() {
         name: businessName,
         timezone: timezone || undefined,
       });
-      if (currency) {
-        await updateBranding({ branding: { primaryColor: primaryColor || undefined, logoUrl: logoUrl || undefined, currency } });
+      if (primaryColor || logoUrl || currency) {
+        await updateBranding({
+          primaryColor: primaryColor || undefined,
+          logoUrl: logoUrl.trim() ? logoUrl : null,
+          currency: currency || undefined,
+        });
       }
       setGeneralSuccess(true);
       setTimeout(() => setGeneralSuccess(false), 3000);
@@ -248,12 +331,22 @@ export default function SettingsPage() {
     setBrandingSaving(true);
     setBrandingSuccess(false);
     try {
+      let nextLogoUrl = logoUrl;
+
+      if (selectedLogoFile) {
+        const uploadResult = await uploadFile(selectedLogoFile);
+        nextLogoUrl = uploadResult.url;
+        setLogoUrl(nextLogoUrl);
+      }
+
       await updateBranding({
-        branding: {
-          primaryColor: primaryColor || undefined,
-          logoUrl: logoUrl || undefined,
-        },
+        primaryColor: primaryColor || undefined,
+        logoUrl: nextLogoUrl.trim() ? nextLogoUrl : null,
       });
+
+      setSelectedLogoFile(null);
+      setLogoPreviewUrl(null);
+      setLogoValidationError("");
       setBrandingSuccess(true);
       setTimeout(() => setBrandingSuccess(false), 3000);
     } catch (err: any) {
@@ -559,27 +652,65 @@ export default function SettingsPage() {
                     </p>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Logo URL</label>
-                    <div className="flex items-center gap-3">
-                      <Input
-                        value={logoUrl}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                          setLogoUrl(e.target.value)
-                        }
-                        placeholder="https://example.com/logo.png"
-                      />
-                      {logoUrl && (
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] overflow-hidden">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium">Business Logo</label>
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/svg+xml"
+                      onChange={handleLogoFileChange}
+                      className="hidden"
+                    />
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03] overflow-hidden">
+                        {displayedLogoUrl && !logoLoadError ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={logoUrl}
-                            alt="Logo preview"
-                            className="h-full w-full object-contain p-1"
-                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                            src={displayedLogoUrl}
+                            alt="Business logo preview"
+                            className="h-full w-full object-contain p-2"
+                            onError={() => setLogoLoadError(true)}
                           />
-                        </div>
-                      )}
+                        ) : (
+                          <Image className="h-5 w-5 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleSelectLogoClick}
+                        >
+                          Upload Logo
+                        </Button>
+                        {(selectedLogoFile || logoUrl) && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => {
+                              setSelectedLogoFile(null);
+                              setLogoPreviewUrl(null);
+                              setLogoUrl("");
+                              setLogoValidationError("");
+                            }}
+                          >
+                            Remove Logo
+                          </Button>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Accepted formats: JPG, PNG, SVG.
+                        </p>
+                        {selectedLogoFile && (
+                          <p className="text-xs text-emerald-400">
+                            Previewing: {selectedLogoFile.name}
+                          </p>
+                        )}
+                        {logoValidationError && (
+                          <p className="text-xs text-red-400">
+                            {logoValidationError}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -597,15 +728,15 @@ export default function SettingsPage() {
                 {!brandingSuccess && <div />}
                 <Button
                   onClick={handleSaveBranding}
-                  disabled={brandingSaving}
+                  disabled={brandingSaving || logoUploading || !!logoValidationError}
                   className="gap-2"
                 >
-                  {brandingSaving ? (
+                  {brandingSaving || logoUploading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Save className="h-4 w-4" />
                   )}
-                  {brandingSaving ? "Saving..." : "Save Branding"}
+                  {brandingSaving || logoUploading ? "Saving..." : "Save Branding"}
                 </Button>
               </CardFooter>
             )}

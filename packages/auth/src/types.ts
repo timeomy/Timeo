@@ -43,6 +43,8 @@ export interface TenantInfo {
   name: string;
   slug: string | null;
   role: TimeoRole;
+  logo?: string | null;
+  logoUrl?: string | null;
 }
 
 export interface TenantSwitcherContext {

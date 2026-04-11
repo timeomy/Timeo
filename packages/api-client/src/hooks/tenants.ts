@@ -7,6 +7,7 @@ interface Tenant {
   name: string;
   slug: string;
   logo?: string;
+  logoUrl?: string;
   industry?: string;
   currency: string;
   timezone: string;
@@ -113,10 +114,12 @@ export function useUpdateTenantBranding(tenantId: string) {
   return useMutation({
     mutationFn: (data: {
       logo?: string;
-      logoUrl?: string;
+      logoUrl?: string | null;
       primaryColor?: string;
       secondaryColor?: string;
-      branding?: Record<string, unknown>;
+      companyDisplayName?: string;
+      currency?: string;
+      [key: string]: unknown;
     }) => api.patch(`/api/tenants/${tenantId}/branding`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({

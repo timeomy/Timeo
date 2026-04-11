@@ -221,6 +221,21 @@ export const UpdateTenantSettingsSchema = z.object({
   paymentGateway: z.enum(["stripe", "revenue_monster", "both"]).optional(),
 });
 
+export const UpdateTenantBrandingSchema = z.object({
+  logo: z.string().max(2048).optional(),
+  logoUrl: z.string().url().nullable().optional(),
+  primaryColor: z
+    .string()
+    .regex(/^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/)
+    .optional(),
+  secondaryColor: z
+    .string()
+    .regex(/^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/)
+    .optional(),
+  companyDisplayName: z.string().trim().min(1).max(200).optional(),
+  currency: z.string().length(3).optional(),
+});
+
 export const CreateTenantSchema = z.object({
   name: z.string().min(1).max(200),
   slug: z

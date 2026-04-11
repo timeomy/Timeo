@@ -17,6 +17,7 @@ import { success, error } from "../lib/response.js";
 import {
   CreateTenantSchema,
   UpdateTenantSettingsSchema,
+  UpdateTenantBrandingSchema,
   AddTenantMemberSchema,
 } from "../lib/validation.js";
 import * as TenantService from "../services/tenant.service.js";
@@ -129,6 +130,9 @@ app.get("/mine", authMiddleware, async (c) => {
       name: row.name,
       slug: row.slug,
       logo: branding.logo as string | undefined,
+      logoUrl:
+        (branding.logoUrl as string | undefined) ??
+        (branding.logo as string | undefined),
       industry: settings.industry as string | undefined,
       currency: (settings.currency as string | undefined) ?? "MYR",
       timezone: (settings.timezone as string | undefined) ?? "Asia/Kuala_Lumpur",
@@ -373,18 +377,25 @@ app.patch(
 );
 
 // PATCH /tenants/:tenantId/branding
-app.patch("/:tenantId/branding", authMiddleware, tenantMiddleware, requireCapability("manage_tenant"), async (c) => {
-  const user = c.get("user");
-  const tenantId = c.get("tenantId");
-  const body = await c.req.json();
+app.patch(
+  "/:tenantId/branding",
+  authMiddleware,
+  tenantMiddleware,
+  requireCapability("manage_tenant"),
+  zValidator("json", UpdateTenantBrandingSchema),
+  async (c) => {
+    const user = c.get("user");
+    const tenantId = c.get("tenantId");
+    const body = c.req.valid("json");
 
-  try {
-    await TenantService.updateTenantBranding(tenantId, body, user.id);
-    return c.json(success({ message: "Branding updated" }));
-  } catch (err) {
-    return c.json(error("TENANT_ERROR", (err as Error).message), 422);
-  }
-});
+    try {
+      await TenantService.updateTenantBranding(tenantId, body, user.id);
+      return c.json(success({ message: "Branding updated" }));
+    } catch (err) {
+      return c.json(error("TENANT_ERROR", (err as Error).message), 422);
+    }
+  },
+);
 
 // GET /tenants/:tenantId/feature-flags — merged flags for tenant
 app.get(

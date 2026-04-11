@@ -201,13 +201,48 @@ const adminSidebarSections: SidebarSection[] = [
   },
 ];
 
+function getTenantLogoUrl(tenant: unknown): string | null {
+  if (!tenant || typeof tenant !== "object") return null;
+
+  const record = tenant as Record<string, unknown>;
+  const branding =
+    typeof record.branding === "object" && record.branding
+      ? (record.branding as Record<string, unknown>)
+      : null;
+  const nestedBranding =
+    branding && typeof branding.branding === "object" && branding.branding
+      ? (branding.branding as Record<string, unknown>)
+      : null;
+
+  return (
+    (branding?.logoUrl as string | undefined) ??
+    (nestedBranding?.logoUrl as string | undefined) ??
+    (record.logoUrl as string | undefined) ??
+    (record.logo as string | undefined) ??
+    null
+  );
+}
+
 function TenantSwitcher() {
   const { tenants, activeTenant, switchTenant, isLoading } =
     useTimeoWebTenantContext();
   const { data: switcherTenantData } = useTenant(activeTenant?.id);
-  const switcherLogoUrl: string | null = (switcherTenantData as any)?.branding?.logoUrl ?? null;
+  const switcherLogoUrl =
+    getTenantLogoUrl(switcherTenantData) ?? getTenantLogoUrl(activeTenant);
 
   const [open, setOpen] = useState(false);
+  const [activeLogoFailed, setActiveLogoFailed] = useState(false);
+  const [tenantLogoFailures, setTenantLogoFailures] = useState<
+    Record<string, boolean>
+  >({});
+
+  useEffect(() => {
+    setActiveLogoFailed(false);
+  }, [switcherLogoUrl]);
+
+  useEffect(() => {
+    setTenantLogoFailures({});
+  }, [tenants]);
 
   if (isLoading) return <Skeleton className="h-10 w-full rounded-lg" />;
 
@@ -218,8 +253,13 @@ function TenantSwitcher() {
         className="flex w-full items-center gap-3 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.06]"
       >
         <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 overflow-hidden">
-          {switcherLogoUrl ? (
-            <img src={switcherLogoUrl} alt={activeTenant?.name || ""} className="h-8 w-8 object-cover rounded-md" />
+          {switcherLogoUrl && !activeLogoFailed ? (
+            <img
+              src={switcherLogoUrl}
+              alt={activeTenant?.name || ""}
+              className="h-8 w-8 object-cover rounded-md"
+              onError={() => setActiveLogoFailed(true)}
+            />
           ) : (
             <Building2 className="h-4 w-4 text-primary" />
           )}
@@ -241,24 +281,47 @@ function TenantSwitcher() {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-64 overflow-y-auto rounded-xl border border-white/[0.08] bg-[#1a1a2e] p-1.5 shadow-xl">
-            {tenants.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => {
-                  switchTenant(t.id);
-                  setOpen(false);
-                }}
-                className={cn(
-                  "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-white/[0.06]",
-                  activeTenant?.id === t.id && "bg-primary/10"
-                )}
-              >
-                <span className="flex-1 truncate">{t.name}</span>
-                {activeTenant?.id === t.id && (
-                  <Check className="h-4 w-4 text-primary" />
-                )}
-              </button>
-            ))}
+            {tenants.map((t) => {
+              const tenantLogoUrl = getTenantLogoUrl(t);
+              const shouldShowLogo =
+                !!tenantLogoUrl && !tenantLogoFailures[t.id];
+
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => {
+                    switchTenant(t.id);
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-white/[0.06]",
+                    activeTenant?.id === t.id && "bg-primary/10"
+                  )}
+                >
+                  <span className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-md bg-white/[0.06]">
+                    {shouldShowLogo ? (
+                      <img
+                        src={tenantLogoUrl ?? ""}
+                        alt={t.name}
+                        className="h-7 w-7 object-cover"
+                        onError={() =>
+                          setTenantLogoFailures((prev) => ({
+                            ...prev,
+                            [t.id]: true,
+                          }))
+                        }
+                      />
+                    ) : (
+                      <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                    )}
+                  </span>
+                  <span className="flex-1 truncate">{t.name}</span>
+                  {activeTenant?.id === t.id && (
+                    <Check className="h-4 w-4 text-primary" />
+                  )}
+                </button>
+              );
+            })}
 
           </div>
         </>
