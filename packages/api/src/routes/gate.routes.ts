@@ -1594,3 +1594,11 @@ app.get("/avatars/:filename", async (c) => {
     return c.text("Not found", 404);
   }
 });
+
+// DEBUG: Catch face-capture requests
+app.post("/face-capture", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  console.log(`[FACE-CAPTURE DEBUG] body=${JSON.stringify(body).slice(0, 1000)}`);
+  // For now, return a success response to see what the turnstile sends
+  return c.json({ result: 0, success: true });
+});
