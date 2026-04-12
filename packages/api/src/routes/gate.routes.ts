@@ -916,6 +916,28 @@ app.post("/validate-card", zValidator("json", ValidateCardSchema), async (c) => 
     }
 
     if (!matchedMember) {
+      const rawId = trimmedCardNo;
+      const faceResults = await db.execute(
+        sql`SELECT tm.user_id as "userId", tm.member_id as "memberId", u.name as "memberName"
+            FROM face_registrations fr
+            JOIN tenant_memberships tm ON tm.user_id = fr.user_id AND tm.tenant_id = ${tenantId}
+            JOIN users u ON tm.user_id = u.id
+            WHERE fr.tenant_id = ${tenantId}
+            AND fr.device_person_id IN (${rawId}, ${rawId + "_0"}, ${rawId.replace(/_0$/, "")})
+            LIMIT 1`,
+      );
+      const faceRow = faceResults.rows?.[0];
+
+      if (faceRow) {
+        matchedMember = {
+          userId: String(faceRow.userId),
+          memberId: faceRow.memberId ? String(faceRow.memberId) : null,
+          memberName: String(faceRow.memberName ?? "Member"),
+        };
+      }
+    }
+
+    if (!matchedMember) {
       return c.json({ valid: false, error: 8, tts: "Not registered" });
     }
 
@@ -1040,6 +1062,28 @@ app.post("/validate-qr", zValidator("json", ValidateQrSchema), async (c) => {
       if (row) {
         matchedMember = row;
         break;
+      }
+    }
+
+    if (!matchedMember) {
+      const rawId = resolved.memberId;
+      const faceResults = await db.execute(
+        sql`SELECT tm.user_id as "userId", tm.member_id as "memberId", u.name as "memberName"
+            FROM face_registrations fr
+            JOIN tenant_memberships tm ON tm.user_id = fr.user_id AND tm.tenant_id = ${tenantId}
+            JOIN users u ON tm.user_id = u.id
+            WHERE fr.tenant_id = ${tenantId}
+            AND fr.device_person_id IN (${rawId}, ${rawId + "_0"}, ${rawId.replace(/_0$/, "")})
+            LIMIT 1`,
+      );
+      const faceRow = faceResults.rows?.[0];
+
+      if (faceRow) {
+        matchedMember = {
+          userId: String(faceRow.userId),
+          memberId: faceRow.memberId ? String(faceRow.memberId) : null,
+          memberName: String(faceRow.memberName ?? "Member"),
+        };
       }
     }
 
