@@ -36,6 +36,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { authMiddleware } from "../middleware/auth.js";
 import { success, error } from "../lib/response.js";
+import { getZahLookupCandidates } from "../lib/zah-card-lookup.js";
 import * as AccessControl from "../services/access-control.service.js";
 
 const app = new Hono();
@@ -323,6 +324,21 @@ function getDeviceSnFromPayload(
   return accessType === "turnstile" ? "zah-cloud-turnstile" : "zah-cloud-door";
 }
 
+function getDeviceSnForLookup(payload: Record<string, unknown>): string | null {
+  const rawValue =
+    typeof payload.device_sn === "string"
+      ? payload.device_sn
+      : typeof payload.deviceSn === "string"
+        ? payload.deviceSn
+        : typeof payload.sn === "string"
+          ? payload.sn
+          : "";
+
+  const deviceSn = rawValue.trim();
+
+  return deviceSn || null;
+}
+
 async function logZahAccessAttempt(input: {
   tenantId: string;
   userId: string | null;
@@ -509,9 +525,31 @@ async function handleZahValidation(c: Context) {
       return sendZahResponse(c, buildZahDeniedResponse(eventNo, reason));
     }
 
-    const memberCandidates = Array.from(
-      new Set([resolved.memberId, resolved.memberId.toUpperCase()]),
+    const lookupCandidates = Array.from(
+      new Set([
+        ...getZahLookupCandidates(resolved.memberId),
+        ...getCardCandidates(resolved.memberId),
+      ]),
     );
+    const memberCandidates = lookupCandidates;
+    const externalIdCandidates = Array.from(
+      new Set(lookupCandidates.flatMap((candidate) => getExternalIdCandidates(candidate))),
+    );
+    const legacyLookups = lookupCandidates.map((candidate) => getLegacyCardCandidates(candidate));
+    const legacyCandidates = Array.from(
+      new Set(legacyLookups.flatMap((lookup) => lookup.candidates)),
+    );
+    const legacyNumericParts = Array.from(
+      new Set(
+        legacyLookups
+          .map((lookup) => lookup.numericPart)
+          .filter((value): value is string => Boolean(value)),
+      ),
+    );
+    const faceCandidates = Array.from(
+      new Set(lookupCandidates.flatMap((candidate) => getZahLookupCandidates(candidate))),
+    );
+    const lookupDeviceSn = getDeviceSnForLookup(payload);
 
     let matchedMember:
       | {
@@ -551,17 +589,124 @@ async function handleZahValidation(c: Context) {
       }
     }
 
-    // Try face_registrations lookup if no member found by member_id
     if (!matchedMember) {
-      const rawId = resolved.memberId;
+      for (const candidate of externalIdCandidates) {
+        const [row] = await db
+          .select({
+            userId: tenantMemberships.user_id,
+            memberId: tenantMemberships.member_id,
+            memberName: users.name,
+            memberStatus: tenantMemberships.status,
+          })
+          .from(tenantMemberships)
+          .innerJoin(users, eq(tenantMemberships.user_id, users.id))
+          .where(
+            and(
+              eq(tenantMemberships.tenant_id, tenantId),
+              eq(tenantMemberships.external_id, candidate),
+            ),
+          )
+          .limit(1);
+
+        if (row) {
+          matchedMember = {
+            userId: row.userId,
+            memberId: row.memberId,
+            memberName: row.memberName ?? "Member",
+            memberStatus: row.memberStatus,
+          };
+          break;
+        }
+      }
+    }
+
+    if (!matchedMember && legacyCandidates.length > 0) {
+      for (const candidate of legacyCandidates) {
+        const [row] = await db
+          .select({
+            userId: tenantMemberships.user_id,
+            memberId: tenantMemberships.member_id,
+            memberName: users.name,
+            memberStatus: tenantMemberships.status,
+          })
+          .from(tenantMemberships)
+          .innerJoin(users, eq(tenantMemberships.user_id, users.id))
+          .where(
+            and(
+              eq(tenantMemberships.tenant_id, tenantId),
+              or(
+                eq(tenantMemberships.member_id, candidate),
+                eq(tenantMemberships.external_id, candidate),
+              ),
+            ),
+          )
+          .limit(1);
+
+        if (row) {
+          matchedMember = {
+            userId: row.userId,
+            memberId: row.memberId,
+            memberName: row.memberName ?? "Member",
+            memberStatus: row.memberStatus,
+          };
+          break;
+        }
+      }
+    }
+
+    if (!matchedMember && legacyNumericParts.length > 0) {
+      for (const numericPart of legacyNumericParts) {
+        const [row] = await db
+          .select({
+            userId: tenantMemberships.user_id,
+            memberId: tenantMemberships.member_id,
+            memberName: users.name,
+            memberStatus: tenantMemberships.status,
+          })
+          .from(tenantMemberships)
+          .innerJoin(users, eq(tenantMemberships.user_id, users.id))
+          .where(
+            and(
+              eq(tenantMemberships.tenant_id, tenantId),
+              or(
+                sql`regexp_replace(coalesce(${tenantMemberships.member_id}, ''), '[^0-9]', '', 'g') = ${numericPart}`,
+                sql`regexp_replace(coalesce(${tenantMemberships.external_id}, ''), '[^0-9]', '', 'g') = ${numericPart}`,
+              ),
+            ),
+          )
+          .limit(1);
+
+        if (row) {
+          matchedMember = {
+            userId: row.userId,
+            memberId: row.memberId,
+            memberName: row.memberName ?? "Member",
+            memberStatus: row.memberStatus,
+          };
+          break;
+        }
+      }
+    }
+
+    // Try face_registrations lookup if no member found by member_id
+    if (!matchedMember && faceCandidates.length > 0) {
+      const faceCandidateSql = sql.join(
+        faceCandidates.map((candidate) => sql`${candidate}`),
+        sql`, `,
+      );
+      const deviceSnSql = lookupDeviceSn
+        ? sql`AND fr.device_sn = ${lookupDeviceSn}`
+        : sql``;
+
       const faceResults = await db.execute(
         sql`SELECT tm.user_id as "userId", tm.member_id as "memberId", u.name as "memberName", tm.status as "memberStatus"
             FROM face_registrations fr
             JOIN tenant_memberships tm ON tm.user_id = fr.user_id AND tm.tenant_id = ${tenantId}
             JOIN users u ON tm.user_id = u.id
             WHERE fr.tenant_id = ${tenantId}
-            AND fr.device_person_id IN (${rawId}, ${rawId + '_0'}, ${rawId.replace(/_0$/, '')})
-            LIMIT 1`
+            ${deviceSnSql}
+            AND fr.device_person_id IN (${faceCandidateSql})
+            LIMIT 1`,
       );
       const faceRow = (faceResults as any[])?.[0];
       if (faceRow) {
@@ -574,7 +719,7 @@ async function handleZahValidation(c: Context) {
       }
     }
 
-    console.log(`[ZAH DEBUG] matchedMember=${JSON.stringify(matchedMember)} resolved=${JSON.stringify(resolved)}`);
+    console.log(`[ZAH DEBUG] matchedMember=${JSON.stringify(matchedMember)} resolved=${JSON.stringify(resolved)} candidates=${JSON.stringify(lookupCandidates)} faceCandidates=${JSON.stringify(faceCandidates)} deviceSn=${lookupDeviceSn ?? ""}`);
     if (!matchedMember) {
       const reason = "Not registered";
 
