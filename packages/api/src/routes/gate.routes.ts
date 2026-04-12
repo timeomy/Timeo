@@ -550,6 +550,46 @@ async function handleZahValidation(c: Context) {
       }
     }
 
+    // Try face_registrations lookup if no member found by member_id
+    if (!matchedMember) {
+      const { faceRegistrations } = await import("@timeo/db/schema");
+      if (faceRegistrations) {
+        // Try matching device_person_id against the raw cardNo or resolved memberId
+        const faceCandidates = [resolved.rawCardNo, resolved.memberId, `${resolved.memberId}_0`].filter(Boolean);
+        for (const faceId of faceCandidates) {
+          const [faceRow] = await db
+            .select({
+              userId: tenantMemberships.user_id,
+              memberId: tenantMemberships.member_id,
+              memberName: users.name,
+              memberStatus: tenantMemberships.status,
+            })
+            .from(faceRegistrations)
+            .innerJoin(tenantMemberships, and(
+              eq(tenantMemberships.user_id, faceRegistrations.user_id),
+              eq(tenantMemberships.tenant_id, tenantId),
+            ))
+            .innerJoin(users, eq(tenantMemberships.user_id, users.id))
+            .where(
+              and(
+                eq(faceRegistrations.tenant_id, tenantId),
+                sql`${faceRegistrations.device_person_id} IN (${faceId}, ${faceId + '_0'})`,
+              ),
+            )
+            .limit(1);
+          if (faceRow) {
+            matchedMember = {
+              userId: faceRow.userId,
+              memberId: faceRow.memberId,
+              memberName: faceRow.memberName ?? "Member",
+              memberStatus: faceRow.memberStatus,
+            };
+            break;
+          }
+        }
+      }
+    }
+
     if (!matchedMember) {
       const reason = "Not registered";
 
