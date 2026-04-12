@@ -30,6 +30,7 @@ import {
   tenants,
   subscriptions,
   memberships,
+  faceRegistrations,
 } from "@timeo/db/schema";
 import { eq, and, ilike, desc, or, sql } from "drizzle-orm";
 import { zValidator } from "@hono/zod-validator";
@@ -552,8 +553,7 @@ async function handleZahValidation(c: Context) {
 
     // Try face_registrations lookup if no member found by member_id
     if (!matchedMember) {
-      const { faceRegistrations } = await import("@timeo/db/schema");
-      if (faceRegistrations) {
+      {
         // Try matching device_person_id against the raw cardNo or resolved memberId
         const faceCandidates = [resolved.rawCardNo, resolved.memberId, `${resolved.memberId}_0`].filter(Boolean);
         for (const faceId of faceCandidates) {
