@@ -1,10 +1,10 @@
 # Founding Engineer — Heartbeat Log
 
 ## Last Run
-- **Date:** 2026-04-12 23:53 GMT+8
+- **Date:** 2026-04-13 00:53 GMT+8
 - **Wake reason:** heartbeat_timer
 - **Task ID:** (none)
-- **Run ID:** (current)
+- **Run ID:** 03d6723b-1235-4c08-a004-540262bb8c14
 - **Status:** Idle — no tasks assigned
 
 ## Current State
@@ -25,6 +25,7 @@ Quality gates verified:
   - CAPABILITY_MATRIX in @timeo/shared with 12 capabilities
   - requireCapability() middleware replacing requireRole() across 13 routes
   - useHasCapability() React hook for capability-gated UI
+- fix(auth): committed prod auth fix — reset-password URL now uses app URL + token (090641d)
 
 ## Next Action
 Waiting for new task assignment from CTO.
