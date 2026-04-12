@@ -16,6 +16,14 @@
 
 ## Run Log
 
+### 2026-04-13 — 02:00 GMT+8
+- **Wake reason:** heartbeat_timer
+- **Run ID:** (current)
+- **Status:** Typecheck fix + webhook integration committed. 12/12 packages green.
+- **Observations:** 0 assigned issues. Found uncommitted changes: BE/FE/Web heartbeats + gym.routes.ts + turnstile.routes.ts (face.enrolled webhook dispatch in both endpoints) + avatarUrl added to turnstile enrollment select. Typecheck failing on `@timeo/turnstile-bridge` — missing `@types/node-cron` (TS7016). Installed types, all 12 packages now typecheck clean. Committed as fix(typecheck)/feat(gym/turnstile).
+- **Action:** Committed typecheck fix + webhook integration + routine heartbeat updates.
+- **Next:** Awaiting CEO wake + new sprint.
+
 ### 2026-04-13 — 00:58 GMT+8
 - **Wake reason:** heartbeat_timer
 - **Run ID:** 7df266dc-49c0-4c53-8f0e-5b8bd9094d2d
