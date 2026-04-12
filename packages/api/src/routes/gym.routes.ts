@@ -36,6 +36,21 @@ const app = new Hono();
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const GYM_DEVICE_KEY_SECRET = process.env.GYM_DEVICE_KEY_SECRET ?? "";
+const TURNSTILE_BRIDGE_SECRET = process.env.TURNSTILE_BRIDGE_SECRET ?? "";
+
+function isValidBridgeSecret(value: string | undefined): boolean {
+  if (!TURNSTILE_BRIDGE_SECRET || !value) {
+    return false;
+  }
+
+  const expectedBuf = Buffer.from(TURNSTILE_BRIDGE_SECRET, "utf-8");
+  const actualBuf = Buffer.from(value, "utf-8");
+  if (expectedBuf.length !== actualBuf.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(expectedBuf, actualBuf);
+}
 
 function computeHmac(tenantSlug: string, memberId: string): string {
   return crypto
@@ -428,11 +443,20 @@ app.post(
 
 app.get(
   "/members",
-  authMiddleware,
-  tenantMiddleware,
-  requireRole("admin", "staff"),
+  async (c, next) => {
+    const bridgeSecret = c.req.header("X-Turnstile-Bridge-Secret");
+    if (isValidBridgeSecret(bridgeSecret)) {
+      return next();
+    }
+
+    return authMiddleware(c, async () => {
+      await tenantMiddleware(c, async () => {
+        await requireRole("admin", "staff")(c, next);
+      });
+    });
+  },
   async (c) => {
-    const tenantId = c.get("tenantId");
+    const tenantId = c.get("tenantId") ?? c.req.query("tenantId");
     const search = c.req.query("search") ?? "";
     const page = Math.max(1, parseInt(c.req.query("page") ?? "1", 10));
     const limit = Math.min(100, Math.max(1, parseInt(c.req.query("limit") ?? "20", 10)));
@@ -506,11 +530,20 @@ app.get(
 
 app.get(
   "/members/:memberId",
-  authMiddleware,
-  tenantMiddleware,
-  requireRole("admin", "staff"),
+  async (c, next) => {
+    const bridgeSecret = c.req.header("X-Turnstile-Bridge-Secret");
+    if (isValidBridgeSecret(bridgeSecret)) {
+      return next();
+    }
+
+    return authMiddleware(c, async () => {
+      await tenantMiddleware(c, async () => {
+        await requireRole("admin", "staff")(c, next);
+      });
+    });
+  },
   async (c) => {
-    const tenantId = c.get("tenantId");
+    const tenantId = c.get("tenantId") ?? c.req.query("tenantId");
     const memberId = c.req.param("memberId");
 
     try {

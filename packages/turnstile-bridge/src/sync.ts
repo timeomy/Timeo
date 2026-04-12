@@ -90,6 +90,10 @@ function buildAuthHeaders(config: BridgeConfig): Record<string, string> {
       : `Bearer ${config.timeoApiToken}`;
   }
 
+  if (config.turnstileBridgeSecret) {
+    headers["X-Turnstile-Bridge-Secret"] = config.turnstileBridgeSecret;
+  }
+
   return headers;
 }
 
@@ -137,13 +141,7 @@ async function fetchImageBase64(
   try {
     const response = await fetch(absoluteUrl, {
       method: "GET",
-      headers: config.timeoApiToken
-        ? {
-            Authorization: config.timeoApiToken.toLowerCase().startsWith("bearer ")
-              ? config.timeoApiToken
-              : `Bearer ${config.timeoApiToken}`,
-          }
-        : undefined,
+      headers: buildAuthHeaders(config),
       signal: controller.signal,
     });
 

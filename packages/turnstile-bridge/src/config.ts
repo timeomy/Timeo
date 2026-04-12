@@ -58,6 +58,7 @@ export interface BridgeConfig {
   webhookSecret: string;
   timeoApiUrl: string;
   timeoApiToken: string | null;
+  turnstileBridgeSecret: string | null;
   timeoTenantId: string | null;
   timeoActiveMembersEndpoint: string | null;
   syncIntervalHours: number;
@@ -88,6 +89,7 @@ export const config: BridgeConfig = {
   ),
   timeoApiUrl: readString(process.env.TIMEO_API_URL, "https://api.timeo.my"),
   timeoApiToken: readOptionalString(process.env.TIMEO_API_TOKEN),
+  turnstileBridgeSecret: readOptionalString(process.env.TURNSTILE_BRIDGE_SECRET),
   timeoTenantId,
   timeoActiveMembersEndpoint: membersEndpoint,
   syncIntervalHours,
