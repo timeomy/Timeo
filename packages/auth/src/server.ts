@@ -45,8 +45,11 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
-    sendResetPassword: async ({ user, url }) => {
-      const safeUrl = url.replace(/[<>"'&]/g, "");
+    sendResetPassword: async ({ user, token, url }) => {
+      const resetPasswordUrl = token
+        ? `${appUrl.replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(token)}`
+        : url;
+      const safeUrl = resetPasswordUrl.replace(/[<>"']/g, "");
       const email = passwordResetEmail({
         name: user.name || user.email,
         url: safeUrl,
