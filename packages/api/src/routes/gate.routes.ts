@@ -553,41 +553,24 @@ async function handleZahValidation(c: Context) {
 
     // Try face_registrations lookup if no member found by member_id
     if (!matchedMember) {
-      {
-        // Try matching device_person_id against the raw cardNo or resolved memberId
-        // Build all possible face ID variants
-        const rawId = resolved.memberId;
-        const faceCandidates = [...new Set([rawId, `${rawId}_0`, rawId.replace(/_0$/, '')])];
-        const [faceRow] = await db
-          .select({
-            userId: tenantMemberships.user_id,
-            memberId: tenantMemberships.member_id,
-            memberName: users.name,
-            memberStatus: tenantMemberships.status,
-          })
-          .from(faceRegistrations)
-          .innerJoin(tenantMemberships, and(
-            eq(tenantMemberships.user_id, faceRegistrations.user_id),
-            eq(tenantMemberships.tenant_id, tenantId),
-          ))
-          .innerJoin(users, eq(tenantMemberships.user_id, users.id))
-          .where(
-            and(
-              eq(faceRegistrations.tenant_id, tenantId),
-              or(
-                ...faceCandidates.map(c => eq(faceRegistrations.device_person_id, c))
-              ),
-            ),
-          )
-          .limit(1);
-        if (faceRow) {
-          matchedMember = {
-            userId: faceRow.userId,
-            memberId: faceRow.memberId,
-            memberName: faceRow.memberName ?? "Member",
-            memberStatus: faceRow.memberStatus,
-          };
-        }
+      const rawId = resolved.memberId;
+      const faceResults = await db.execute(
+        sql`SELECT tm.user_id as "userId", tm.member_id as "memberId", u.name as "memberName", tm.status as "memberStatus"
+            FROM face_registrations fr
+            JOIN tenant_memberships tm ON tm.user_id = fr.user_id AND tm.tenant_id = ${tenantId}
+            JOIN users u ON tm.user_id = u.id
+            WHERE fr.tenant_id = ${tenantId}
+            AND fr.device_person_id IN (${rawId}, ${rawId + '_0'}, ${rawId.replace(/_0$/, '')})
+            LIMIT 1`
+      );
+      const faceRow = faceResults.rows?.[0];
+      if (faceRow) {
+        matchedMember = {
+          userId: String(faceRow.userId),
+          memberId: faceRow.memberId ? String(faceRow.memberId) : null,
+          memberName: String(faceRow.memberName ?? "Member"),
+          memberStatus: String(faceRow.memberStatus),
+        };
       }
     }
 
