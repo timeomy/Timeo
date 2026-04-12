@@ -209,7 +209,6 @@ export default function ProfilePage() {
 
   const passwordValid = useMemo(() => {
     return (
-      passwordForm.current.length > 0 &&
       passwordForm.next.length >= 8 &&
       passwordForm.next === passwordForm.confirm
     );
@@ -225,9 +224,10 @@ export default function ProfilePage() {
 
     try {
       await changePasswordMutation.mutateAsync({
-        currentPassword: passwordForm.current,
+        currentPassword: passwordForm.current || undefined,
         newPassword: passwordForm.next,
-      });
+        revokeOtherSessions: false,
+      } as any);
 
       setPasswordSuccess(true);
       setPasswordForm({ current: "", next: "", confirm: "" });
@@ -422,7 +422,7 @@ export default function ProfilePage() {
               }))
             }
             className="h-11 rounded-xl border-white/[0.1] bg-white/[0.03]"
-            placeholder="Current password"
+            placeholder="Current password (optional)"
           />
           <Input
             type="password"
