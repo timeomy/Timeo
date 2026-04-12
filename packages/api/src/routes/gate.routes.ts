@@ -489,6 +489,7 @@ async function handleZahValidation(c: Context) {
     }
 
     const cardNo = typeof payload.cardNo === "string" ? payload.cardNo : "";
+    console.log(`[ZAH DEBUG] cmd=${cmd} cardNo="${cardNo}" eventNo=${eventNo} payload=${JSON.stringify(payload).slice(0, 500)}`);
     const resolved = resolveMemberIdFromCardNo(cardNo);
 
     if (!resolved.memberId) {
@@ -573,6 +574,7 @@ async function handleZahValidation(c: Context) {
       }
     }
 
+    console.log(`[ZAH DEBUG] matchedMember=${JSON.stringify(matchedMember)} resolved=${JSON.stringify(resolved)}`);
     if (!matchedMember) {
       const reason = "Not registered";
 
