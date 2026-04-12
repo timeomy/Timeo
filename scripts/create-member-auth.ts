@@ -1,8 +1,13 @@
-import "dotenv/config";
-
 import postgres, { type Sql } from "postgres";
+import { randomBytes } from "crypto";
 
-import { generateId } from "../packages/db/src/id";
+function generateId(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = randomBytes(21);
+  let id = '';
+  for (let i = 0; i < 21; i++) id += chars[bytes[i] % chars.length];
+  return id;
+}
 
 const WS_FITNESS_TENANT_ID = "7Kw87VeAnXg4qDXi6UTbu";
 const DEFAULT_PASSWORD = "WsGym2026";

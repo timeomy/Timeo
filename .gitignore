@@ -58,3 +58,4 @@ _legacy/
 
 # Temporary working files (hardware integration, scratch)
 .tmp-*
+.tmp/
