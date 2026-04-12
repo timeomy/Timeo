@@ -30,9 +30,8 @@ import {
   tenants,
   subscriptions,
   memberships,
-  faceRegistrations,
 } from "@timeo/db/schema";
-import { eq, and, ilike, desc, or, sql } from "drizzle-orm";
+import { eq, and, desc, or, sql } from "drizzle-orm";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { authMiddleware } from "../middleware/auth.js";
@@ -563,7 +562,7 @@ async function handleZahValidation(c: Context) {
             AND fr.device_person_id IN (${rawId}, ${rawId + '_0'}, ${rawId.replace(/_0$/, '')})
             LIMIT 1`
       );
-      const faceRow = (faceResults.rows ?? faceResults)?.[0];
+      const faceRow = (faceResults as any[])?.[0];
       if (faceRow) {
         matchedMember = {
           userId: String(faceRow.userId),
@@ -926,7 +925,7 @@ app.post("/validate-card", zValidator("json", ValidateCardSchema), async (c) => 
             AND fr.device_person_id IN (${rawId}, ${rawId + "_0"}, ${rawId.replace(/_0$/, "")})
             LIMIT 1`,
       );
-      const faceRow = (faceResults.rows ?? faceResults)?.[0];
+      const faceRow = (faceResults as any[])?.[0];
 
       if (faceRow) {
         matchedMember = {
@@ -1076,7 +1075,7 @@ app.post("/validate-qr", zValidator("json", ValidateQrSchema), async (c) => {
             AND fr.device_person_id IN (${rawId}, ${rawId + "_0"}, ${rawId.replace(/_0$/, "")})
             LIMIT 1`,
       );
-      const faceRow = (faceResults.rows ?? faceResults)?.[0];
+      const faceRow = (faceResults as any[])?.[0];
 
       if (faceRow) {
         matchedMember = {
