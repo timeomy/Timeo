@@ -555,37 +555,38 @@ async function handleZahValidation(c: Context) {
     if (!matchedMember) {
       {
         // Try matching device_person_id against the raw cardNo or resolved memberId
-        const faceCandidates = [resolved.rawCardNo, resolved.memberId, `${resolved.memberId}_0`].filter(Boolean);
-        for (const faceId of faceCandidates) {
-          const [faceRow] = await db
-            .select({
-              userId: tenantMemberships.user_id,
-              memberId: tenantMemberships.member_id,
-              memberName: users.name,
-              memberStatus: tenantMemberships.status,
-            })
-            .from(faceRegistrations)
-            .innerJoin(tenantMemberships, and(
-              eq(tenantMemberships.user_id, faceRegistrations.user_id),
-              eq(tenantMemberships.tenant_id, tenantId),
-            ))
-            .innerJoin(users, eq(tenantMemberships.user_id, users.id))
-            .where(
-              and(
-                eq(faceRegistrations.tenant_id, tenantId),
-                sql`${faceRegistrations.device_person_id} IN (${faceId}, ${faceId + '_0'})`,
+        // Build all possible face ID variants
+        const rawId = resolved.memberId;
+        const faceCandidates = [...new Set([rawId, `${rawId}_0`, rawId.replace(/_0$/, '')])];
+        const [faceRow] = await db
+          .select({
+            userId: tenantMemberships.user_id,
+            memberId: tenantMemberships.member_id,
+            memberName: users.name,
+            memberStatus: tenantMemberships.status,
+          })
+          .from(faceRegistrations)
+          .innerJoin(tenantMemberships, and(
+            eq(tenantMemberships.user_id, faceRegistrations.user_id),
+            eq(tenantMemberships.tenant_id, tenantId),
+          ))
+          .innerJoin(users, eq(tenantMemberships.user_id, users.id))
+          .where(
+            and(
+              eq(faceRegistrations.tenant_id, tenantId),
+              or(
+                ...faceCandidates.map(c => eq(faceRegistrations.device_person_id, c))
               ),
-            )
-            .limit(1);
-          if (faceRow) {
-            matchedMember = {
-              userId: faceRow.userId,
-              memberId: faceRow.memberId,
-              memberName: faceRow.memberName ?? "Member",
-              memberStatus: faceRow.memberStatus,
-            };
-            break;
-          }
+            ),
+          )
+          .limit(1);
+        if (faceRow) {
+          matchedMember = {
+            userId: faceRow.userId,
+            memberId: faceRow.memberId,
+            memberName: faceRow.memberName ?? "Member",
+            memberStatus: faceRow.memberStatus,
+          };
         }
       }
     }
