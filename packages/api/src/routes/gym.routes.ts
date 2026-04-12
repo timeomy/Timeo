@@ -22,6 +22,7 @@ import { requireCapability, requireRole } from "../middleware/rbac.js";
 import { success, error } from "../lib/response.js";
 import * as CheckInService from "../services/check-in.service.js";
 import * as AccessControlService from "../services/access-control.service.js";
+import { dispatchTurnstileWebhook } from "../services/turnstile-webhook.service.js";
 import { generateId } from "@timeo/db";
 import { user as authUser, account as authAccount } from "@timeo/db/schema";
 
@@ -1154,6 +1155,14 @@ app.post(
           updated_at: new Date(),
         })
         .where(eq(users.id, memberId));
+
+      dispatchTurnstileWebhook({
+        event: "face.enrolled",
+        tenantId,
+        userId: memberId,
+        memberId,
+        faceImageUrl: body.photoUrl,
+      });
 
       return c.json(
         success({

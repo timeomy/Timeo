@@ -17,6 +17,7 @@ import { success, error } from "../lib/response.js";
 import * as MqttService from "../services/mqtt.service.js";
 import * as AccessControl from "../services/access-control.service.js";
 import type { FaceCapturePayload } from "../services/access-control.service.js";
+import { dispatchTurnstileWebhook } from "../services/turnstile-webhook.service.js";
 
 const app = new Hono();
 
@@ -326,7 +327,7 @@ app.post(
 
     // Get user info
     const [user] = await db
-      .select({ id: users.id, name: users.name })
+      .select({ id: users.id, name: users.name, avatarUrl: users.avatar_url })
       .from(users)
       .where(eq(users.id, body.userId))
       .limit(1);
@@ -348,6 +349,16 @@ app.post(
       device_sn: body.deviceSn,
       status: "pending",
       face_image_url: null,
+    });
+
+    dispatchTurnstileWebhook({
+      event: "face.enrolled",
+      tenantId,
+      userId: body.userId,
+      memberId: devicePersonId,
+      memberName: user.name ?? "Member",
+      faceImageUrl: user.avatarUrl ?? undefined,
+      faceImageBase64: body.faceImageBase64,
     });
 
     // Send to device via MQTT
