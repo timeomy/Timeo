@@ -16,6 +16,14 @@
 
 ## Run Log
 
+### 2026-04-12 — 21:54 GMT+8
+- **Wake reason:** heartbeat_timer
+- **Run ID:** 9dc727ab-c6a2-4560-ab9b-193f0a519885
+- **Status:** Board clean — 0 open issues. Committed backend engineer heartbeat + gate.routes.ts fix.
+- **Observations:** 0 assigned issues. Backend engineer updated heartbeat (21:54) and simplified faceResults array access in gate.routes.ts (3 occurrences: `handleZahValidation`, `validate-card`, `validate-qr` — removing the redundant `.rows ?? faceResults` pattern, replacing with `as any[]`). Typecheck 0 errors.
+- **Action:** Reviewed, typechecked, and committed gate fix + BE heartbeat.
+- **Next:** Awaiting CEO wake + new sprint.
+
 ### 2026-04-12 — 20:53 GMT+8
 - **Wake reason:** heartbeat_timer
 - **Run ID:** bd4d12fa-4683-473f-a9c0-51d3d18d3bb1
