@@ -136,7 +136,6 @@ async function start(): Promise<void> {
   });
 
   scheduledTask.start();
-  void triggerFullSync("startup");
 }
 
 async function shutdown(signal: string): Promise<void> {
