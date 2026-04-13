@@ -55,7 +55,7 @@ async function triggerFullSync(source: string) {
       source,
       message: (error as Error).message,
     });
-    throw error;
+    return null;
   } finally {
     syncInProgress = false;
   }
