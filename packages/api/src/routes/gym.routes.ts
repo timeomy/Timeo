@@ -456,7 +456,7 @@ app.get(
     });
   },
   async (c) => {
-    const tenantId = c.get("tenantId") ?? c.req.query("tenantId");
+    const tenantId = c.get("tenantId") ?? c.req.query("tenantId") ?? "";
     const search = c.req.query("search") ?? "";
     const page = Math.max(1, parseInt(c.req.query("page") ?? "1", 10));
     const limit = Math.min(100, Math.max(1, parseInt(c.req.query("limit") ?? "20", 10)));
@@ -543,7 +543,7 @@ app.get(
     });
   },
   async (c) => {
-    const tenantId = c.get("tenantId") ?? c.req.query("tenantId");
+    const tenantId = c.get("tenantId") ?? c.req.query("tenantId") ?? "";
     const memberId = c.req.param("memberId");
 
     try {
