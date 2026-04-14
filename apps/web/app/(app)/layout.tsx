@@ -505,11 +505,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isLoaded || tenantsLoading) return;
     if (!isSignedIn) { router.replace("/sign-in"); return; }
-    if (activeRole === "platform_admin") { router.replace("/admin"); return; }
     if (tenants.length === 0) { router.replace("/portal"); return; }
     if (!hasStaffMembership) { router.replace("/portal"); return; }
     if (userProfile?.force_password_reset) { router.replace("/change-password"); return; }
-  }, [isLoaded, tenantsLoading, isSignedIn, tenants, activeRole, hasStaffMembership, userProfile, router]);
+  }, [isLoaded, tenantsLoading, isSignedIn, tenants, hasStaffMembership, userProfile, router]);
 
   if (!isLoaded || tenantsLoading) {
     return (
