@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTimeoWebAuthContext, useTimeoWebTenantContext } from "@timeo/auth/web";
-import { useTenant } from "@timeo/api-client";
 import { getInitials } from "@timeo/shared";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
 import {
@@ -12,7 +11,6 @@ import {
   AvatarImage,
   AvatarFallback,
   Separator,
-  Skeleton,
   cn,
 } from "@timeo/ui/web";
 import { TimeoLogo } from "@/timeo-logo";
@@ -32,8 +30,6 @@ import {
   Menu,
   LogOut,
   Shield,
-  ChevronDown,
-  Check,
 } from "lucide-react";
 
 type SidebarLink = {
@@ -56,65 +52,6 @@ const sidebarLinks: SidebarLink[] = [
   { href: "/admin/integrations", label: "API Keys", icon: Key },
   { href: "/admin/data", label: "Data", icon: Database },
 ];
-
-function TenantSwitcher() {
-  const { tenants, activeTenant, switchTenant, isLoading } = useTimeoWebTenantContext();
-  const { data: switcherTenantData } = useTenant(activeTenant?.id);
-  const switcherLogoUrl: string | null = (switcherTenantData as any)?.branding?.logoUrl ?? null;
-  const [open, setOpen] = useState(false);
-
-  if (isLoading) return <Skeleton className="h-10 w-full rounded-lg" />;
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-3 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.06]"
-      >
-        <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-md bg-primary/10">
-          {switcherLogoUrl ? (
-            <img src={switcherLogoUrl} alt={activeTenant?.name || ""} className="h-8 w-8 rounded-md object-cover" />
-          ) : (
-            <Building2 className="h-4 w-4 text-primary" />
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">
-            {activeTenant?.name ?? "Select Business"}
-          </p>
-          {activeTenant?.slug && (
-            <p className="truncate text-xs text-muted-foreground">@{activeTenant.slug}</p>
-          )}
-        </div>
-        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-64 overflow-y-auto rounded-xl border border-white/[0.08] bg-[#1a1a2e] p-1.5 shadow-xl">
-            {tenants.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => {
-                  switchTenant(t.id);
-                  setOpen(false);
-                }}
-                className={cn(
-                  "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-white/[0.06]",
-                  activeTenant?.id === t.id && "bg-primary/10"
-                )}
-              >
-                <span className="flex-1 truncate">{t.name}</span>
-                {activeTenant?.id === t.id && <Check className="h-4 w-4 text-primary" />}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -288,41 +225,18 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
       {/* Main Content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Mobile Header */}
-        <header className="glass-nav border-b border-white/[0.06] lg:hidden">
-          <div className="flex h-14 items-center gap-3 px-4">
-            <button
-              onClick={() => setMobileOpen(true)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-white/[0.06]"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-            <div className="flex items-center gap-2">
-              <TimeoLogo size="sm" />
-              <span className="text-xs text-muted-foreground">C2</span>
-            </div>
-          </div>
-          <div className="px-4 pb-3">
-            <TenantSwitcher />
+        <header className="glass-nav flex h-14 items-center gap-3 px-4 lg:hidden">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-white/[0.06]"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <div className="flex items-center gap-2">
+            <TimeoLogo size="sm" />
+            <span className="text-xs text-muted-foreground">C2</span>
           </div>
         </header>
-
-        <header className="hidden h-16 items-center border-b border-white/[0.06] px-6 lg:flex">
-          <div className="w-full max-w-sm">
-            <TenantSwitcher />
-          </div>
-        </header>
-
-        <div className="border-b border-white/[0.06] bg-card/30 px-4 py-3 sm:px-6 lg:px-8">
-          <div className="mx-auto flex max-w-7xl flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/35">Workspace</p>
-              <p className="text-sm text-white/60">Switch business and module here</p>
-            </div>
-            <div className="w-full lg:max-w-sm">
-              <TenantSwitcher />
-            </div>
-          </div>
-        </div>
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto">
