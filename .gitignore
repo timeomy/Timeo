@@ -54,3 +54,7 @@ yarn-error.log*
 
 # Legacy
 _legacy/
+
+# Temporary scratch files (may contain credentials)
+.tmp-*
+.tmp/
