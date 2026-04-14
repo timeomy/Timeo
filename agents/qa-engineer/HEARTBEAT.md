@@ -1,3 +1,87 @@
+# QA Engineer Heartbeat — April 15, 2026 (Updated)
+
+## Recent Work: Coverage Infrastructure (April 15, 2026)
+
+### Coverage Reporting Infrastructure — COMPLETE
+**Date:** 2026-04-15 04:20 GMT+8  
+**Commit:** 1d85ff3  
+**Status:** ✅ OPERATIONAL
+
+#### What Was Done
+1. **Vitest Coverage Configuration**
+   - Added coverage-v8 provider (HTML, LCOV, JSON reports)
+   - Configured realistic Phase 1 thresholds:
+     - Lines: 7% (currently passing at 7.31%)
+     - Functions: 7%
+     - Branches: 65%
+   
+2. **Test Coverage Analysis Document**
+   - Created `TEST_COVERAGE_ANALYSIS.md` with strategic overview
+   - Documented well-tested modules (auth, health, gym, tenants)
+   - Identified coverage gaps (services, jobs, socket.io)
+   - Outlined Phase 2/3 improvement strategy
+
+3. **Test Script & Local Generation**
+   - Added `test:coverage` script in `packages/api/package.json`
+   - Generates HTML reports at `coverage/index.html`
+   - LCOV output for CI/CD integration
+
+#### Current Test Metrics
+- **Test Files:** 10 passed (all integrations)
+- **Tests:** 91 passed | 12 todo = 103 total
+- **Coverage:** 7.31% lines (Phase 1 threshold: 7%) ✅ PASS
+- **TypeScript:** 0 errors across monorepo ✅ PASS
+
+#### Key Insight
+Coverage is intentionally low for Phase 1 (7%) because:
+- Phase 1 focuses on MVP features with critical path testing
+- Phase 2 will expand with TDD (50%+ target for new code)
+- Phase 3 will bring overall coverage to 60-70%
+- Long-term goal remains 80%+ for public APIs
+
+#### CI/CD Integration — STARTED
+1. ✅ **Added coverage reporting to GitHub Actions** (Commit: 791afd3)
+   - Added `test:coverage` step to `api-tests.yml`
+   - Upload coverage artifacts for trend tracking
+   - Generate coverage summary for regression detection
+   
+2. ⏳ **Recommended Future Steps**
+   - Fail PR if coverage regresses below 7%
+   - Generate coverage badges in README
+   - Upload to Codecov for trend tracking
+
+---
+
+## Session Summary — April 15, 2026 (Current)
+
+### Status Verification Completed
+- ✅ API Tests: 91 passed | 12 todo (103 total)
+- ✅ TypeScript: 0 errors across 11 packages
+- ✅ Coverage: 7.31% lines (Phase 1 threshold: 7%) PASS
+- ⏳ E2E Tests: Running (auth, onboarding, bookings, platform flows)
+
+### Work Completed This Session
+1. **Coverage infrastructure verification** — Confirmed vitest, coverage-v8, HTML/LCOV reporting operational
+2. **GitHub Actions improvement** (Commit: 791afd3) — Added coverage reporting step to API test workflow
+3. **Status documentation** — Updated HEARTBEAT with current test metrics and CI/CD progress
+
+### Quality Gate Summary
+| Metric | Value | Status |
+|--------|-------|--------|
+| Test Files | 10 passed | ✅ |
+| Total Tests | 91 passed | ✅ |
+| Coverage Lines | 7.31% | ✅ PASS |
+| TypeScript | 0 errors | ✅ |
+| Phase 1 Threshold | 7% | ✅ |
+
+### Next Steps
+1. Verify E2E tests pass successfully
+2. Prepare post-deployment smoke tests for Dokploy
+3. Monitor coverage trends as Phase 2 features are added with TDD
+4. Plan Codecov integration for better historical tracking
+
+---
+
 # QA Engineer Heartbeat — March 10, 2026 (Updated)
 
 ## Sprint TIM-3: Production Readiness — Wave 3 Update
