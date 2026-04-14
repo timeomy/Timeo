@@ -551,32 +551,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {/* Main Content */}
           <div className="flex flex-1 flex-col overflow-hidden">
             {/* Mobile Header */}
-            <header className="glass-nav border-b border-white/[0.06] lg:hidden">
-              <div className="flex h-14 items-center gap-3 px-4">
-                <button
-                  onClick={() => setMobileOpen(true)}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-white/[0.06]"
-                >
-                  <Menu className="h-5 w-5" />
-                </button>
-                <div className="flex flex-1 items-center gap-2">
-                  <TimeoLogo size="sm" />
-                </div>
-                <div className="flex items-center gap-2">
-                  <NotificationsBell />
-                </div>
+            <header className="glass-nav flex h-14 items-center gap-3 px-4 lg:hidden">
+              <button
+                onClick={() => setMobileOpen(true)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-white/[0.06]"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              <div className="flex flex-1 items-center gap-2">
+                <TimeoLogo size="sm" />
               </div>
-              <div className="px-4 pb-3">
-                <TenantSwitcher />
+              <div className="flex items-center gap-2">
+                <NotificationsBell />
               </div>
             </header>
 
             {/* Desktop Top Bar */}
-            <header className="hidden h-16 items-center justify-between border-b border-white/[0.06] px-6 lg:flex">
-              <div className="w-full max-w-sm">
-                <TenantSwitcher />
-              </div>
-              <div className="flex items-center gap-2 pl-4">
+            <header className="hidden h-12 items-center justify-end border-b border-white/[0.06] px-6 lg:flex">
+              <div className="flex items-center gap-2">
                 <NotificationsBell />
               </div>
             </header>
