@@ -42,22 +42,6 @@ function TimeoWebAuthInner({
   const isSignedIn = !!session.data?.user;
   const isLoaded = !session.isPending;
 
-  const persistActiveTenantId = React.useCallback((tenantId: string | null) => {
-    setActiveTenantId(tenantId);
-
-    if (typeof window === "undefined") return;
-
-    try {
-      if (tenantId) {
-        window.localStorage.setItem(ACTIVE_TENANT_STORAGE_KEY, tenantId);
-      } else {
-        window.localStorage.removeItem(ACTIVE_TENANT_STORAGE_KEY);
-      }
-    } catch {
-      // localStorage may be unavailable in private mode; ignore safely.
-    }
-  }, []);
-
   const tenants = externalTenants ?? [];
   const preferredTenant = getPreferredTenant(tenants, activeTenantId);
   const resolvedTenantId = preferredTenant?.id ?? null;
@@ -89,7 +73,7 @@ function TimeoWebAuthInner({
       },
       activeTenantId: resolvedTenantId,
       activeRole,
-      setActiveTenant: persistActiveTenantId,
+      setActiveTenant: setActiveTenantId,
       isPlatformAdmin,
       viewMode,
       setViewMode,
@@ -100,17 +84,31 @@ function TimeoWebAuthInner({
     return {
       tenants,
       activeTenant: preferredTenant,
-      switchTenant: persistActiveTenantId,
+      switchTenant: setActiveTenantId,
       isLoading: tenantsLoading ?? false,
     };
-  }, [tenants, preferredTenant, tenantsLoading, persistActiveTenantId]);
+  }, [tenants, preferredTenant, tenantsLoading]);
 
   // Keep selected tenant valid and prefer elevated memberships over customer-only profiles.
   React.useEffect(() => {
     if (resolvedTenantId !== activeTenantId) {
-      persistActiveTenantId(resolvedTenantId);
+      setActiveTenantId(resolvedTenantId);
     }
-  }, [activeTenantId, resolvedTenantId, persistActiveTenantId]);
+  }, [activeTenantId, resolvedTenantId]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      if (activeTenantId) {
+        window.localStorage.setItem(ACTIVE_TENANT_STORAGE_KEY, activeTenantId);
+      } else {
+        window.localStorage.removeItem(ACTIVE_TENANT_STORAGE_KEY);
+      }
+    } catch {
+      // localStorage may be unavailable in private mode; ignore safely.
+    }
+  }, [activeTenantId]);
 
   return (
     <TimeoWebAuthCtx.Provider value={authContext}>

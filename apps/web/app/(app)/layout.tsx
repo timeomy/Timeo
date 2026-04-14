@@ -279,27 +279,20 @@ function ViewModeSwitcher() {
             </button>
 
             <div className="space-y-3">
-              {tenants.map((tenant) => {
-                const isActive = viewMode === "tenant" && activeTenant?.id === tenant.id;
-                const destinations = [
-                  { label: "Admin", href: "/dashboard" },
-                  { label: "Staff", href: "/dashboard/bookings" },
-                  { label: "Coach", href: "/dashboard/my-clients" },
-                  { label: "Member", href: "/portal" },
-                ];
-
-                return (
-                  <div key={tenant.id} className="rounded-lg border border-white/[0.06] p-3">
-                    <p className="text-sm font-medium text-white">{tenant.name}</p>
-                    {tenant.slug && <p className="mb-2 text-xs text-white/40">@{tenant.slug}</p>}
-                    <div className="grid grid-cols-4 gap-2">
-                      {destinations.map((destination) => (
+              {tenants.map((tenant) => (
+                <div key={tenant.id} className="rounded-lg border border-white/[0.06] p-3">
+                  <p className="text-sm font-medium text-white">{tenant.name}</p>
+                  {tenant.slug && <p className="mb-2 text-xs text-white/40">@{tenant.slug}</p>}
+                  <div className="grid grid-cols-4 gap-2">
+                    {(["Admin", "Staff", "Coach", "Member"] as const).map((roleLabel) => {
+                      const isActive = viewMode === "tenant" && activeTenant?.id === tenant.id && roleLabel === "Admin";
+                      return (
                         <button
-                          key={destination.label}
+                          key={roleLabel}
                           onClick={() => {
                             switchTenant(tenant.id);
                             setViewMode("tenant");
-                            router.push(destination.href);
+                            router.push("/dashboard");
                             setOpen(false);
                           }}
                           className={cn(
@@ -309,13 +302,13 @@ function ViewModeSwitcher() {
                               : "border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
                           )}
                         >
-                          {destination.label}
+                          {roleLabel}
                         </button>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           </div>
         </>
