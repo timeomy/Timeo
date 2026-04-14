@@ -620,7 +620,7 @@ function CoachSection({ tenantId }: { tenantId: string }) {
 }
 
 // ─── Tab Content ──────────────────────────────────────────────────────────────
-type Tab = "broadcasts" | "catalog" | "vouchers" | "qr";
+type Tab = "broadcasts" | "catalog" | "vouchers";
 
 // ─── Gym Header ───────────────────────────────────────────────────────────────
 type TenantData = {
@@ -689,7 +689,6 @@ function TenantDashboard({ tenantId, firstName }: { tenantId: string; firstName:
     { id: "broadcasts", label: "Feed", icon: Megaphone },
     { id: "catalog", label: "Catalog", icon: Tag },
     { id: "vouchers", label: "Vouchers", icon: ShoppingBag },
-    { id: "qr", label: "My QR", icon: QrCode },
   ];
 
   return (
@@ -722,6 +721,13 @@ function TenantDashboard({ tenantId, firstName }: { tenantId: string; firstName:
             </button>
           );
         })}
+        <Link
+          href="/portal/qr-code"
+          className="flex shrink-0 items-center gap-2 rounded-full bg-white/[0.06] px-4 py-2 text-sm font-semibold text-white/60 transition-all hover:bg-white/[0.1] hover:text-white"
+        >
+          <QrCode className="h-3.5 w-3.5" />
+          My QR
+        </Link>
       </div>
 
       {/* 3. Tab Content */}
@@ -821,25 +827,6 @@ function TenantDashboard({ tenantId, firstName }: { tenantId: string; firstName:
         </div>
       )}
 
-      {activeTab === "qr" && (
-        <div className="space-y-4">
-          <div className="text-center">
-            <h2 className="text-lg font-bold text-white">My Check-in QR</h2>
-            <p className="text-sm text-white/40 mt-1">Show this to check in at the gym</p>
-          </div>
-          <Card className="glass border-emerald-500/20 bg-emerald-500/5">
-            <CardContent className="p-8">
-              <QrSection tenantId={tenantId} />
-              {/* Member identity below QR */}
-              <div className="mt-6 text-center border-t border-white/[0.06] pt-6">
-                <p className="text-xs font-semibold uppercase tracking-widest text-white/30 mb-1">Member</p>
-                <p className="text-xl font-bold text-white">{firstName}</p>
-                <p className="text-sm text-white/40 mt-0.5">{gymName}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }
