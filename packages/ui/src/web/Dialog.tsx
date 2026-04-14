@@ -74,12 +74,12 @@ const DialogContent = React.forwardRef<
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:items-center sm:p-4">
       <DialogOverlay />
       <div
         ref={ref}
         className={cn(
-          "relative z-50 grid w-full max-w-lg gap-4 rounded-2xl border bg-background p-6 shadow-lg duration-200 animate-in fade-in-0 zoom-in-95",
+          "relative z-50 grid max-h-[calc(100dvh-1.5rem-env(safe-area-inset-bottom))] w-full max-w-lg gap-4 overflow-y-auto rounded-2xl border bg-background p-6 shadow-lg duration-200 animate-in fade-in-0 zoom-in-95 sm:max-h-[calc(100dvh-2rem)]",
           className
         )}
         {...props}

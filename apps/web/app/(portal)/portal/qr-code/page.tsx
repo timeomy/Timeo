@@ -12,7 +12,63 @@ import {
   cn,
 } from "@timeo/ui/web";
 import { QRCodeSVG } from "qrcode.react";
-import { QrCode, RefreshCw, Printer, Download } from "lucide-react";
+import { AlertTriangle, CheckCircle2, QrCode, RefreshCw, Printer } from "lucide-react";
+
+function getAccessCopy(reason?: string, allowed?: boolean) {
+  if (allowed === false) {
+    if (reason === "subscription_expired") {
+      return {
+        badge: "Expired",
+        title: "Door access paused",
+        detail: "Your membership plan has ended. Renew your plan to restore access.",
+      };
+    }
+
+    if (reason === "membership_suspended") {
+      return {
+        badge: "Suspended",
+        title: "Door access paused",
+        detail: "Your gym membership is suspended right now. Please contact the gym team for help.",
+      };
+    }
+
+    if (reason === "membership_inactive") {
+      return {
+        badge: "Inactive",
+        title: "Door access paused",
+        detail: "Your member profile is inactive, so scans will be declined until it is reactivated.",
+      };
+    }
+
+    if (reason === "payment_pending_verification") {
+      return {
+        badge: "Pending review",
+        title: "Waiting for payment review",
+        detail: "Your latest payment is still being verified. Access will turn on automatically once it is approved.",
+      };
+    }
+
+    if (reason === "payment_rejected") {
+      return {
+        badge: "Payment issue",
+        title: "Payment needs attention",
+        detail: "Your latest payment was rejected. Submit a new payment or contact the gym team.",
+      };
+    }
+
+    return {
+      badge: "Unavailable",
+      title: "Access unavailable",
+      detail: "This QR is still yours, but the scanner will deny entry until your access is restored.",
+    };
+  }
+
+  return {
+    badge: "Access live",
+    title: "Ready to scan",
+    detail: "Your access is active. This page refreshes automatically to match your latest membership status.",
+  };
+}
 
 export default function QrCodePage() {
   const { user } = useTimeoWebAuthContext();
@@ -26,6 +82,7 @@ export default function QrCodePage() {
   const displayName = user
     ? user.name || user.email || "Member"
     : "Member";
+  const accessCopy = getAccessCopy(qrCode?.access?.reason, qrCode?.access?.allowed);
 
   async function handleGenerate() {
     if (!tenantId) return;
@@ -113,7 +170,7 @@ export default function QrCodePage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-white">QR Code</h1>
-        <p className="text-sm text-white/50">Show this code at the front desk to check in</p>
+        <p className="text-sm text-white/50">Show this code at the downstairs door scanner</p>
       </div>
 
       {/* QR Code Display */}
@@ -121,8 +178,7 @@ export default function QrCodePage() {
         {qrCode ? (
           <Card className="glass border-white/[0.08] w-full max-w-sm">
             <CardContent className="flex flex-col items-center p-6">
-              {/* Member Info */}
-              <div className="mb-6 text-center">
+              <div className="mb-4 text-center">
                 <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/20 text-base font-bold text-primary">
                   {(displayName[0] ?? "M").toUpperCase()}
                 </div>
@@ -132,31 +188,55 @@ export default function QrCodePage() {
                 )}
               </div>
 
-              {/* Real QR Code — Large & Centered */}
+              <div className="mb-6 w-full rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 text-left">
+                <div className="flex items-start gap-3">
+                  <div
+                    className={cn(
+                      "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+                      qrCode.access?.allowed === false ? "bg-red-500/15 text-red-200" : "bg-emerald-500/15 text-emerald-200"
+                    )}
+                  >
+                    {qrCode.access?.allowed === false ? <AlertTriangle className="h-4.5 w-4.5" /> : <CheckCircle2 className="h-4.5 w-4.5" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div
+                      className={cn(
+                        "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                        qrCode.access?.allowed === false
+                          ? "border-red-500/35 bg-red-500/15 text-red-200"
+                          : "border-emerald-500/35 bg-emerald-500/15 text-emerald-200"
+                      )}
+                    >
+                      {accessCopy.badge}
+                    </div>
+                    <p className="mt-2 text-sm font-semibold text-white">{accessCopy.title}</p>
+                    <p className="mt-1 text-sm leading-6 text-white/65">{accessCopy.detail}</p>
+                    <div className="mt-3 inline-flex items-center gap-2 text-xs text-white/45">
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Refreshes automatically about every 15 seconds
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div
                 ref={qrRef}
-                className="flex items-center justify-center rounded-3xl bg-white p-6 shadow-2xl"
+                className="flex w-full items-center justify-center rounded-3xl bg-white p-4 shadow-2xl sm:p-6"
               >
                 <QRCodeSVG
                   value={qrCode.code}
-                  size={240}
+                  size={280}
                   level="H"
                   includeMargin={false}
+                  bgColor="#FFFFFF"
+                  fgColor="#111111"
+                  className="h-auto w-full max-w-[280px]"
                 />
               </div>
 
-              {/* Member ID below QR */}
-              <div className="mt-5 text-center">
-                <p className="text-xs font-semibold uppercase tracking-widest text-white/30 mb-1">Member ID</p>
-                <p className="font-mono text-lg font-bold text-white tracking-wider">{qrCode.code.slice(0, 8).toUpperCase()}</p>
-              </div>
-
-              {/* Code String */}
-              <div className="w-full rounded-lg bg-white/[0.04] px-4 py-3 text-center">
-                <p className="text-xs text-white/40">Full Check-in Code</p>
-                <p className="mt-1 font-mono text-xs font-semibold tracking-wider text-white/60">
-                  {qrCode.code}
-                </p>
+              <div className="mt-5 w-full rounded-xl border border-white/[0.08] bg-black/20 px-4 py-3 text-center">
+                <p className="text-xs font-semibold uppercase tracking-widest text-white/30">Member ID</p>
+                <p className="mt-1 font-mono text-sm font-bold tracking-[0.24em] text-white sm:text-lg">{(qrCode.memberId ?? qrCode.code.slice(0, 8)).toUpperCase()}</p>
               </div>
 
               {/* Action Buttons */}
