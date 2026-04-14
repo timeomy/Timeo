@@ -33,6 +33,7 @@ import {
   User,
   ChevronDown,
   Search,
+  Shield,
 } from "lucide-react";
 
 type NavLink = {
@@ -55,7 +56,7 @@ export default function PortalLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isLoaded, isSignedIn, user, signOut, activeRole } =
+  const { isLoaded, isSignedIn, user, signOut, activeRole, isPlatformAdmin, setViewMode } =
     useTimeoWebAuthContext();
   const { tenants, isLoading: tenantsLoading } = useTimeoWebTenantContext();
   useEnsureUser(!!isSignedIn);
@@ -68,6 +69,18 @@ export default function PortalLayout({
   const hasBusinessMembership = hasNonCustomerTenant(tenants);
 
   const displayName = user?.name || user?.email || "User";
+
+  function goToAdminPanel() {
+    setUserMenuOpen(false);
+    setMobileMenuOpen(false);
+    if (isPlatformAdmin) {
+      setViewMode("platform");
+      router.push("/admin");
+      return;
+    }
+    setViewMode("tenant");
+    router.push("/dashboard");
+  }
 
   // Redirect logic in useEffect to avoid infinite re-render loops
   useEffect(() => {
@@ -158,6 +171,16 @@ export default function PortalLayout({
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
             <NotificationsBell />
+            {hasBusinessMembership && (
+              <button
+                onClick={goToAdminPanel}
+                className="hidden items-center gap-2 rounded-lg border border-primary/20 bg-primary/8 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/12 md:inline-flex"
+              >
+                <Shield className="h-4 w-4" />
+                Admin Panel
+              </button>
+            )}
+            
             {/* User Dropdown (Desktop) */}
             <div className="relative hidden md:block">
               <button
@@ -191,6 +214,15 @@ export default function PortalLayout({
                       <User className="h-4 w-4" />
                       Profile
                     </Link>
+                    {hasBusinessMembership && (
+                      <button
+                        onClick={goToAdminPanel}
+                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-primary transition-colors hover:bg-white/[0.06]"
+                      >
+                        <Shield className="h-4 w-4" />
+                        Admin Panel
+                      </button>
+                    )}
                     <Separator className="my-1.5 bg-white/[0.06]" />
                     <button
                       onClick={() => {
@@ -249,6 +281,16 @@ export default function PortalLayout({
               })}
 
               <Separator className="my-2 bg-white/[0.06]" />
+
+              {hasBusinessMembership && (
+                <button
+                  onClick={goToAdminPanel}
+                  className="flex w-full items-center gap-3 rounded-lg border border-primary/20 bg-primary/8 px-3 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/12"
+                >
+                  <Shield className="h-4 w-4" />
+                  Admin Panel
+                </button>
+              )}
 
               {/* Mobile User Section */}
               <div className="flex items-center gap-3 px-3 py-2">
