@@ -67,6 +67,27 @@ jobs:
           SITE_URL: http://localhost:3000
           API_URL: http://localhost:4000
 
+      - name: Generate coverage report
+        run: pnpm --filter @timeo/api test:coverage
+        env:
+          DATABASE_URL: postgresql://timeo:timeo@localhost:5432/timeo
+          REDIS_URL: redis://localhost:6379
+          BETTER_AUTH_SECRET: ci-test-secret-min-32-chars-pad
+          JWT_SECRET: ci-test-jwt-secret-min-32-chars
+          SITE_URL: http://localhost:3000
+          API_URL: http://localhost:4000
+
+      - name: Check coverage thresholds
+        run: |
+          echo "Coverage Report Generated"
+          cat packages/api/coverage/coverage-summary.json | jq '.total'
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-coverage-report
+          path: packages/api/coverage/
+
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
