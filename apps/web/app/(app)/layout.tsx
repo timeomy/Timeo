@@ -585,6 +585,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
             </header>
 
+            <div className="border-b border-white/[0.06] bg-card/30 px-4 py-3 sm:px-6 lg:px-8">
+              <div className="mx-auto flex max-w-7xl flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/35">Workspace</p>
+                  <p className="text-sm text-white/60">Switch business and module here</p>
+                </div>
+                <div className="w-full lg:max-w-sm">
+                  <TenantSwitcher />
+                </div>
+              </div>
+            </div>
+
             {/* Announcements */}
             <AnnouncementBanner />
 
