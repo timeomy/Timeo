@@ -14,9 +14,12 @@ import {
   cn,
 } from "@timeo/ui/web";
 import { TimeoLogo } from "@/timeo-logo";
+import { ViewModeSwitcher } from "@/view-mode-switcher";
+import { ThemeToggle } from "@/theme-toggle";
 import {
   LayoutDashboard,
   Building2,
+  LayoutTemplate,
   Users,
   CreditCard,
   ToggleRight,
@@ -30,8 +33,6 @@ import {
   Menu,
   LogOut,
   Shield,
-  ChevronDown,
-  Check,
 } from "lucide-react";
 
 type SidebarLink = {
@@ -43,6 +44,7 @@ type SidebarLink = {
 const sidebarLinks: SidebarLink[] = [
   { href: "/admin", label: "Command", icon: LayoutDashboard },
   { href: "/admin/tenants", label: "Tenants", icon: Building2 },
+  { href: "/admin/templates", label: "Templates", icon: LayoutTemplate },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/billing", label: "Billing", icon: CreditCard },
   { href: "/admin/features", label: "Feature Flags", icon: ToggleRight },
@@ -55,92 +57,10 @@ const sidebarLinks: SidebarLink[] = [
   { href: "/admin/data", label: "Data", icon: Database },
 ];
 
-function ViewModeSwitcher() {
-  const router = useRouter();
-  const { viewMode, setViewMode } = useTimeoWebAuthContext();
-  const { tenants, activeTenant, switchTenant } = useTimeoWebTenantContext();
-  const [open, setOpen] = useState(false);
-
-  const label = viewMode === "platform"
-    ? "Platform Admin"
-    : (activeTenant?.name ?? "Business View");
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm font-medium transition-colors hover:bg-white/[0.06]"
-      >
-        <span className="truncate max-w-[180px]">{label}</span>
-        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-50 mt-2 w-[360px] rounded-xl border border-primary/20 bg-[#10182b] p-3 shadow-2xl">
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">View Mode</p>
-
-            <button
-              onClick={() => {
-                setViewMode("platform");
-                router.push("/admin");
-                setOpen(false);
-              }}
-              className={cn(
-                "mb-3 flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors",
-                viewMode === "platform"
-                  ? "border-primary/30 bg-primary/10 text-primary"
-                  : "border-white/[0.08] bg-white/[0.03] text-white/80 hover:bg-white/[0.06]"
-              )}
-            >
-              <span>Back to Platform Admin</span>
-              {viewMode === "platform" && <Check className="h-4 w-4" />}
-            </button>
-
-            <div className="space-y-3">
-              {tenants.map((tenant) => (
-                <div key={tenant.id} className="rounded-lg border border-white/[0.06] p-3">
-                  <p className="text-sm font-medium text-white">{tenant.name}</p>
-                  {tenant.slug && <p className="mb-2 text-xs text-white/40">@{tenant.slug}</p>}
-                  <div className="grid grid-cols-4 gap-2">
-                    {(["Admin", "Staff", "Coach", "Member"] as const).map((roleLabel) => {
-                      const isActive = viewMode === "tenant" && activeTenant?.id === tenant.id && roleLabel === "Admin";
-                      return (
-                        <button
-                          key={roleLabel}
-                          onClick={() => {
-                            switchTenant(tenant.id);
-                            setViewMode("tenant");
-                            router.push("/dashboard");
-                            setOpen(false);
-                          }}
-                          className={cn(
-                            "rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors",
-                            isActive
-                              ? "border-primary/30 bg-primary/10 text-primary"
-                              : "border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
-                          )}
-                        >
-                          {roleLabel}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, signOut, setViewMode } = useTimeoWebAuthContext();
+  const { user, signOut, setViewMode, setViewAsRole } = useTimeoWebAuthContext();
   const { tenants } = useTimeoWebTenantContext();
 
   const displayName = user?.name || user?.email || "User";
@@ -149,7 +69,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex h-full flex-col">
       {/* Logo */}
       <div className="p-4">
-        <Link href="/admin" className="flex items-center gap-2" onClick={onNavigate}>
+        <Link href="/admin" prefetch className="flex items-center gap-2" onClick={onNavigate}>
           <TimeoLogo size="md" />
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
             C2
@@ -186,6 +106,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             <Link
               key={link.href}
               href={link.href}
+              prefetch
               onClick={onNavigate}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
@@ -208,6 +129,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <div className="p-3">
           <button
             onClick={() => {
+              setViewAsRole(null);
               setViewMode("tenant");
               router.push("/dashboard");
               onNavigate?.();
@@ -254,22 +176,18 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export default function PlatformLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { isLoaded, isSignedIn, isPlatformAdmin, setViewMode } = useTimeoWebAuthContext();
+  const { isLoaded, isSignedIn, isPlatformAdmin } = useTimeoWebAuthContext();
+  const { isLoading: tenantsLoading } = useTimeoWebTenantContext();
   useEnsureUser(!!isSignedIn);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Ensure viewMode is "platform" when on C2 pages
   useEffect(() => {
-    if (isPlatformAdmin) setViewMode("platform");
-  }, [isPlatformAdmin, setViewMode]);
-
-  useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded || tenantsLoading) return;
     if (!isSignedIn) { router.replace("/sign-in"); return; }
     if (!isPlatformAdmin) { router.replace("/dashboard"); }
-  }, [isLoaded, isSignedIn, isPlatformAdmin, router]);
+  }, [isLoaded, tenantsLoading, isSignedIn, isPlatformAdmin, router]);
 
-  if (!isLoaded) {
+  if (!isLoaded || tenantsLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -289,7 +207,7 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
   return (
     <div className="flex h-screen bg-background">
       {/* Desktop Sidebar */}
-      <aside className="hidden w-64 flex-shrink-0 border-r border-white/[0.06] bg-card/50 lg:block">
+      <aside className="hidden w-64 flex-shrink-0 border-r border-border/70 bg-card/50 lg:block">
         <SidebarContent />
       </aside>
 
@@ -300,7 +218,7 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="absolute left-0 top-0 h-full w-72 border-r border-white/[0.06] bg-card shadow-2xl">
+          <aside className="absolute left-0 top-0 h-full w-72 border-r border-border/70 bg-card shadow-2xl">
             <SidebarContent onNavigate={() => setMobileOpen(false)} />
           </aside>
         </div>
@@ -320,10 +238,19 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
             <TimeoLogo size="sm" />
             <span className="text-xs text-muted-foreground">C2</span>
           </div>
+          <div className="ml-auto">
+            <div className="flex items-center gap-2">
+              <ViewModeSwitcher />
+              <ThemeToggle />
+            </div>
+          </div>
         </header>
 
-        <header className="hidden h-12 items-center justify-end border-b border-white/[0.06] px-6 lg:flex">
-          <ViewModeSwitcher />
+        <header className="hidden h-12 items-center justify-end border-b border-border/70 px-6 lg:flex">
+          <div className="flex items-center gap-2">
+            <ViewModeSwitcher />
+            <ThemeToggle />
+          </div>
         </header>
 
         {/* Page Content */}
