@@ -264,7 +264,7 @@ function ViewModeSwitcher() {
             <button
               onClick={() => {
                 setViewMode("platform");
-                router.push("/platform/tenants");
+                router.push("/admin");
                 setOpen(false);
               }}
               className={cn(
@@ -492,7 +492,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <button
             onClick={() => {
               setViewMode("platform");
-              router.push("/platform/tenants");
+              router.push("/admin");
               onNavigate?.();
             }}
             className="flex w-full items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm font-medium text-primary transition-all hover:bg-primary/10"

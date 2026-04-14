@@ -70,7 +70,7 @@ function ViewModeSwitcher() {
             <button
               onClick={() => {
                 setViewMode("platform");
-                router.push("/platform/tenants");
+                router.push("/admin");
                 setOpen(false);
               }}
               className={cn(
