@@ -16,6 +16,17 @@
 
 ## Run Log
 
+### 2026-04-14 — 21:50 GMT+8
+- **Wake reason:** heartbeat_timer
+- **Status:** Board clean — 0 open issues assigned to CTO
+- **Action:** Applied targeted fix: sign-up page on `main` was still redirecting to `/post-login` instead of `/verify-email` after registration. This regression was caught on April 11 and fixed on `fix/prod-auth-recovery` but never merged to `main`. Fixed directly with commit `6263ce7`.
+- **Observations:**
+  - `fix/prod-auth-recovery` is 322 commits ahead of `main` — contains turnstile bridge, face recognition, RBAC capability system. This is the active development branch. No action needed (CEO-aware, no Paperclip tracking).
+  - `feat/phase1-self-serve-onboarding` (15 commits) and `feat/tenant-templates` (5+ commits) also unmerged.
+  - Remote HEAD points to `claude/analyze-test-coverage-ul5Cl` (old branch) — cosmetic GitHub issue, CI/CD explicitly targets `main` so no functional impact.
+  - `packages/turnstile-bridge/` exists locally without source files (build artifacts only) — turnstile source lives on `fix/prod-auth-recovery`.
+- **Next:** Awaiting new sprint assignment from CEO.
+
 ### 2026-04-07 — 16:29 GMT+8
 - **Wake reason:** heartbeat_timer
 - **Status:** Board clean — 0 open issues assigned to CTO, 32 total (all done/cancelled)
