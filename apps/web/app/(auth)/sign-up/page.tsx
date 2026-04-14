@@ -44,7 +44,7 @@ export default function SignUpPage() {
         return;
       }
 
-      router.push("/post-login");
+      router.push("/verify-email");
     } catch {
       setError("An unexpected error occurred");
       setLoading(false);
