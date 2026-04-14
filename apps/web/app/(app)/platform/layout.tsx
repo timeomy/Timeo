@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useTimeoWebAuthContext, useTimeoWebTenantContext, isRoleAtLeast } from "@timeo/auth/web";
+import { useTimeoWebAuthContext, isRoleAtLeast } from "@timeo/auth/web";
 import { useEnsureUser } from "@/hooks/use-ensure-user";
 import { Separator, cn } from "@timeo/ui/web";
 import {
@@ -18,8 +18,6 @@ import {
   Menu,
   LogOut,
   ChevronLeft,
-  ChevronDown,
-  Check,
   Shield,
 } from "lucide-react";
 function SystemHealthBar() {
@@ -40,88 +38,6 @@ const platformLinks = [
   { href: "/platform/activity", label: "Activity Log", icon: ScrollText },
   { href: "/platform/flags", label: "Feature Flags", icon: Flag },
 ];
-
-function ViewModeSwitcher() {
-  const router = useRouter();
-  const { viewMode, setViewMode } = useTimeoWebAuthContext();
-  const { tenants, activeTenant, switchTenant } = useTimeoWebTenantContext();
-  const [open, setOpen] = useState(false);
-
-  const label = viewMode === "platform"
-    ? "Platform Admin"
-    : (activeTenant?.name ?? "Business View");
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm font-medium transition-colors hover:bg-white/[0.06]"
-      >
-        <span className="truncate max-w-[180px]">{label}</span>
-        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-50 mt-2 w-[360px] rounded-xl border border-primary/20 bg-[#10182b] p-3 shadow-2xl">
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">View Mode</p>
-
-            <button
-              onClick={() => {
-                setViewMode("platform");
-                router.push("/admin");
-                setOpen(false);
-              }}
-              className={cn(
-                "mb-3 flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors",
-                viewMode === "platform"
-                  ? "border-primary/30 bg-primary/10 text-primary"
-                  : "border-white/[0.08] bg-white/[0.03] text-white/80 hover:bg-white/[0.06]"
-              )}
-            >
-              <span>Back to Platform Admin</span>
-              {viewMode === "platform" && <Check className="h-4 w-4" />}
-            </button>
-
-            <div className="space-y-3">
-              {tenants.map((tenant) => (
-                <div key={tenant.id} className="rounded-lg border border-white/[0.06] p-3">
-                  <p className="text-sm font-medium text-white">{tenant.name}</p>
-                  {tenant.slug && <p className="mb-2 text-xs text-white/40">@{tenant.slug}</p>}
-                  <div className="grid grid-cols-4 gap-2">
-                    {(["Admin", "Staff", "Coach", "Member"] as const).map((roleLabel) => {
-                      const isActive = viewMode === "tenant" && activeTenant?.id === tenant.id && roleLabel === "Admin";
-                      return (
-                        <button
-                          key={roleLabel}
-                          onClick={() => {
-                            switchTenant(tenant.id);
-                            setViewMode("tenant");
-                            router.push("/dashboard");
-                            setOpen(false);
-                          }}
-                          className={cn(
-                            "rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors",
-                            isActive
-                              ? "border-primary/30 bg-primary/10 text-primary"
-                              : "border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
-                          )}
-                        >
-                          {roleLabel}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
 function PlatformSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -303,10 +219,6 @@ export default function PlatformLayout({
             </div>
             <span className="font-semibold">Platform</span>
           </div>
-        </header>
-
-        <header className="hidden h-12 items-center justify-end border-b border-white/[0.06] px-6 lg:flex">
-          <ViewModeSwitcher />
         </header>
 
         {/* Page Content */}
