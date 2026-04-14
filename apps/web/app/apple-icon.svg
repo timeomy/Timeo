@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">
-  <rect width="180" height="180" rx="32" fill="#0A0F1E"/>
-  <text x="90" y="132" text-anchor="middle" font-family="Inter,'Segoe UI',system-ui,sans-serif" font-weight="800" font-size="120" fill="white">t</text>
-  <circle cx="130" cy="103" r="12" fill="#0066FF"/>
+  <rect width="180" height="180" rx="32" fill="#0B1020"/>
+  <path fill="#FFFFFF" d="M82 44c0-2 2-4 4-4h19v19h15c2 0 4 2 4 4v16h-23v41c0 6 2 10 5 12 4 2 8 3 14 2v16c-3 1-7 2-11 2-11 1-19-1-25-6-6-5-9-14-9-25V79H61c-2 0-4-2-4-4V59h25V44z"/>
+  <circle cx="112" cy="126" r="7" fill="#0A63FF"/>
 </svg>
