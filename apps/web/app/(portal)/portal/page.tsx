@@ -1,489 +1,858 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
 import {
   useMemberQrCode,
-  useMyBookings,
-  useMyCoach,
-  useMyCheckInHistory,
-  useMyMembershipSubscriptions,
+  useGenerateQrCode,
   useSessionCredits,
   useTenant,
+  useTenantBroadcasts,
+  useServiceCatalog,
 } from "@timeo/api-client";
+import type { Broadcast, ServiceCatalogItem } from "@timeo/api-client";
 import { useTimeoWebAuthContext } from "@timeo/auth/web";
-import { getInitials } from "@timeo/shared";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  Skeleton,
-  cn,
-} from "@timeo/ui/web";
-import {
-  Calendar,
-  CheckCircle2,
-  DoorOpen,
-  MessageCircle,
-  QrCode,
-  Receipt,
-  RefreshCw,
-  Sparkles,
-  UserPlus,
-  Wallet,
-} from "lucide-react";
 import { useTenantId } from "@/hooks/use-tenant-id";
-import { MembershipCard } from "@/member/membership-card";
-import { QuickActions, type QuickActionItem } from "@/member/quick-actions";
+import { Card, CardContent, Skeleton, cn } from "@timeo/ui/web";
+import { QRCodeSVG } from "qrcode.react";
+import {
+  QrCode,
+  RefreshCw,
+  Dumbbell,
+  User,
+  ChevronDown,
+  ChevronUp,
+  Zap,
+  KeyRound,
+  Search,
+  Calendar,
+  ShoppingBag,
+  Megaphone,
+  Tag,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  ArrowRight,
+  Check,
+} from "lucide-react";
+import Link from "next/link";
 
-type SubscriptionRow = {
-  subscription?: {
-    status?: string;
-    currentPeriodStart?: string;
-    current_period_start?: string;
-    currentPeriodEnd?: string;
-    current_period_end?: string;
-  };
-  plan?: {
-    name?: string | null;
-  };
+// ─── Training type badge colours ─────────────────────────────────────────────
+const TRAINING_BADGE: Record<string, { bg: string; text: string; label: string }> = {
+  PUSH: { bg: "bg-orange-500/20", text: "text-orange-300", label: "Push" },
+  PULL: { bg: "bg-blue-500/20", text: "text-blue-300", label: "Pull" },
+  LEGS: { bg: "bg-green-500/20", text: "text-green-300", label: "Legs" },
+  UPPER: { bg: "bg-purple-500/20", text: "text-purple-300", label: "Upper" },
+  LOWER: { bg: "bg-yellow-500/20", text: "text-yellow-300", label: "Lower" },
+  CARDIO: { bg: "bg-pink-500/20", text: "text-pink-300", label: "Cardio" },
+  FULL_BODY: { bg: "bg-cyan-500/20", text: "text-cyan-300", label: "Full Body" },
 };
 
-type TimelineItem = {
-  id: string;
-  timestamp: string;
-  title: string;
-  detail: string;
-  kind: "check-in" | "class";
+function getBadge(type: string) {
+  const key = type.toUpperCase().replace(/ /g, "_");
+  return TRAINING_BADGE[key] ?? { bg: "bg-white/10", text: "text-white/60", label: type };
+}
+
+// ─── Broadcast type config ────────────────────────────────────────────────────
+const BROADCAST_CONFIG = {
+  promotion: { bg: "from-amber-600/80 to-orange-700/80", badge: "bg-amber-500", label: "Promo" },
+  announcement: { bg: "from-blue-600/80 to-blue-800/80", badge: "bg-blue-500", label: "News" },
+  event: { bg: "from-purple-600/80 to-indigo-700/80", badge: "bg-purple-500", label: "Event" },
+  new_service: { bg: "from-emerald-600/80 to-teal-700/80", badge: "bg-emerald-500", label: "New" },
 };
 
-function getSubscriptionStartDate(row: SubscriptionRow | null) {
-  return row?.subscription?.currentPeriodStart ?? row?.subscription?.current_period_start ?? null;
-}
-
-function getSubscriptionEndDate(row: SubscriptionRow | null) {
-  return row?.subscription?.currentPeriodEnd ?? row?.subscription?.current_period_end ?? null;
-}
-
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString("en-MY", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatRelative(value: string) {
-  const date = new Date(value).getTime();
-  const diffMinutes = Math.floor((Date.now() - date) / 60000);
-
-  if (diffMinutes < 60) {
-    return `${Math.max(diffMinutes, 1)}m ago`;
-  }
-
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) {
-    return `${diffHours}h ago`;
-  }
-
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
-}
-
-function formatCheckInMethod(method?: string) {
-  if (!method) return "Unknown";
-
-  if (method === "nfc") return "Card";
-  return method.toUpperCase();
-}
-
-function EmptyTenantState({ firstName }: { firstName: string }) {
+// ─── No Tenant Onboarding ─────────────────────────────────────────────────────
+function NoTenantOnboarding({ firstName }: { firstName: string }) {
   return (
-    <div className="space-y-4 pt-4">
-      <Card className="rounded-2xl border-white/[0.08] bg-white/[0.03]">
-        <CardContent className="p-5">
-          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/20">
-            <Sparkles className="h-6 w-6 text-emerald-300" />
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-8 px-4">
+      <div className="text-center">
+        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10">
+          <Zap className="h-10 w-10 text-primary" />
+        </div>
+        <h1 className="text-3xl font-bold text-white">Welcome, {firstName}! 👋</h1>
+        <p className="mx-auto mt-3 max-w-sm text-lg text-white/60">
+          You&apos;re not linked to a gym yet. Join your gym to get started.
+        </p>
+      </div>
+      <div className="w-full max-w-sm space-y-4">
+        <Link href="/join">
+          <div className="flex items-center gap-4 rounded-2xl bg-primary/10 border border-primary/20 p-5 hover:bg-primary/20 transition-colors">
+            <div className="rounded-xl bg-primary/20 p-3">
+              <KeyRound className="h-7 w-7 text-primary" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-white">I Have a Code</p>
+              <p className="text-sm text-white/50">Enter your gym&apos;s invite code</p>
+            </div>
           </div>
-          <h1 className="text-2xl font-bold text-white">Welcome, {firstName} 👋</h1>
-          <p className="mt-2 text-sm text-white/60">Join a gym to unlock check-ins, plans, and your member dashboard.</p>
-        </CardContent>
-      </Card>
-
-      <Link href="/join" className="block">
-        <Card className="rounded-2xl border-emerald-500/30 bg-emerald-500/10 transition-colors hover:bg-emerald-500/15">
-          <CardContent className="p-4">
-            <p className="text-sm font-semibold text-emerald-200">I have an invite code</p>
-            <p className="mt-1 text-xs text-emerald-100/70">Join your gym in one step</p>
-          </CardContent>
-        </Card>
-      </Link>
-
-      <Link href="/portal/directory" className="block">
-        <Card className="rounded-2xl border-white/[0.08] bg-white/[0.03] transition-colors hover:bg-white/[0.06]">
-          <CardContent className="p-4">
-            <p className="text-sm font-semibold text-white">Browse gyms</p>
-            <p className="mt-1 text-xs text-white/55">Find a gym near you</p>
-          </CardContent>
-        </Card>
-      </Link>
+        </Link>
+        <Link href="/portal/directory">
+          <div className="flex items-center gap-4 rounded-2xl bg-white/[0.04] border border-white/10 p-5 hover:bg-white/[0.08] transition-colors">
+            <div className="rounded-xl bg-white/10 p-3">
+              <Search className="h-7 w-7 text-white/60" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-white">Find a Business</p>
+              <p className="text-sm text-white/50">Browse our directory</p>
+            </div>
+          </div>
+        </Link>
+      </div>
     </div>
   );
 }
 
-export default function PortalHomePage() {
-  const router = useRouter();
-  const { user } = useTimeoWebAuthContext();
-  const { tenantId } = useTenantId();
-  const [pullDistance, setPullDistance] = useState(0);
-  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
-  const touchStartYRef = useRef<number | null>(null);
+// ─── Broadcast Carousel ───────────────────────────────────────────────────────
+function BroadcastCarousel({ broadcasts, tenantName }: { broadcasts: Broadcast[]; tenantName: string }) {
+  const [current, setCurrent] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const { data: tenantData } = useTenant(tenantId);
-  const { data: subscriptions = [], isLoading: subscriptionsLoading } =
-    useMyMembershipSubscriptions(tenantId);
-  const { data: sessionCredits = [] } = useSessionCredits(tenantId);
-  const { data: checkInHistory, isLoading: checkInsLoading } = useMyCheckInHistory(tenantId, {
-    page: 1,
-    limit: 5,
-  });
-  const { data: myBookings = [], isLoading: bookingsLoading } = useMyBookings(tenantId);
-  const { data: myCoach, isLoading: coachLoading } = useMyCoach(tenantId);
-  const { data: memberQrData } = useMemberQrCode(tenantId);
+  const startTimer = () => {
+    timerRef.current = setInterval(() => {
+      setCurrent((c) => (c + 1) % broadcasts.length);
+    }, 5000);
+  };
 
-  const firstName = user?.name?.split(" ")[0] ?? "Member";
-  const displayName = user?.name ?? user?.email ?? "Member";
-  const memberBadgeId =
-    memberQrData?.memberId?.toUpperCase() ?? user?.id?.slice(0, 8).toUpperCase() ?? "MEMBER";
+  useEffect(() => {
+    if (broadcasts.length > 1) startTimer();
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [broadcasts.length]);
 
-  if (!tenantId) {
-    return <EmptyTenantState firstName={firstName} />;
+  const goTo = (idx: number) => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setCurrent(idx);
+    startTimer();
+  };
+
+  if (broadcasts.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-40 rounded-2xl bg-white/[0.04] border border-white/[0.08] gap-3">
+        <Megaphone className="h-8 w-8 text-white/20" />
+        <p className="text-sm text-white/40">No broadcasts yet</p>
+      </div>
+    );
   }
 
-  const tenantName = tenantData?.name ?? "Your Gym";
-  const sortedSubscriptions = [...(subscriptions as SubscriptionRow[])].sort((left, right) => {
-    const leftDate = new Date(getSubscriptionEndDate(left) ?? 0).getTime();
-    const rightDate = new Date(getSubscriptionEndDate(right) ?? 0).getTime();
-    return rightDate - leftDate;
-  });
-  const latestSubscription = sortedSubscriptions[0] ?? null;
-  const periodStart = getSubscriptionStartDate(latestSubscription);
-  const periodEnd = getSubscriptionEndDate(latestSubscription);
-  const planName = latestSubscription?.plan?.name ?? null;
-
-  const daysRemaining = useMemo(() => {
-    if (!periodEnd) return null;
-    const dayMs = 86_400_000;
-    return Math.ceil((new Date(periodEnd).getTime() - Date.now()) / dayMs);
-  }, [periodEnd]);
-
-  const sessionBalance = useMemo(() => {
-    return sessionCredits.reduce((total, credit) => total + Math.max(0, credit.remaining ?? 0), 0);
-  }, [sessionCredits]);
-
-  const recentTimeline = useMemo<TimelineItem[]>(() => {
-    const checkIns = (checkInHistory?.items ?? []).map((item) => ({
-      id: `check-in-${item.id}`,
-      kind: "check-in" as const,
-      timestamp: item.checkedInAt,
-      title: "Gym check-in",
-      detail: `${formatCheckInMethod(item.method)} scan • ${formatDateTime(item.checkedInAt)}`,
-    }));
-
-    const classes = myBookings.map((booking) => {
-      const isUpcoming = new Date(booking.startTime).getTime() > Date.now();
-      const title = isUpcoming ? "Class booking" : booking.status === "completed" ? "Class attended" : "Booking update";
-
-      return {
-        id: `booking-${booking.id}`,
-        kind: "class" as const,
-        timestamp: booking.startTime,
-        title,
-        detail: `${booking.serviceName ?? "Class"} • ${formatDateTime(booking.startTime)}`,
-      };
-    });
-
-    return [...checkIns, ...classes]
-      .sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())
-      .slice(0, 5);
-  }, [checkInHistory?.items, myBookings]);
-
-  function handleOpenQr() {
-    router.push("/portal/qr-code");
-  }
-
-  async function handleReferFriend() {
-    const shareText = `Join me at ${tenantName} on Timeo!`;
-
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({ title: "Join my gym", text: shareText });
-        return;
-      } catch {
-        // User canceled share, fallback to clipboard.
-      }
-    }
-
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      await navigator.clipboard.writeText(shareText);
-    }
-  }
-
-  const quickActions: QuickActionItem[] = [
-    {
-      id: "qr",
-      label: "My QR Code",
-      subtitle: "Open scanner",
-      icon: QrCode,
-      onClick: handleOpenQr,
-      tone: "emerald",
-    },
-    {
-      id: "book",
-      label: "Book a Class",
-      subtitle: "Reserve now",
-      icon: Calendar,
-      href: "/portal/bookings/new",
-      tone: "sky",
-    },
-    {
-      id: "sessions",
-      label: "My Sessions",
-      subtitle: `${sessionBalance} credit${sessionBalance === 1 ? "" : "s"}`,
-      icon: Wallet,
-      href: "/portal/plan",
-      tone: "violet",
-    },
-    {
-      id: "payments",
-      label: "Payment History",
-      subtitle: "Receipts",
-      icon: Receipt,
-      href: "/portal/transactions",
-      tone: "amber",
-    },
-    {
-      id: "coach",
-      label: "Contact Coach",
-      subtitle: "Support",
-      icon: MessageCircle,
-      href: "/portal/profile",
-      tone: "indigo",
-    },
-    {
-      id: "refer",
-      label: "Refer a Friend",
-      subtitle: "Share invite",
-      icon: UserPlus,
-      onClick: handleReferFriend,
-      tone: "rose",
-    },
-  ];
-
-  function handleTouchStart(event: React.TouchEvent<HTMLDivElement>) {
-    if (typeof window === "undefined" || window.scrollY > 0) {
-      touchStartYRef.current = null;
-      return;
-    }
-
-    touchStartYRef.current = event.touches[0]?.clientY ?? null;
-  }
-
-  function handleTouchMove(event: React.TouchEvent<HTMLDivElement>) {
-    if (touchStartYRef.current === null) {
-      return;
-    }
-
-    const currentY = event.touches[0]?.clientY ?? touchStartYRef.current;
-    const delta = currentY - touchStartYRef.current;
-
-    if (delta > 0) {
-      setPullDistance(Math.min(100, delta * 0.55));
-    }
-  }
-
-  function handleTouchEnd() {
-    if (pullDistance >= 72) {
-      setIsPullRefreshing(true);
-      router.refresh();
-      window.setTimeout(() => setIsPullRefreshing(false), 700);
-    }
-
-    setPullDistance(0);
-    touchStartYRef.current = null;
-  }
-
-  const isTimelineLoading = checkInsLoading || bookingsLoading;
+  const bc = broadcasts[current];
+  const cfg = BROADCAST_CONFIG[bc.type as keyof typeof BROADCAST_CONFIG] ?? BROADCAST_CONFIG.announcement;
 
   return (
-    <div
-      className="space-y-5 pb-4"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-    >
-      <div
-        className="flex justify-center overflow-hidden transition-all"
-        style={{ height: pullDistance > 0 || isPullRefreshing ? 32 : 0 }}
-      >
-        <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.1] bg-white/[0.05] px-3 py-1.5 text-xs text-white/65">
-          <RefreshCw className={cn("h-3.5 w-3.5", (isPullRefreshing || pullDistance > 72) && "animate-spin")} />
-          {pullDistance > 72 ? "Release to refresh" : "Pull down to refresh"}
+    <div className="relative overflow-hidden rounded-2xl shadow-xl" style={{ minHeight: 200 }}>
+      {/* Background */}
+      {bc.imageUrl ? (
+        <div className="absolute inset-0">
+          <img
+            src={bc.imageUrl}
+            alt={bc.title ?? ""}
+            className="h-full w-full object-cover"
+          />
+          <div className={cn("absolute inset-0 bg-gradient-to-t", cfg.bg)} />
+        </div>
+      ) : (
+        <div className={cn("absolute inset-0 bg-gradient-to-br", cfg.bg)} />
+      )}
+
+      {/* Content */}
+      <div className="relative z-10 flex flex-col justify-between h-full p-5" style={{ minHeight: 200 }}>
+        <div className="flex items-start justify-between">
+          {/* Type badge */}
+          <span className={cn("rounded-full px-3 py-1 text-xs font-bold text-white", cfg.badge)}>
+            {cfg.label}
+          </span>
+          {/* Gym badge */}
+          <span className="flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
+            {tenantName}
+          </span>
+        </div>
+
+        <div className="mt-auto">
+          {bc.title && (
+            <h3 className="text-xl font-bold text-white leading-tight drop-shadow">
+              {bc.title}
+            </h3>
+          )}
+          {bc.content && (
+            <p className="mt-1.5 text-sm text-white/80 line-clamp-2 drop-shadow">
+              {bc.content}
+            </p>
+          )}
         </div>
       </div>
 
-      <Card className="rounded-2xl border-white/[0.08] bg-gradient-to-br from-emerald-500/20 via-emerald-500/10 to-transparent">
-        <CardContent className="p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <Avatar className="h-12 w-12 border border-white/20">
-                {user?.imageUrl ? <AvatarImage src={user.imageUrl} alt={displayName} /> : null}
-                <AvatarFallback className="bg-white/10 text-sm text-white">{getInitials(displayName)}</AvatarFallback>
-              </Avatar>
+      {/* Nav arrows */}
+      {broadcasts.length > 1 && (
+        <>
+          <button
+            onClick={() => goTo((current - 1 + broadcasts.length) % broadcasts.length)}
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-20 rounded-full bg-black/40 p-1.5 backdrop-blur-sm hover:bg-black/60 transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4 text-white" />
+          </button>
+          <button
+            onClick={() => goTo((current + 1) % broadcasts.length)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-20 rounded-full bg-black/40 p-1.5 backdrop-blur-sm hover:bg-black/60 transition-colors"
+          >
+            <ChevronRight className="h-4 w-4 text-white" />
+          </button>
+        </>
+      )}
 
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-100/80">Welcome back</p>
-                <h1 className="truncate text-xl font-bold text-white">{firstName}</h1>
-                <p className="truncate text-sm text-white/70">{tenantName}</p>
-              </div>
-            </div>
-
+      {/* Dots */}
+      {broadcasts.length > 1 && (
+        <div className="absolute bottom-3 left-0 right-0 z-20 flex justify-center gap-1.5">
+          {broadcasts.map((_, i) => (
             <button
-              type="button"
-              onClick={handleOpenQr}
-              className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/15"
-            >
-              <QrCode className="h-5 w-5" />
-              My QR Code
-            </button>
-          </div>
+              key={i}
+              onClick={() => goTo(i)}
+              className={cn(
+                "rounded-full transition-all",
+                i === current ? "w-5 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/40"
+              )}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
-          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-white/80">
-            <Sparkles className="h-3.5 w-3.5" />
-            Everything important in two taps
+// ─── Service Catalog Grid ─────────────────────────────────────────────────────
+function ServiceCatalogGrid({ tenantId }: { tenantId: string }) {
+  const { data: items, isLoading } = useServiceCatalog(tenantId);
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 gap-3">
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-28 rounded-2xl bg-white/[0.06]" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!items || items.length === 0) {
+    return (
+      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-6 text-center">
+        <ShoppingBag className="h-8 w-8 text-white/20 mx-auto mb-2" />
+        <p className="text-sm text-white/40">No services listed yet</p>
+      </div>
+    );
+  }
+
+  const formatPrice = (price: number) =>
+    new Intl.NumberFormat("en-MY", { style: "currency", currency: "MYR" }).format(price / 100);
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {items.map((item: ServiceCatalogItem) => (
+        <Link key={item.id} href={`/portal/bookings/new?serviceId=${item.id}`}>
+          <div
+            className="relative overflow-hidden rounded-2xl bg-white/[0.04] border border-white/[0.08] p-4 hover:bg-white/[0.07] hover:border-primary/30 transition-all cursor-pointer"
+          >
+            {item.category && (
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-primary/70">
+                {item.category}
+              </span>
+            )}
+            <p className="mt-1 text-sm font-semibold text-white leading-tight line-clamp-2">
+              {item.name}
+            </p>
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-base font-bold text-primary">{formatPrice(item.price)}</span>
+              <span className="flex items-center gap-1 text-xs text-white/40">
+                <Clock className="h-3 w-3" />
+                {item.durationMinutes}m
+              </span>
+            </div>
+            <div className="mt-3">
+              <span className="inline-flex items-center gap-1 rounded-lg bg-primary/10 border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary w-full justify-center">
+                Book Now
+              </span>
+            </div>
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+// ─── QR Section ───────────────────────────────────────────────────────────────
+function QrSection({ tenantId }: { tenantId: string }) {
+  const { data: qrCode, isLoading } = useMemberQrCode(tenantId);
+  const { mutateAsync: generateQrCode } = useGenerateQrCode(tenantId);
+  const [generating, setGenerating] = useState(false);
+  const [countdown, setCountdown] = useState(30);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          generateQrCode({ tenantId }).catch(() => {});
+          return 30;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [generateQrCode, tenantId]);
+
+  async function handleGenerate() {
+    setGenerating(true);
+    try {
+      await generateQrCode({ tenantId });
+      setCountdown(30);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  function handlePrintQr() {
+    const svgEl = document.querySelector(".qr-print-target svg") as SVGElement | null;
+    if (!svgEl || !qrCode) return;
+    const svgString = new XMLSerializer().serializeToString(svgEl);
+    const svgDataUrl = "data:image/svg+xml;base64," + btoa(svgString);
+    const code = qrCode.code;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    const html = [
+      "<!DOCTYPE html><html><head><title>QR Code</title>",
+      "<style>body{font-family:system-ui;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#fff}",
+      ".card{text-align:center;padding:40px;border:2px solid #e5e7eb;border-radius:16px;max-width:300px}",
+      ".code{font-family:monospace;font-size:13px;color:#374151;background:#f3f4f6;padding:8px 16px;border-radius:8px;letter-spacing:2px;display:inline-block;margin-top:16px}",
+      ".footer{font-size:11px;color:#9ca3af;margin-top:12px}</style></head>",
+      "<body><div class='card'>",
+      "<img src='" + svgDataUrl + "' width='200' height='200' />",
+      "<p class='code'>" + code + "</p>",
+      "<p class='footer'>Show this QR code to check in</p>",
+      "</div><script>window.onload=function(){window.print()}<\/script></body></html>",
+    ].join("");
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center">
+        <Skeleton className="h-64 w-64 rounded-3xl bg-white/[0.06]" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-4">
+      {qrCode ? (
+        <>
+          <div className="relative">
+            <div className="absolute -inset-2 rounded-3xl bg-emerald-500/30 animate-pulse" />
+            <div className="relative rounded-2xl bg-white p-5 shadow-2xl qr-print-target">
+              <QRCodeSVG value={qrCode.code} size={200} level="H" fgColor="#111" bgColor="#fff" />
+            </div>
+          </div>
+          <p className="text-center text-base font-medium text-white/70">
+            Show this at the front desk to check in
+          </p>
+          <div className="flex items-center gap-2 text-sm text-white/40">
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span>Refreshes in {countdown}s</span>
+          </div>
+          <button
+            onClick={handlePrintQr}
+            className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2 text-sm font-medium text-white/60 hover:bg-white/[0.08] hover:text-white transition-colors"
+          >
+            <span>&#128424;</span> Print QR Code
+          </button>
+        </>
+      ) : (
+        <div className="flex flex-col items-center gap-4">
+          <div className="rounded-full bg-white/[0.06] p-8">
+            <QrCode className="h-14 w-14 text-white/30" />
+          </div>
+          <p className="text-base text-white/60">No QR code yet</p>
+          <button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="flex items-center gap-2 rounded-2xl bg-primary px-8 py-3 text-base font-semibold text-white disabled:opacity-50"
+          >
+            <QrCode className="h-5 w-5" />
+            {generating ? "Generating..." : "Get My QR Code"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Membership Card ──────────────────────────────────────────────────────────
+function MembershipSection({ tenantId }: { tenantId: string }) {
+  const { data: credits, isLoading } = useSessionCredits(tenantId);
+
+  if (isLoading) return <Skeleton className="h-28 w-full rounded-2xl bg-white/[0.06]" />;
+
+  if (!credits || credits.length === 0) {
+    return (
+      <Link href="/portal/packages">
+        <div className="flex items-center justify-between rounded-2xl bg-white/[0.04] border border-white/[0.08] p-5 hover:bg-white/[0.07] transition-colors">
+          <div>
+            <p className="text-base font-semibold text-white">No active package</p>
+            <p className="text-sm text-white/40 mt-0.5">Browse packages to get started</p>
+          </div>
+          <ArrowRight className="h-5 w-5 text-white/30" />
+        </div>
+      </Link>
+    );
+  }
+
+  // SessionCredit has direct fields: totalSessions, usedSessions, remaining, expiresAt, packageName
+  const credit = credits[0] as {
+    id: string;
+    totalSessions: number;
+    usedSessions: number;
+    remaining: number;
+    expiresAt?: string;
+    packageName?: string;
+  };
+  const packageName = credit.packageName ?? "Your Package";
+  const total = credit.totalSessions ?? 0;
+  const remaining = credit.remaining ?? (total - (credit.usedSessions ?? 0));
+  const expiresAt = credit.expiresAt;
+  const pct = total > 0 ? (remaining / total) * 100 : 0;
+  const barColor = pct > 40 ? "bg-emerald-500" : pct > 15 ? "bg-amber-400" : "bg-red-500";
+
+  return (
+    <Card className="glass border-white/[0.08]">
+      <CardContent className="p-5">
+        <p className="text-sm font-medium text-white/50 mb-1">{packageName}</p>
+        <div className="flex items-end gap-2 mb-3">
+          <span className="text-4xl font-extrabold text-white">{remaining}</span>
+          <span className="text-lg text-white/50 pb-0.5">sessions left</span>
+        </div>
+        <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden mb-2">
+          <div className={cn("h-full rounded-full transition-all", barColor)} style={{ width: `${pct}%` }} />
+        </div>
+        {expiresAt && (
+          <p className="text-xs text-white/40 mt-1.5">
+            Expires {new Date(expiresAt).toLocaleDateString("en-MY", { day: "numeric", month: "long", year: "numeric" })}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Training History ─────────────────────────────────────────────────────────
+function TrainingLogCard({ log }: { log: { id: string; date: string; notes?: string | null; trainingTypes?: string[]; exercises?: Array<{ name: string; sets?: number; reps?: number; weight?: number }> } }) {
+  const [expanded, setExpanded] = useState(false);
+  const dateStr = new Date(log.date).toLocaleDateString("en-MY", {
+    weekday: "long", day: "numeric", month: "long",
+  });
+
+  return (
+    <Card className="glass border-white/[0.08]">
+      <CardContent className="p-4">
+        <button className="w-full text-left" onClick={() => setExpanded((e) => !e)}>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1">
+              <p className="text-base font-semibold text-white">{dateStr}</p>
+              {log.trainingTypes && log.trainingTypes.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {log.trainingTypes.map((t) => {
+                    const badge = getBadge(t);
+                    return (
+                      <span key={t} className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", badge.bg, badge.text)}>
+                        {badge.label}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            {expanded ? <ChevronUp className="h-5 w-5 text-white/30 mt-0.5 shrink-0" /> : <ChevronDown className="h-5 w-5 text-white/30 mt-0.5 shrink-0" />}
+          </div>
+        </button>
+        {expanded && (
+          <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+            {log.exercises && log.exercises.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-white/40 uppercase tracking-wider mb-2">Exercises</p>
+                <div className="space-y-1.5">
+                  {log.exercises!.map((ex, i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <span className="text-sm text-white">{ex.name}</span>
+                      <span className="text-xs text-white/40">
+                        {[ex.sets && `${ex.sets} sets`, ex.reps && `${ex.reps} reps`, ex.weight && `${ex.weight}kg`].filter(Boolean).join(" · ")}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {log.notes && (
+              <div className="rounded-xl bg-white/[0.04] p-3">
+                <p className="text-xs font-medium text-white/40 mb-1">Coach&apos;s Note</p>
+                <p className="text-sm text-white/80">{log.notes}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function TrainingSection({ tenantId }: { tenantId: string }) {
+  // TODO: Implement useMyTrainingLogs hook
+  const isLoading = false;
+  const logs: any[] = [];
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2].map((i) => <Skeleton key={i} className="h-20 w-full rounded-2xl bg-white/[0.06]" />)}
+      </div>
+    );
+  }
+
+  if (!logs || logs.length === 0) {
+    return (
+      <Card className="glass border-white/[0.08]">
+        <CardContent className="p-6 text-center">
+          <Dumbbell className="h-8 w-8 text-white/20 mx-auto mb-2" />
+          <p className="text-sm text-white/50">No training sessions yet</p>
+          <p className="text-xs text-white/30 mt-1">Your coach will log your sessions here</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {logs.slice(0, 3).map((log) => (
+        <TrainingLogCard key={log.id} log={log} />
+      ))}
+    </div>
+  );
+}
+
+// ─── Coach Section ────────────────────────────────────────────────────────────
+function CoachSection({ tenantId }: { tenantId: string }) {
+  // TODO: Implement useMyCoach hook
+  const isLoading = false;
+  const coach: any = null;
+  if (isLoading) {
+    return (
+      <Card className="glass border-white/[0.08]">
+        <CardContent className="p-5">
+          <div className="flex items-center gap-4 animate-pulse">
+            <div className="h-14 w-14 rounded-full bg-white/[0.08]" />
+            <div className="flex-1 space-y-2">
+              <div className="h-3 w-24 rounded bg-white/[0.08]" />
+              <div className="h-4 w-32 rounded bg-white/[0.08]" />
+            </div>
           </div>
         </CardContent>
       </Card>
+    );
+  }
+  if (!coach) return null;
 
-      <MembershipCard
-        memberName={displayName}
-        planName={planName}
-        daysRemaining={daysRemaining}
-        periodStart={periodStart}
-        periodEnd={periodEnd}
-        isLoading={subscriptionsLoading}
-        onRenew={() => router.push("/portal/packages")}
-      />
+  const initials = coach.name
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-white">Quick Actions</h2>
-          <Badge className="rounded-full border-white/[0.12] bg-white/[0.05] text-white/70">One tap</Badge>
-        </div>
-        <QuickActions actions={quickActions} />
-      </section>
-
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-white">Coach Notes</h2>
-          {myCoach ? (
-            <Badge className="rounded-full border-white/[0.12] bg-white/[0.05] text-white/70">{myCoach.name}</Badge>
-          ) : null}
-        </div>
-
-        <Card className="rounded-2xl border-white/[0.08] bg-white/[0.03]">
-          <CardContent className="p-4">
-            {coachLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-40 rounded-lg bg-white/[0.06]" />
-                <Skeleton className="h-12 w-full rounded-xl bg-white/[0.06]" />
-              </div>
-            ) : !myCoach ? (
-              <p className="text-sm text-white/55">No coach assigned yet.</p>
-            ) : myCoach.notes.trim() ? (
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-white">Latest message from {myCoach.name}</p>
-                <p className="whitespace-pre-wrap text-sm text-white/75">{myCoach.notes}</p>
-                {myCoach.notesUpdatedAt ? (
-                  <p className="text-xs text-white/45">Updated {formatRelative(myCoach.notesUpdatedAt)}</p>
-                ) : null}
-              </div>
+  return (
+    <Card className="glass border-white/[0.08] overflow-hidden">
+      {/* Subtle gradient accent bar */}
+      <div className="h-1 w-full bg-gradient-to-r from-primary/60 via-purple-500/60 to-blue-500/60" />
+      <CardContent className="p-5">
+        <div className="flex items-start gap-4">
+          {/* Avatar */}
+          <div className="relative shrink-0">
+            {coach.avatarUrl ? (
+              <img
+                src={coach.avatarUrl}
+                alt={coach.name}
+                className="h-14 w-14 rounded-xl object-cover border-2 border-primary/20"
+              />
             ) : (
-              <p className="text-sm text-white/55">Your coach has not shared notes yet.</p>
-            )}
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-white">Recent Activity</h2>
-          <Link href="/portal/activity" className="text-xs font-medium text-emerald-300 hover:text-emerald-200">
-            View all
-          </Link>
-        </div>
-
-        <Card className="rounded-2xl border-white/[0.08] bg-white/[0.03]">
-          <CardContent className="p-4">
-            {isTimelineLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((key) => (
-                  <Skeleton key={key} className="h-12 rounded-xl bg-white/[0.06]" />
-                ))}
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-primary/30 to-purple-500/20 text-lg font-bold text-primary border-2 border-primary/20">
+                {initials}
               </div>
-            ) : recentTimeline.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-                <DoorOpen className="h-8 w-8 text-white/20" />
-                <p className="text-sm font-medium text-white/70">No activity yet</p>
-                <p className="text-xs text-white/45">Your check-ins and class visits will appear here.</p>
-                <Button
-                  type="button"
-                  onClick={() => router.push("/portal/bookings/new")}
-                  className="mt-2 h-11 rounded-xl bg-emerald-500 px-5 font-semibold text-black hover:bg-emerald-500/90"
+            )}
+            {/* Online indicator */}
+            <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-emerald-500 border-2 border-[#0d1117]" />
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-primary/70 mb-0.5">
+              Your Personal Trainer
+            </p>
+            <p className="text-base font-bold text-white leading-tight">{coach.name}</p>
+            {coach.email && (
+              <p className="text-xs text-white/40 mt-0.5 truncate">{coach.email}</p>
+            )}
+            {/* Specialty badges */}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {["Strength", "Conditioning", "Nutrition"].map((s) => (
+                <span
+                  key={s}
+                  className="rounded-full bg-white/[0.06] border border-white/[0.08] px-2 py-0.5 text-[10px] font-semibold text-white/50"
                 >
-                  Book first class
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {recentTimeline.map((item, index) => (
-                  <div key={item.id} className="relative flex gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3">
-                    <div className="flex w-8 flex-col items-center">
-                      <span
-                        className={cn(
-                          "mt-0.5 flex h-8 w-8 items-center justify-center rounded-full",
-                          item.kind === "check-in" ? "bg-emerald-500/20" : "bg-sky-500/20"
-                        )}
-                      >
-                        {item.kind === "check-in" ? (
-                          <DoorOpen className="h-4 w-4 text-emerald-300" />
-                        ) : (
-                          <CheckCircle2 className="h-4 w-4 text-sky-300" />
-                        )}
-                      </span>
-                      {index !== recentTimeline.length - 1 ? <span className="mt-1 h-full w-px bg-white/[0.08]" /> : null}
-                    </div>
+                  {s}
+                </span>
+              ))}
+            </div>
+          </div>
 
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-white">{item.title}</p>
-                      <p className="mt-1 truncate text-xs text-white/55">{item.detail}</p>
-                    </div>
+          {/* Badge */}
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+            <Dumbbell className="h-4 w-4 text-primary" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
-                    <div className="shrink-0 text-[11px] text-white/45">{formatRelative(item.timestamp)}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </section>
+// ─── Tab Content ──────────────────────────────────────────────────────────────
+type Tab = "broadcasts" | "catalog" | "vouchers" | "qr";
 
+// ─── Gym Header ───────────────────────────────────────────────────────────────
+type TenantData = {
+  name?: string;
+  logoUrl?: string;
+  branding?: { logoUrl?: string; primaryColor?: string; [key: string]: unknown };
+};
+
+function GymHeader({
+  tenantData,
+  tenantLoading,
+  firstName,
+}: {
+  tenantData: TenantData | undefined;
+  tenantLoading: boolean;
+  firstName: string;
+}) {
+  const logoUrl = tenantData?.logoUrl ?? tenantData?.branding?.logoUrl ?? null;
+  const gymName = tenantData?.name ?? "Your Gym";
+
+  return (
+    <div className="flex items-center gap-4 py-2">
+      {/* Logo circle */}
+      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/[0.08] border border-white/[0.1] overflow-hidden">
+        {tenantLoading ? (
+          <Skeleton className="h-14 w-14 rounded-2xl bg-white/[0.06]" />
+        ) : logoUrl ? (
+          <img
+            src={logoUrl}
+            alt={gymName}
+            className="h-full w-full object-cover"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+        ) : (
+          <Dumbbell className="h-7 w-7 text-primary" />
+        )}
+      </div>
+      {/* Name + greeting */}
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold text-white/40 uppercase tracking-widest truncate">
+          {tenantLoading ? <span className="inline-block w-24 h-3 bg-white/[0.08] rounded animate-pulse" /> : gymName}
+        </p>
+        <h1 className="text-xl font-extrabold text-white leading-tight">
+          Hey, {firstName}! 👋
+        </h1>
+      </div>
+      {/* Sparkles badge */}
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+        <Sparkles className="h-4 w-4 text-primary" />
+      </div>
     </div>
   );
+}
+
+// ─── Main Tenant Dashboard ────────────────────────────────────────────────────
+function TenantDashboard({ tenantId, firstName }: { tenantId: string; firstName: string }) {
+  const { data: tenantData, isLoading: tenantLoading } = useTenant(tenantId);
+  const { data: broadcasts, isLoading: broadcastsLoading } = useTenantBroadcasts(tenantId);
+  const [activeTab, setActiveTab] = useState<Tab>("broadcasts");
+
+  const gymName = (tenantData as TenantData | undefined)?.name ?? "Your Gym";
+
+  const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
+    { id: "broadcasts", label: "Feed", icon: Megaphone },
+    { id: "catalog", label: "Catalog", icon: Tag },
+    { id: "vouchers", label: "Vouchers", icon: ShoppingBag },
+    { id: "qr", label: "My QR", icon: QrCode },
+  ];
+
+  return (
+    <div className="space-y-5 pb-16">
+      {/* 1. Gym Header */}
+      <GymHeader
+        tenantData={tenantData as TenantData | undefined}
+        tenantLoading={tenantLoading}
+        firstName={firstName}
+      />
+
+      {/* 2. Category Tabs */}
+      <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all",
+                isActive
+                  ? "bg-primary text-white shadow-md shadow-primary/30"
+                  : "bg-white/[0.06] text-white/60 hover:bg-white/[0.1] hover:text-white"
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 3. Tab Content */}
+      {activeTab === "broadcasts" && (
+        <div className="space-y-5">
+          {/* Broadcast Carousel */}
+          <div>
+            {broadcastsLoading ? (
+              <Skeleton className="h-52 w-full rounded-2xl bg-white/[0.06]" />
+            ) : (
+              <BroadcastCarousel
+                broadcasts={broadcasts ?? []}
+                tenantName={gymName}
+              />
+            )}
+          </div>
+
+          {/* Quick Actions */}
+          <div className="grid grid-cols-2 gap-3">
+            <Link href="/portal/bookings">
+              <div className="flex flex-col gap-3 rounded-2xl bg-primary/10 border border-primary/20 p-4 hover:bg-primary/20 transition-colors">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20">
+                  <Calendar className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">Book Session</p>
+                  <p className="text-xs text-white/50">Schedule now</p>
+                </div>
+              </div>
+            </Link>
+            <Link href="/portal/packages">
+              <div className="flex flex-col gap-3 rounded-2xl bg-white/[0.04] border border-white/[0.08] p-4 hover:bg-white/[0.08] transition-colors">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.08]">
+                  <ShoppingBag className="h-5 w-5 text-white/70" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">Packages</p>
+                  <p className="text-xs text-white/50">Browse plans</p>
+                </div>
+              </div>
+            </Link>
+          </div>
+
+          {/* My Package */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-bold text-white">My Package</h2>
+              <Link href="/portal/packages" className="text-xs text-primary hover:underline flex items-center gap-1">
+                View all <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+            <MembershipSection tenantId={tenantId} />
+          </div>
+
+          {/* Training History */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-bold text-white">Training History</h2>
+            </div>
+            <TrainingSection tenantId={tenantId} />
+          </div>
+
+          {/* My Coach */}
+          <CoachSection tenantId={tenantId} />
+        </div>
+      )}
+
+      {activeTab === "catalog" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-white">Services</h2>
+              <p className="text-sm text-white/40">What {gymName} offers</p>
+            </div>
+          </div>
+          <ServiceCatalogGrid tenantId={tenantId} />
+        </div>
+      )}
+
+      {activeTab === "vouchers" && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-bold text-white">Vouchers & Promotions</h2>
+          <Link href="/portal/vouchers">
+            <div className="flex items-center justify-between rounded-2xl bg-white/[0.04] border border-white/[0.08] p-5 hover:bg-white/[0.07] transition-colors">
+              <div className="flex items-center gap-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/20">
+                  <Tag className="h-5 w-5 text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-base font-semibold text-white">My Vouchers</p>
+                  <p className="text-sm text-white/40">View your vouchers &amp; gift cards</p>
+                </div>
+              </div>
+              <ArrowRight className="h-5 w-5 text-white/30" />
+            </div>
+          </Link>
+        </div>
+      )}
+
+      {activeTab === "qr" && (
+        <div className="space-y-4">
+          <div className="text-center">
+            <h2 className="text-lg font-bold text-white">My Check-in QR</h2>
+            <p className="text-sm text-white/40 mt-1">Show this to check in at the gym</p>
+          </div>
+          <Card className="glass border-emerald-500/20 bg-emerald-500/5">
+            <CardContent className="p-8">
+              <QrSection tenantId={tenantId} />
+              {/* Member identity below QR */}
+              <div className="mt-6 text-center border-t border-white/[0.06] pt-6">
+                <p className="text-xs font-semibold uppercase tracking-widest text-white/30 mb-1">Member</p>
+                <p className="text-xl font-bold text-white">{firstName}</p>
+                <p className="text-sm text-white/40 mt-0.5">{gymName}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Page Root ────────────────────────────────────────────────────────────────
+export default function PortalHomePage() {
+  const { user } = useTimeoWebAuthContext();
+  const { tenantId } = useTenantId();
+  const firstName = user?.name?.split(" ")[0] ?? "there";
+
+  if (!tenantId) {
+    return <NoTenantOnboarding firstName={firstName} />;
+  }
+
+  return <TenantDashboard tenantId={tenantId} firstName={firstName} />;
 }
