@@ -279,36 +279,36 @@ function ViewModeSwitcher() {
             </button>
 
             <div className="space-y-3">
-              {tenants.map((tenant) => (
-                <div key={tenant.id} className="rounded-lg border border-white/[0.06] p-3">
-                  <p className="text-sm font-medium text-white">{tenant.name}</p>
-                  {tenant.slug && <p className="mb-2 text-xs text-white/40">@{tenant.slug}</p>}
-                  <div className="grid grid-cols-4 gap-2">
-                    {(["Admin", "Staff", "Coach", "Member"] as const).map((roleLabel) => {
-                      const isActive = viewMode === "tenant" && activeTenant?.id === tenant.id && roleLabel === "Admin";
-                      return (
-                        <button
-                          key={roleLabel}
-                          onClick={() => {
-                            switchTenant(tenant.id);
-                            setViewMode("tenant");
-                            router.push("/dashboard");
-                            setOpen(false);
-                          }}
-                          className={cn(
-                            "rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors",
-                            isActive
-                              ? "border-primary/30 bg-primary/10 text-primary"
-                              : "border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
-                          )}
-                        >
-                          {roleLabel}
-                        </button>
-                      );
-                    })}
+              {tenants.map((tenant) => {
+                const roleLabel = tenant.role === "customer"
+                  ? "Member"
+                  : tenant.role.charAt(0).toUpperCase() + tenant.role.slice(1);
+                const isActive = viewMode === "tenant" && activeTenant?.id === tenant.id;
+                const targetHref = tenant.role === "customer" ? "/portal" : "/dashboard";
+
+                return (
+                  <div key={tenant.id} className="rounded-lg border border-white/[0.06] p-3">
+                    <p className="text-sm font-medium text-white">{tenant.name}</p>
+                    {tenant.slug && <p className="mb-2 text-xs text-white/40">@{tenant.slug}</p>}
+                    <button
+                      onClick={() => {
+                        switchTenant(tenant.id);
+                        setViewMode("tenant");
+                        router.push(targetHref);
+                        setOpen(false);
+                      }}
+                      className={cn(
+                        "rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
+                        isActive
+                          ? "border-primary/30 bg-primary/10 text-primary"
+                          : "border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
+                      )}
+                    >
+                      {roleLabel}
+                    </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </>
