@@ -26,9 +26,187 @@ import { eq, and } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
 import { success, error } from "../lib/response.js";
 import * as AccessControl from "../services/access-control.service.js";
+import type { FaceCapturePayload } from "../services/access-control.service.js";
 
 const app = new Hono();
 const QR_SECRET = process.env.QR_TOKEN_SECRET ?? "timeo-qr-secret-change-me";
+
+function sanitizeRawData(
+  payload: FaceCapturePayload,
+): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = { ...payload };
+
+  if (sanitized.overall_pic) {
+    sanitized.overall_pic = { flag: true, data: "[stripped]" };
+  }
+
+  if (sanitized.closeup_pic) {
+    sanitized.closeup_pic = { flag: true, data: "[stripped]" };
+  }
+
+  if (sanitized.match && typeof sanitized.match === "object") {
+    sanitized.match = {
+      ...sanitized.match,
+      image: sanitized.match.image ? "[stripped]" : undefined,
+    };
+  }
+
+  return sanitized;
+}
+
+// ─── Legacy face capture endpoint for old turnstile HTTP upload ───────────
+// POST /api/gate/face-capture
+// Older device configs push here without a tenant slug in the path.
+// We derive the tenant from the device serial number so existing hardware keeps working.
+app.post("/face-capture", async (c) => {
+  let payload: FaceCapturePayload;
+  try {
+    payload = await c.req.json();
+  } catch {
+    return c.json({ reply: "ACK", cmd: "face", code: 0 });
+  }
+
+  if (payload.cmd !== "face") {
+    return c.json({ reply: "ACK", cmd: payload.cmd ?? "unknown", code: 0 });
+  }
+
+  const sequenceNo = payload.sequence_no ?? 0;
+  const capTime = payload.cap_time ?? "";
+  const deviceSn = payload.device_sn ?? "";
+  const matchResult = payload.match_result ?? 0;
+
+  const device = await AccessControl.findDeviceBySerialNumber(deviceSn);
+
+  if (!device) {
+    return c.json(
+      AccessControl.buildDeviceResponse({
+        allowed: false,
+        sequenceNo,
+        capTime,
+        personId: null,
+        memberName: null,
+        denyReason: "unknown_device",
+      }),
+    );
+  }
+
+  const tenantId = device.tenant_id;
+
+  if (matchResult <= 0) {
+    await AccessControl.logAccessAttempt({
+      tenantId,
+      deviceSn,
+      userId: null,
+      personIdFromDevice: null,
+      matchScore: matchResult,
+      matchResult: "stranger",
+      denyReason: "face_not_recognized",
+      sequenceNo,
+      capTime,
+      rawData: sanitizeRawData(payload),
+    });
+
+    return c.json(
+      AccessControl.buildDeviceResponse({
+        allowed: false,
+        sequenceNo,
+        capTime,
+        personId: null,
+        memberName: null,
+        denyReason: "face_not_recognized",
+      }),
+    );
+  }
+
+  const devicePersonId = payload.match?.person_id ?? "";
+  const devicePersonName = payload.match?.person_name ?? "";
+
+  const registration = await AccessControl.findFaceRegistration(
+    deviceSn,
+    devicePersonId,
+  );
+
+  if (!registration) {
+    await AccessControl.logAccessAttempt({
+      tenantId,
+      deviceSn,
+      userId: null,
+      personIdFromDevice: devicePersonId,
+      matchScore: matchResult,
+      matchResult: "denied",
+      denyReason: "registration_not_found",
+      sequenceNo,
+      capTime,
+      rawData: sanitizeRawData(payload),
+    });
+
+    return c.json(
+      AccessControl.buildDeviceResponse({
+        allowed: false,
+        sequenceNo,
+        capTime,
+        personId: devicePersonId,
+        memberName: devicePersonName,
+        denyReason: "registration_not_found",
+      }),
+    );
+  }
+
+  const userId = registration.faceReg.user_id;
+  const memberName = registration.userName ?? devicePersonName;
+  const validation = await AccessControl.validateMemberAccess(tenantId, userId);
+
+  if (!validation.allowed) {
+    await AccessControl.logAccessAttempt({
+      tenantId,
+      deviceSn,
+      userId,
+      personIdFromDevice: devicePersonId,
+      matchScore: matchResult,
+      matchResult: "denied",
+      denyReason: validation.reason,
+      sequenceNo,
+      capTime,
+      rawData: sanitizeRawData(payload),
+    });
+
+    return c.json(
+      AccessControl.buildDeviceResponse({
+        allowed: false,
+        sequenceNo,
+        capTime,
+        personId: devicePersonId,
+        memberName,
+        denyReason: validation.reason,
+      }),
+    );
+  }
+
+  await AccessControl.logAccessAttempt({
+    tenantId,
+    deviceSn,
+    userId,
+    personIdFromDevice: devicePersonId,
+    matchScore: matchResult,
+    matchResult: "allowed",
+    denyReason: null,
+    sequenceNo,
+    capTime,
+    rawData: sanitizeRawData(payload),
+  });
+
+  await AccessControl.createFaceCheckIn(tenantId, userId);
+
+  return c.json(
+    AccessControl.buildDeviceResponse({
+      allowed: true,
+      sequenceNo,
+      capTime,
+      personId: devicePersonId,
+      memberName,
+    }),
+  );
+});
 
 // ─── Permanent QR helpers ────────────────────────────────────────────────────
 
