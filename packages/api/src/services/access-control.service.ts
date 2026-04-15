@@ -146,6 +146,9 @@ export async function validateMemberAccess(
     };
   }
 
+  // Staff / coach / admin access should not depend on customer subscriptions.
+  const requiresSubscription = membership.role === "customer";
+
   // 2. Get user name
   const [user] = await db
     .select({ name: users.name })
@@ -154,6 +157,15 @@ export async function validateMemberAccess(
     .limit(1);
 
   const memberName = user?.name ?? "Member";
+
+  if (!requiresSubscription) {
+    return {
+      allowed: true,
+      reason: "ok",
+      memberName,
+      userId,
+    };
+  }
 
   // 3. Check active subscription (if gym uses subscriptions)
   const now = new Date();
