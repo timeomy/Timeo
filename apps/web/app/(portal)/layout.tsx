@@ -67,6 +67,7 @@ export default function PortalLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const hasBusinessMembership = hasNonCustomerTenant(tenants);
+  const shouldRedirectToDashboard = hasBusinessMembership && activeRole !== "customer";
 
   const displayName = user?.name || user?.email || "User";
 
@@ -97,11 +98,12 @@ export default function PortalLayout({
       return;
     }
 
-    // Staff/admin with any business membership go to business dashboard.
-    if (hasBusinessMembership) {
+    // Only redirect to dashboard when the current effective role is staff-like.
+    // Platform admins viewing as Member must be allowed to stay in the portal.
+    if (shouldRedirectToDashboard) {
       router.replace("/dashboard");
     }
-  }, [isLoaded, tenantsLoading, isSignedIn, activeRole, hasBusinessMembership, router]);
+  }, [isLoaded, tenantsLoading, isSignedIn, activeRole, shouldRedirectToDashboard, router]);
 
   // Loading state
   if (!isLoaded || tenantsLoading) {
@@ -117,8 +119,8 @@ export default function PortalLayout({
     );
   }
 
-  // Show loading while redirecting (staff/admin go to dashboard, platform admin to C2)
-  if (!isSignedIn || hasBusinessMembership) {
+  // Show loading while redirecting (staff-like roles go to dashboard, platform admin to C2)
+  if (!isSignedIn || shouldRedirectToDashboard || activeRole === "platform_admin") {
     return null;
   }
 
