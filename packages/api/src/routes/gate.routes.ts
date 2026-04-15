@@ -45,9 +45,10 @@ function sanitizeRawData(
   }
 
   if (sanitized.match && typeof sanitized.match === "object") {
+    const matchObj = sanitized.match as Record<string, unknown>;
     sanitized.match = {
-      ...sanitized.match,
-      image: sanitized.match.image ? "[stripped]" : undefined,
+      ...matchObj,
+      image: matchObj.image ? "[stripped]" : undefined,
     };
   }
 
