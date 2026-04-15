@@ -10,7 +10,7 @@ import {
   auditLogs,
 } from "@timeo/db/schema";
 import { generateId } from "@timeo/db";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, desc } from "drizzle-orm";
 import { emitToTenant } from "../realtime/socket.js";
 import { SocketEvents } from "../realtime/events.js";
 
@@ -21,6 +21,10 @@ export interface AccessValidationResult {
   reason: string;
   memberName: string | null;
   userId: string | null;
+  role?: string | null;
+  expiresAt?: Date | null;
+  statusText?: string | null;
+  voiceText?: string | null;
 }
 
 export interface FaceCapturePayload {
@@ -103,6 +107,15 @@ export async function findFaceRegistration(
 
 // ─── Membership Validation ──────────────────────────────────────────────────
 
+function formatExpiryDate(date: Date | null | undefined): string | null {
+  if (!date) return null;
+
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export async function validateMemberAccess(
   tenantId: string,
   userId: string,
@@ -125,6 +138,10 @@ export async function validateMemberAccess(
       reason: "not_found",
       memberName: null,
       userId,
+      role: null,
+      expiresAt: null,
+      statusText: "Member not found",
+      voiceText: "Access denied",
     };
   }
 
@@ -134,6 +151,10 @@ export async function validateMemberAccess(
       reason: "membership_suspended",
       memberName: null,
       userId,
+      role: membership.role,
+      expiresAt: null,
+      statusText: "Membership suspended",
+      voiceText: "Membership suspended",
     };
   }
 
@@ -143,6 +164,10 @@ export async function validateMemberAccess(
       reason: "membership_inactive",
       memberName: null,
       userId,
+      role: membership.role,
+      expiresAt: null,
+      statusText: "Membership inactive",
+      voiceText: "Access denied",
     };
   }
 
@@ -159,11 +184,23 @@ export async function validateMemberAccess(
   const memberName = user?.name ?? "Member";
 
   if (!requiresSubscription) {
+    const roleLabel = membership.role === "admin"
+      ? "Admin access"
+      : membership.role === "staff"
+        ? "Staff access"
+        : membership.role === "coach"
+          ? "Coach access"
+          : "Member active";
+
     return {
       allowed: true,
       reason: "ok",
       memberName,
       userId,
+      role: membership.role,
+      expiresAt: null,
+      statusText: roleLabel,
+      voiceText: `Welcome, ${memberName}`,
     };
   }
 
@@ -197,19 +234,49 @@ export async function validateMemberAccess(
     .limit(1);
 
   if (anySub && !activeSub) {
+    const latestSub = await db
+      .select({ currentPeriodEnd: subscriptions.current_period_end })
+      .from(subscriptions)
+      .where(
+        and(
+          eq(subscriptions.tenant_id, tenantId),
+          eq(subscriptions.customer_id, userId),
+        ),
+      )
+      .orderBy(desc(subscriptions.current_period_end))
+      .limit(1);
+
+    const expiredAt = latestSub[0]?.currentPeriodEnd ?? null;
+    const formattedExpiry = formatExpiryDate(expiredAt);
+
     return {
       allowed: false,
       reason: "subscription_expired",
       memberName,
       userId,
+      role: membership.role,
+      expiresAt: expiredAt,
+      statusText: formattedExpiry
+        ? `Expired ${formattedExpiry}`
+        : "Membership expired",
+      voiceText: "Membership expired",
     };
   }
+
+  const activeExpiry = activeSub?.current_period_end ?? null;
+  const formattedActiveExpiry = formatExpiryDate(activeExpiry);
 
   return {
     allowed: true,
     reason: "ok",
     memberName,
     userId,
+    role: membership.role,
+    expiresAt: activeExpiry,
+    statusText: formattedActiveExpiry
+      ? `Active until ${formattedActiveExpiry}`
+      : "Member active",
+    voiceText: `Welcome, ${memberName}`,
   };
 }
 
@@ -295,6 +362,8 @@ export function buildDeviceResponse(input: {
   personId: string | null;
   memberName: string | null;
   denyReason?: string;
+  statusText?: string | null;
+  voiceText?: string | null;
 }) {
   const response: Record<string, unknown> = {
     reply: "ACK",
@@ -316,35 +385,46 @@ export function buildDeviceResponse(input: {
     // Welcome voice
     const displayName = input.memberName ?? "Member";
     response.tts = {
-      text: `Welcome, ${displayName}`,
+      text: input.voiceText ?? `Welcome, ${displayName}`,
     };
+
+    const statusText = input.statusText?.trim();
+    const displayText = statusText
+      ? `${displayName}\n${statusText}`
+      : `Welcome ${displayName}`;
 
     // Screen text
     response.text_display = {
       position: { x: 0, y: 500 },
-      alive_time: 2000,
-      font_size: 80,
+      alive_time: 3500,
+      font_size: statusText ? 58 : 80,
       font_spacing: 1,
       font_color: "0xff00ff00", // green
-      text: `Welcome ${displayName}`,
+      text: displayText,
     };
   } else {
     // Deny — no gateway_ctrl means gate stays closed
     const denyText =
-      input.denyReason === "subscription_expired"
+      input.statusText ??
+      (input.denyReason === "subscription_expired"
         ? "Membership expired"
         : input.denyReason === "membership_suspended"
           ? "Membership suspended"
-          : "Access denied";
+          : "Access denied");
 
-    response.tts = { text: denyText };
+    const displayName = input.memberName?.trim();
+    const displayText = displayName
+      ? `${displayName}\n${denyText}`
+      : denyText;
+
+    response.tts = { text: input.voiceText ?? denyText };
     response.text_display = {
       position: { x: 0, y: 500 },
-      alive_time: 2000,
-      font_size: 80,
+      alive_time: 3500,
+      font_size: displayName ? 58 : 80,
       font_spacing: 1,
       font_color: "0xffff0000", // red
-      text: denyText,
+      text: displayText,
     };
   }
 

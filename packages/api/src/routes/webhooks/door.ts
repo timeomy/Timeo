@@ -181,6 +181,8 @@ app.post("/:tenantSlug/face-capture", async (c) => {
         personId: devicePersonId,
         memberName,
         denyReason: validation.reason,
+        statusText: validation.statusText,
+        voiceText: validation.voiceText,
       }),
     );
   }
@@ -209,6 +211,8 @@ app.post("/:tenantSlug/face-capture", async (c) => {
       capTime,
       personId: devicePersonId,
       memberName,
+      statusText: validation.statusText,
+      voiceText: validation.voiceText,
     }),
   );
 });
